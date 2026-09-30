@@ -6,7 +6,7 @@ const path = require('path');
 const dir = path.resolve(__dirname);
 const remote = 'https://github.com/mandanrohithkumar/msncommunications-website.git';
 const username = 'mandanrohithkumar';
-const token = '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';
+const token = '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';
 
 const onAuth = () => ({ username, password: token });
 
