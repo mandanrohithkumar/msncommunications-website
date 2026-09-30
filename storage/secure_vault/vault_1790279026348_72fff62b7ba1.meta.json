@@ -1,0 +1,28 @@
+{
+  "fileId": "vault_1790279026348_72fff62b7ba1",
+  "userId": "google-1790279017430",
+  "fileName": "ration_card.xml",
+  "docName": "Ration card",
+  "categoryName": "Family, Civil & Status",
+  "fileSizeBytes": 1989,
+  "mimeType": "application/xml",
+  "encryptedFilePath": "C:\\Users\\MALLEPAKULA KAVERI\\OneDrive\\Desktop(1)\\kumar\\kumar\\storage\\secure_vault\\vault_1790279026348_72fff62b7ba1.enc",
+  "sha256Hash": "23452ea1e125b0f80b4a25c1bc8f796adb07db2b10495609c81f8ed62e16be63",
+  "uploadedAt": "2026-09-24T19:43:46.355Z",
+  "verificationStatus": "verified",
+  "digilockerMeta": {
+    "uri": "in.gov.telangana.epds-RATIN-WAD1928374",
+    "issuer": "Consumer Affairs, Food & Civil Supplies Dept, Telangana",
+    "issuerId": "in.gov.telangana.epds",
+    "issueDate": "2019-06-25",
+    "verificationStatus": "verified",
+    "verifiedAt": "2026-09-24T19:43:46.346Z",
+    "digilockerDocType": "RATIN",
+    "certThumbprint": "2C7B59F8066437DA4FB4BBDB419E0684EB432AE3E6C2F03FD870DAFD993D3A1D",
+    "signatureAlgorithm": "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256",
+    "isXmlDSigValid": true,
+    "tamperProofHash": "2C7B59F8066437DA4FB4BBDB419E0684EB432AE3E6C2F03FD870DAFD993D3A1D",
+    "isEncryptedAtRest": true,
+    "maskedId": "WAD192****4"
+  }
+}

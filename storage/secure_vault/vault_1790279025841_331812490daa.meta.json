@@ -1,0 +1,28 @@
+{
+  "fileId": "vault_1790279025841_331812490daa",
+  "userId": "google-1790279017430",
+  "fileName": "driving_licence.pdf",
+  "docName": "Driving licence",
+  "categoryName": "Identity & Personal Documents",
+  "fileSizeBytes": 1041,
+  "mimeType": "application/pdf",
+  "encryptedFilePath": "C:\\Users\\MALLEPAKULA KAVERI\\OneDrive\\Desktop(1)\\kumar\\kumar\\storage\\secure_vault\\vault_1790279025841_331812490daa.enc",
+  "sha256Hash": "4edd99bbee32e6db187f5728d2a5f3bd8607285da8f12d14ae0cbc0a3ea9e438",
+  "uploadedAt": "2026-09-24T19:43:45.876Z",
+  "verificationStatus": "verified",
+  "digilockerMeta": {
+    "uri": "in.gov.morth-DRVLC-TS0920190012345",
+    "issuer": "Ministry of Road Transport and Highways (MoRTH)",
+    "issuerId": "in.gov.morth",
+    "issueDate": "2019-11-04",
+    "verificationStatus": "verified",
+    "verifiedAt": "2026-09-24T19:43:45.833Z",
+    "digilockerDocType": "DRVLC",
+    "certThumbprint": "4EDD99BBEE32E6DB187F5728D2A5F3BD",
+    "signatureAlgorithm": "PKCS#7 / CMS (SHA256withRSA)",
+    "isXmlDSigValid": true,
+    "tamperProofHash": "4EDD99BBEE32E6DB187F5728D2A5F3BD",
+    "isEncryptedAtRest": true,
+    "maskedId": "TS-09-2019-****345"
+  }
+}

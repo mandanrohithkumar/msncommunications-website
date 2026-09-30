@@ -1,0 +1,28 @@
+{
+  "fileId": "vault_1790279026522_059ebfc0be3c",
+  "userId": "google-1790279017430",
+  "fileName": "class_x_marksheet.pdf",
+  "docName": "Class X Marksheet",
+  "categoryName": "Academic & Education",
+  "fileSizeBytes": 1028,
+  "mimeType": "application/pdf",
+  "encryptedFilePath": "C:\\Users\\MALLEPAKULA KAVERI\\OneDrive\\Desktop(1)\\kumar\\kumar\\storage\\secure_vault\\vault_1790279026522_059ebfc0be3c.enc",
+  "sha256Hash": "137614362bd6b587c6b09f5be86f50230c31e8eb65f08590c3b9f15637196635",
+  "uploadedAt": "2026-09-24T19:43:46.532Z",
+  "verificationStatus": "verified",
+  "digilockerMeta": {
+    "uri": "in.gov.cbse-SSCER-2012-9182736",
+    "issuer": "Central Board of Secondary Education (CBSE)",
+    "issuerId": "in.gov.cbse",
+    "issueDate": "2012-05-24",
+    "verificationStatus": "verified",
+    "verifiedAt": "2026-09-24T19:43:46.519Z",
+    "digilockerDocType": "SSCER",
+    "certThumbprint": "137614362BD6B587C6B09F5BE86F5023",
+    "signatureAlgorithm": "PKCS#7 / CMS (SHA256withRSA)",
+    "isXmlDSigValid": true,
+    "tamperProofHash": "137614362BD6B587C6B09F5BE86F5023",
+    "isEncryptedAtRest": true,
+    "maskedId": "ROLL-918****6"
+  }
+}

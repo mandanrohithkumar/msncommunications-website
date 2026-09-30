@@ -1,0 +1,28 @@
+{
+  "fileId": "vault_1790279026070_f36688fbea3a",
+  "userId": "google-1790279017430",
+  "fileName": "vehicle_registration_certificate__rc_.pdf",
+  "docName": "Vehicle Registration certificate (RC)",
+  "categoryName": "Vehicles & Travel",
+  "fileSizeBytes": 1038,
+  "mimeType": "application/pdf",
+  "encryptedFilePath": "C:\\Users\\MALLEPAKULA KAVERI\\OneDrive\\Desktop(1)\\kumar\\kumar\\storage\\secure_vault\\vault_1790279026070_f36688fbea3a.enc",
+  "sha256Hash": "ae546a34db913e3b94c34d9ee780a96c8efe8ff55daf0882a607ed28866b02b2",
+  "uploadedAt": "2026-09-24T19:43:46.079Z",
+  "verificationStatus": "verified",
+  "digilockerMeta": {
+    "uri": "in.gov.morth-VRRCO-TS08EA1234",
+    "issuer": "Telangana Transport Department",
+    "issuerId": "in.gov.morth",
+    "issueDate": "2021-02-14",
+    "verificationStatus": "verified",
+    "verifiedAt": "2026-09-24T19:43:46.068Z",
+    "digilockerDocType": "VRRCO",
+    "certThumbprint": "AE546A34DB913E3B94C34D9EE780A96C",
+    "signatureAlgorithm": "PKCS#7 / CMS (SHA256withRSA)",
+    "isXmlDSigValid": true,
+    "tamperProofHash": "AE546A34DB913E3B94C34D9EE780A96C",
+    "isEncryptedAtRest": true,
+    "maskedId": "TS08EA****"
+  }
+}

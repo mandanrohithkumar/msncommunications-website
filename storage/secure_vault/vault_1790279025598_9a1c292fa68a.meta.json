@@ -1,0 +1,28 @@
+{
+  "fileId": "vault_1790279025598_9a1c292fa68a",
+  "userId": "google-1790279017430",
+  "fileName": "pan_card.xml",
+  "docName": "Pan Card",
+  "categoryName": "Identity & Personal Documents",
+  "fileSizeBytes": 1946,
+  "mimeType": "application/xml",
+  "encryptedFilePath": "C:\\Users\\MALLEPAKULA KAVERI\\OneDrive\\Desktop(1)\\kumar\\kumar\\storage\\secure_vault\\vault_1790279025598_9a1c292fa68a.enc",
+  "sha256Hash": "b35f3bc789549d2c33aef744841af05e505bf93e743b948c59f710dec0d643bd",
+  "uploadedAt": "2026-09-24T19:43:45.616Z",
+  "verificationStatus": "verified",
+  "digilockerMeta": {
+    "uri": "in.gov.incometax-PANCR-ABCPM1234K",
+    "issuer": "Income Tax Department (Protean / NSDL)",
+    "issuerId": "in.gov.incometax",
+    "issueDate": "2020-09-18",
+    "verificationStatus": "verified",
+    "verifiedAt": "2026-09-24T19:43:45.596Z",
+    "digilockerDocType": "PANCR",
+    "certThumbprint": "2C7B59F8066437DA4FB4BBDB419E0684EB432AE3E6C2F03FD870DAFD993D3A1D",
+    "signatureAlgorithm": "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256",
+    "isXmlDSigValid": true,
+    "tamperProofHash": "2C7B59F8066437DA4FB4BBDB419E0684EB432AE3E6C2F03FD870DAFD993D3A1D",
+    "isEncryptedAtRest": true,
+    "maskedId": "ABCPM****K"
+  }
+}

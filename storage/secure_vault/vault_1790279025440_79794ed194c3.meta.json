@@ -1,0 +1,28 @@
+{
+  "fileId": "vault_1790279025440_79794ed194c3",
+  "userId": "google-1790279017430",
+  "fileName": "aadhaar_card.xml",
+  "docName": "Aadhaar Card",
+  "categoryName": "Identity & Personal Documents",
+  "fileSizeBytes": 1968,
+  "mimeType": "application/xml",
+  "encryptedFilePath": "C:\\Users\\MALLEPAKULA KAVERI\\OneDrive\\Desktop(1)\\kumar\\kumar\\storage\\secure_vault\\vault_1790279025440_79794ed194c3.enc",
+  "sha256Hash": "cc6752a7b109aefbda48304bd106a108e833d8b3431d3fc99773bd2427bc80fb",
+  "uploadedAt": "2026-09-24T19:43:45.462Z",
+  "verificationStatus": "verified",
+  "digilockerMeta": {
+    "uri": "in.gov.uidai-ADHAR-0019283746",
+    "issuer": "Unique Identification Authority of India (UIDAI)",
+    "issuerId": "in.gov.uidai",
+    "issueDate": "2018-04-12",
+    "verificationStatus": "verified",
+    "verifiedAt": "2026-09-24T19:43:45.437Z",
+    "digilockerDocType": "ADHAR",
+    "certThumbprint": "2C7B59F8066437DA4FB4BBDB419E0684EB432AE3E6C2F03FD870DAFD993D3A1D",
+    "signatureAlgorithm": "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256",
+    "isXmlDSigValid": true,
+    "tamperProofHash": "2C7B59F8066437DA4FB4BBDB419E0684EB432AE3E6C2F03FD870DAFD993D3A1D",
+    "isEncryptedAtRest": true,
+    "maskedId": "XXXXXXXX9421"
+  }
+}

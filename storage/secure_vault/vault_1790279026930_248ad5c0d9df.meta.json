@@ -1,0 +1,28 @@
+{
+  "fileId": "vault_1790279026930_248ad5c0d9df",
+  "userId": "google-1790279017430",
+  "fileName": "income_certificate.xml",
+  "docName": "Income Certificate",
+  "categoryName": "Certificates",
+  "fileSizeBytes": 1967,
+  "mimeType": "application/xml",
+  "encryptedFilePath": "C:\\Users\\MALLEPAKULA KAVERI\\OneDrive\\Desktop(1)\\kumar\\kumar\\storage\\secure_vault\\vault_1790279026930_248ad5c0d9df.enc",
+  "sha256Hash": "7317200304fd746dbb3622b15c392dd3bd41f644ccbfc8857d918994fb9ad917",
+  "uploadedAt": "2026-09-24T19:43:46.942Z",
+  "verificationStatus": "verified",
+  "digilockerMeta": {
+    "uri": "in.gov.telangana.meeseva-INCMC-INC2022837",
+    "issuer": "Revenue Department - MeeSeva Telangana",
+    "issuerId": "in.gov.telangana.meeseva",
+    "issueDate": "2022-03-15",
+    "verificationStatus": "verified",
+    "verifiedAt": "2026-09-24T19:43:46.928Z",
+    "digilockerDocType": "INCMC",
+    "certThumbprint": "2C7B59F8066437DA4FB4BBDB419E0684EB432AE3E6C2F03FD870DAFD993D3A1D",
+    "signatureAlgorithm": "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256",
+    "isXmlDSigValid": true,
+    "tamperProofHash": "2C7B59F8066437DA4FB4BBDB419E0684EB432AE3E6C2F03FD870DAFD993D3A1D",
+    "isEncryptedAtRest": true,
+    "maskedId": "INC/2022/****"
+  }
+}

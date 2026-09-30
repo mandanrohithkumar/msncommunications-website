@@ -1,0 +1,28 @@
+{
+  "fileId": "vault_1790279027180_514529e2ebe8",
+  "userId": "google-1790279017430",
+  "fileName": "birth_certificate.pdf",
+  "docName": "Birth Certificate",
+  "categoryName": "Family, Civil & Status",
+  "fileSizeBytes": 1045,
+  "mimeType": "application/pdf",
+  "encryptedFilePath": "C:\\Users\\MALLEPAKULA KAVERI\\OneDrive\\Desktop(1)\\kumar\\kumar\\storage\\secure_vault\\vault_1790279027180_514529e2ebe8.enc",
+  "sha256Hash": "ec3bd1dc905f7ec16d247427d3c60ff6573b106748140903007e923dc7a4d548",
+  "uploadedAt": "2026-09-24T19:43:47.193Z",
+  "verificationStatus": "verified",
+  "digilockerMeta": {
+    "uri": "in.gov.telangana.ghmc-BRTHC-B2023001928",
+    "issuer": "Greater Hyderabad Municipal Corporation (GHMC)",
+    "issuerId": "in.gov.telangana.ghmc",
+    "issueDate": "2023-01-11",
+    "verificationStatus": "verified",
+    "verifiedAt": "2026-09-24T19:43:47.175Z",
+    "digilockerDocType": "BRTHC",
+    "certThumbprint": "EC3BD1DC905F7EC16D247427D3C60FF6",
+    "signatureAlgorithm": "PKCS#7 / CMS (SHA256withRSA)",
+    "isXmlDSigValid": true,
+    "tamperProofHash": "EC3BD1DC905F7EC16D247427D3C60FF6",
+    "isEncryptedAtRest": true,
+    "maskedId": "REG-2023-****28"
+  }
+}
