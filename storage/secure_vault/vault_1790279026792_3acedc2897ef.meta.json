@@ -1,0 +1,28 @@
+{
+  "fileId": "vault_1790279026792_3acedc2897ef",
+  "userId": "google-1790279017430",
+  "fileName": "caste_certificate.xml",
+  "docName": "Caste Certificate",
+  "categoryName": "Certificates",
+  "fileSizeBytes": 1966,
+  "mimeType": "application/xml",
+  "encryptedFilePath": "C:\\Users\\MALLEPAKULA KAVERI\\OneDrive\\Desktop(1)\\kumar\\kumar\\storage\\secure_vault\\vault_1790279026792_3acedc2897ef.enc",
+  "sha256Hash": "d51b55a9163ffb7be576d2cb63e9eab3bc64afe80bb7e81e4be3046cfd733aee",
+  "uploadedAt": "2026-09-24T19:43:46.804Z",
+  "verificationStatus": "verified",
+  "digilockerMeta": {
+    "uri": "in.gov.telangana.meeseva-CASTC-CST2021948",
+    "issuer": "Revenue Department - MeeSeva Telangana",
+    "issuerId": "in.gov.telangana.meeseva",
+    "issueDate": "2021-08-10",
+    "verificationStatus": "verified",
+    "verifiedAt": "2026-09-24T19:43:46.789Z",
+    "digilockerDocType": "CASTC",
+    "certThumbprint": "2C7B59F8066437DA4FB4BBDB419E0684EB432AE3E6C2F03FD870DAFD993D3A1D",
+    "signatureAlgorithm": "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256",
+    "isXmlDSigValid": true,
+    "tamperProofHash": "2C7B59F8066437DA4FB4BBDB419E0684EB432AE3E6C2F03FD870DAFD993D3A1D",
+    "isEncryptedAtRest": true,
+    "maskedId": "CST/2021/****"
+  }
+}

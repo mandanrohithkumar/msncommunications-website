@@ -1,0 +1,28 @@
+{
+  "fileId": "vault_1790279027052_62e245e0b822",
+  "userId": "google-1790279017430",
+  "fileName": "residence_certificate.xml",
+  "docName": "Residence Certificate",
+  "categoryName": "Certificates",
+  "fileSizeBytes": 1970,
+  "mimeType": "application/xml",
+  "encryptedFilePath": "C:\\Users\\MALLEPAKULA KAVERI\\OneDrive\\Desktop(1)\\kumar\\kumar\\storage\\secure_vault\\vault_1790279027052_62e245e0b822.enc",
+  "sha256Hash": "c8ca5871a643b3f52718e18712a99c4d49ad0a991e6da54ef17689abdc7fd8f9",
+  "uploadedAt": "2026-09-24T19:43:47.065Z",
+  "verificationStatus": "verified",
+  "digilockerMeta": {
+    "uri": "in.gov.telangana.meeseva-RESDC-RES2022102",
+    "issuer": "Revenue Department - MeeSeva Telangana",
+    "issuerId": "in.gov.telangana.meeseva",
+    "issueDate": "2022-07-22",
+    "verificationStatus": "verified",
+    "verifiedAt": "2026-09-24T19:43:47.047Z",
+    "digilockerDocType": "RESDC",
+    "certThumbprint": "2C7B59F8066437DA4FB4BBDB419E0684EB432AE3E6C2F03FD870DAFD993D3A1D",
+    "signatureAlgorithm": "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256",
+    "isXmlDSigValid": true,
+    "tamperProofHash": "2C7B59F8066437DA4FB4BBDB419E0684EB432AE3E6C2F03FD870DAFD993D3A1D",
+    "isEncryptedAtRest": true,
+    "maskedId": "RES/2022/****"
+  }
+}

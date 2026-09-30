@@ -1,0 +1,28 @@
+{
+  "fileId": "vault_1790279027305_b8d384405872",
+  "userId": "google-1790279017430",
+  "fileName": "death_certificate.pdf",
+  "docName": "Death Certificate",
+  "categoryName": "Family, Civil & Status",
+  "fileSizeBytes": 1045,
+  "mimeType": "application/pdf",
+  "encryptedFilePath": "C:\\Users\\MALLEPAKULA KAVERI\\OneDrive\\Desktop(1)\\kumar\\kumar\\storage\\secure_vault\\vault_1790279027305_b8d384405872.enc",
+  "sha256Hash": "fd3100995ce75284ed2a458186f7d8526b8dce4f55866c1e4201aec0a7065adb",
+  "uploadedAt": "2026-09-24T19:43:47.313Z",
+  "verificationStatus": "verified",
+  "digilockerMeta": {
+    "uri": "in.gov.telangana.ghmc-DETHC-D2024009182",
+    "issuer": "Greater Hyderabad Municipal Corporation (GHMC)",
+    "issuerId": "in.gov.telangana.ghmc",
+    "issueDate": "2024-04-19",
+    "verificationStatus": "verified",
+    "verifiedAt": "2026-09-24T19:43:47.301Z",
+    "digilockerDocType": "DETHC",
+    "certThumbprint": "FD3100995CE75284ED2A458186F7D852",
+    "signatureAlgorithm": "PKCS#7 / CMS (SHA256withRSA)",
+    "isXmlDSigValid": true,
+    "tamperProofHash": "FD3100995CE75284ED2A458186F7D852",
+    "isEncryptedAtRest": true,
+    "maskedId": "REG-2024-****82"
+  }
+}
