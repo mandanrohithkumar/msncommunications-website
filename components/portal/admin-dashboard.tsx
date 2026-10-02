@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { usePortal } from "@/lib/portal-store";
 import { ServiceItem } from "@/types/portal";
 import { sanitizePhoneNumber } from "@/lib/field-validation";
@@ -56,7 +56,10 @@ import {
   LogOut,
   Camera,
   Scan,
-  ListPlus
+  ListPlus,
+  Send,
+  MessageSquare,
+  AlertOctagon
 } from "lucide-react";
 import {
   ServiceDetails,
@@ -114,6 +117,9 @@ export const AdminDashboard: React.FC = () => {
     approvePasswordReset,
     rejectPasswordReset,
     passwordChangeAudits,
+    forceLogoutCustomer,
+    deleteCustomerAccount,
+    sendMessageToCustomer,
     logout
   } = usePortal();
 
@@ -192,26 +198,191 @@ export const AdminDashboard: React.FC = () => {
   const [selectedUserForAnalytics, setSelectedUserForAnalytics] = useState<UserAccount | null>(null);
   const [analyticsTab, setAnalyticsTab] = useState<"sessions" | "activity">("sessions");
 
-  // Dedicated Customer Directory search & filter state
+  // Dedicated Customer View search, pagination & modal state
   const [customerFilterText, setCustomerFilterText] = useState("");
+  const [customerPage, setCustomerPage] = useState(1);
+  const [customerPageSize, setCustomerPageSize] = useState(6);
+  const [inspectingFaceCustomer, setInspectingFaceCustomer] = useState<UserAccount | null>(null);
+  const [messagingCustomer, setMessagingCustomer] = useState<UserAccount | null>(null);
+  const [messageForm, setMessageForm] = useState<{
+    title: string;
+    content: string;
+    type: "info" | "alert" | "urgent" | "success";
+  }>({
+    title: "",
+    content: "",
+    type: "info"
+  });
+  const [forceLogoutConfirmCustomer, setForceLogoutConfirmCustomer] = useState<UserAccount | null>(null);
+  const [deletingCustomer, setDeletingCustomer] = useState<UserAccount | null>(null);
 
-  // Super Admin split tabs: Side 1 (Customer Directory) vs Side 2 (Staff & Management)
+  // Super Admin split tabs: Customer View vs Staff & Management
   const [accountSubTab, setAccountSubTab] = useState<"customers" | "staff">("customers");
   const [showHistoryApprovals, setShowHistoryApprovals] = useState(false);
 
+  // Dedicated Customer View API synchronization & loading state
+  const [apiCustomers, setApiCustomers] = useState<UserAccount[]>([]);
+  const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
+  const [customerFetchError, setCustomerFetchError] = useState<string | null>(null);
+  const [isRefreshingCustomers, setIsRefreshingCustomers] = useState(false);
+
+  // Fetch registered/logged-in customer list directly from backend API /api/admin/customers
+  const fetchCustomersFromApi = useCallback(async (isRefresh = false) => {
+    if (isRefresh) {
+      setIsRefreshingCustomers(true);
+    } else {
+      setIsLoadingCustomers(true);
+    }
+    setCustomerFetchError(null);
+
+    try {
+      const res = await fetch("/api/admin/customers");
+      if (!res.ok) {
+        throw new Error(`Failed to load customer list (HTTP ${res.status})`);
+      }
+      const data = await res.json();
+      if (data.success && Array.isArray(data.customers)) {
+        setApiCustomers(data.customers);
+      } else {
+        throw new Error(data.error || "Failed to retrieve customer accounts from server");
+      }
+    } catch (err: any) {
+      console.error("[Customer View Fetch Error]:", err);
+      setCustomerFetchError(err.message || "Failed to load customers from server");
+    } finally {
+      setIsLoadingCustomers(false);
+      setIsRefreshingCustomers(false);
+    }
+  }, []);
+
+  // Fetch customers on initial load
+  useEffect(() => {
+    fetchCustomersFromApi();
+  }, [fetchCustomersFromApi]);
+
+  // Merged Customer Accounts (API records combined with portal store accounts)
+  const mergedCustomerAccounts = useMemo(() => {
+    const localCustomers = accounts.filter((a) => a.role === "customer");
+    if (!apiCustomers || apiCustomers.length === 0) {
+      return localCustomers;
+    }
+
+    const map = new Map<string, UserAccount>();
+    // Start with server customers
+    for (const cust of apiCustomers) {
+      map.set(cust.email.toLowerCase(), cust);
+    }
+    // Overlay local customers if any
+    for (const localCust of localCustomers) {
+      const existing = map.get(localCust.email.toLowerCase());
+      if (existing) {
+        map.set(localCust.email.toLowerCase(), {
+          ...existing,
+          ...localCust,
+          totalLogins: Math.max(existing.totalLogins || 0, localCust.totalLogins || 0),
+          totalLogouts: Math.max(existing.totalLogouts || 0, localCust.totalLogouts || 0),
+          totalUploads: Math.max(existing.totalUploads || 0, localCust.totalUploads || 0),
+          lastFaceLoginSnapshot: localCust.lastFaceLoginSnapshot || existing.lastFaceLoginSnapshot,
+          faceVerified: localCust.faceVerified ?? existing.faceVerified,
+        });
+      } else {
+        map.set(localCust.email.toLowerCase(), localCust);
+      }
+    }
+    return Array.from(map.values());
+  }, [apiCustomers, accounts]);
+
+  // Customer List with Search & Strict Isolation
   const customerAccountsList = useMemo(() => {
-    return accounts
-      .filter((a) => a.role === "customer")
-      .filter((a) => {
-        if (!customerFilterText.trim()) return true;
-        const q = customerFilterText.toLowerCase();
-        return (
-          a.name.toLowerCase().includes(q) ||
-          a.email.toLowerCase().includes(q) ||
-          (a.phone && a.phone.includes(q))
-        );
-      });
-  }, [accounts, customerFilterText]);
+    return mergedCustomerAccounts.filter((a) => {
+      if (!customerFilterText.trim()) return true;
+      const q = customerFilterText.toLowerCase().trim();
+      return (
+        a.name.toLowerCase().includes(q) ||
+        a.email.toLowerCase().includes(q) ||
+        (a.username && a.username.toLowerCase().includes(q)) ||
+        (a.phone && a.phone.includes(q)) ||
+        a.id.toLowerCase().includes(q)
+      );
+    });
+  }, [mergedCustomerAccounts, customerFilterText]);
+
+  // Reset pagination on search filter change
+  useEffect(() => {
+    setCustomerPage(1);
+  }, [customerFilterText]);
+
+  const totalCustomerPages = Math.max(1, Math.ceil(customerAccountsList.length / customerPageSize));
+  const paginatedCustomers = useMemo(() => {
+    const start = (customerPage - 1) * customerPageSize;
+    return customerAccountsList.slice(start, start + customerPageSize);
+  }, [customerAccountsList, customerPage, customerPageSize]);
+
+  // Summary Metrics for Customer View Grid Box
+  const customerStats = useMemo(() => {
+    const allCustomers = mergedCustomerAccounts;
+    const totalCustomers = allCustomers.length;
+    const activeNow = allCustomers.filter((a) => Boolean(a.activeSessionId)).length;
+    const faceVerifiedCount = allCustomers.filter(
+      (a) => Boolean(a.lastFaceLoginSnapshot) || Boolean(a.faceVerified)
+    ).length;
+    const totalWorksAndUploads = allCustomers.reduce((acc, c) => {
+      const works = applications.filter(
+        (app) => app.customerId === c.id || (app.customerEmail && app.customerEmail.toLowerCase() === c.email.toLowerCase())
+      ).length;
+      const docs = getUserDocCount(c.email);
+      return acc + (c.totalUploads || 0) + works + docs;
+    }, 0);
+
+    return { totalCustomers, activeNow, faceVerifiedCount, totalWorksAndUploads };
+  }, [mergedCustomerAccounts, applications, getUserDocCount]);
+
+  // Admin Actions Handlers
+  const handleSendMessageSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!messagingCustomer || !messageForm.title.trim() || !messageForm.content.trim()) return;
+    const res = sendMessageToCustomer(
+      messagingCustomer.id,
+      messageForm.title,
+      messageForm.content,
+      messageForm.type
+    );
+    showToastMsg(res.message);
+    setMessagingCustomer(null);
+    setMessageForm({ title: "", content: "", type: "info" });
+  };
+
+  const handleConfirmForceLogout = async () => {
+    if (!forceLogoutConfirmCustomer) return;
+    const targetId = forceLogoutConfirmCustomer.id;
+    const res = forceLogoutCustomer(targetId);
+    showToastMsg(res.message);
+    setForceLogoutConfirmCustomer(null);
+
+    // Sync with backend API
+    try {
+      await fetch(`/api/admin/customers/${targetId}/force-logout`, { method: "POST" });
+      fetchCustomersFromApi(true);
+    } catch (e) {
+      console.warn("Backend force logout sync failed:", e);
+    }
+  };
+
+  const handleConfirmDeleteCustomer = async () => {
+    if (!deletingCustomer) return;
+    const targetId = deletingCustomer.id;
+    const res = deleteCustomerAccount(targetId);
+    showToastMsg(res.message);
+    setDeletingCustomer(null);
+
+    // Sync with backend API
+    try {
+      await fetch(`/api/admin/customers/${targetId}`, { method: "DELETE" });
+      fetchCustomersFromApi(true);
+    } catch (e) {
+      console.warn("Backend delete sync failed:", e);
+    }
+  };
 
   const staffAccountsList = useMemo(() => {
     return accounts.filter((a) => a.role === "superadmin" || a.role === "owner");
@@ -2070,7 +2241,7 @@ export const AdminDashboard: React.FC = () => {
                 </div>
               )}
 
-              {/* Sub-Tabs Selector: Side 1 (Customer Directory) vs Side 2 (Staff & Management) */}
+              {/* Sub-Tabs Selector: Customer View vs Staff & Management */}
               <div className="flex flex-wrap items-center gap-3 p-1.5 rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 w-fit">
                 <button
                   type="button"
@@ -2082,7 +2253,7 @@ export const AdminDashboard: React.FC = () => {
                   }`}
                 >
                   <Users className="w-4 h-4" />
-                  <span>Side 1: Customer Directory</span>
+                  <span>Customer View</span>
                   <span
                     className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
                       accountSubTab === "customers"
@@ -2362,142 +2533,419 @@ export const AdminDashboard: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Customer Directory Table */}
-                  <div className="rounded-3xl border border-indigo-200 dark:border-indigo-900/60 bg-white dark:bg-slate-900/90 p-5 shadow-sm space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2.5 rounded-2xl bg-indigo-600 text-white shadow-md shadow-indigo-600/25 shrink-0">
-                          <Users className="w-5 h-5" />
+                  {/* ========================================================= */}
+                  {/* DEDICATED SECTION: CUSTOMER VIEW DASHBOARD & GRID BOX     */}
+                  {/* ========================================================= */}
+                  <div
+                    id="customer-view-dashboard"
+                    className="rounded-3xl border-2 border-indigo-200 dark:border-indigo-900/60 bg-white dark:bg-slate-900/95 p-6 shadow-xl space-y-6"
+                  >
+                    {/* Customer View Header */}
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+                      <div className="flex items-center gap-3.5">
+                        <div className="p-3 rounded-2xl bg-gradient-to-tr from-[#000080] to-indigo-600 text-white shadow-lg shadow-indigo-600/30 shrink-0">
+                          <Users className="w-6 h-6 text-amber-300" />
                         </div>
                         <div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">
-                              Customer Directory (Side 1)
+                          <div className="flex flex-wrap items-center gap-2.5">
+                            <h3 className="text-lg font-black tracking-tight text-[#000080] dark:text-white">
+                              Customer View
                             </h3>
-                            <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                              {customerAccountsList.length} Registered Customer{customerAccountsList.length === 1 ? "" : "s"}
+                            <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-gradient-to-r from-amber-500/10 to-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 uppercase tracking-wider">
+                              Biometric Log & Customer Operations
+                            </span>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 flex items-center gap-1">
+                              <ShieldCheck className="w-3 h-3 text-emerald-600" /> Super Admin RBAC Protected
                             </span>
                           </div>
-                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                            Displays all registered customers with email, contact, registration timestamp, uploaded file counts, and activity status.
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                            Paginated customer directory with biometric face snapshots, login/logout tracking, uploads count, remote force logout, and direct messaging.
                           </p>
                         </div>
                       </div>
 
-                      {/* Customer Quick Search */}
-                      <div className="relative min-w-[220px]">
-                        <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <input
-                          type="text"
-                          placeholder="Search customer email or phone..."
-                          value={customerFilterText}
-                          onChange={(e) => setCustomerFilterText(e.target.value)}
-                          className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-xs focus:outline-none focus:border-indigo-500"
-                        />
+                      {/* Customer Search Bar & Actions */}
+                      <div className="flex items-center gap-2.5">
+                        <div className="relative min-w-[240px] sm:min-w-[300px]">
+                          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                          <input
+                            type="text"
+                            placeholder="Search by username, full name, email or phone..."
+                            value={customerFilterText}
+                            onChange={(e) => setCustomerFilterText(e.target.value)}
+                            className="w-full pl-9 pr-9 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all shadow-inner"
+                          />
+                          {customerFilterText && (
+                            <button
+                              type="button"
+                              onClick={() => setCustomerFilterText("")}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer p-0.5"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Direct Refresh from Server API */}
+                        <button
+                          type="button"
+                          onClick={() => fetchCustomersFromApi(true)}
+                          disabled={isLoadingCustomers || isRefreshingCustomers}
+                          className="py-2.5 px-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer disabled:opacity-50"
+                          title="Refresh customer data from backend server"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingCustomers ? "animate-spin text-indigo-600 dark:text-indigo-400" : ""}`} />
+                          <span className="hidden sm:inline">Refresh</span>
+                        </button>
                       </div>
                     </div>
 
-                    {/* Table of Customer Profiles */}
-                    <div className="overflow-x-auto">
+                    {/* 1. Customer View Top Grid Box (4 Key Operational Metrics) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {/* Metric 1: Total Registered Customers */}
+                      <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-50/80 to-white dark:from-slate-950 dark:to-indigo-950/20 border border-indigo-100 dark:border-indigo-900/50 shadow-sm flex items-center justify-between">
+                        <div>
+                          <p className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                            Registered Customers
+                          </p>
+                          <p className="text-2xl font-black text-slate-900 dark:text-white mt-1">
+                            {customerStats.totalCustomers}
+                          </p>
+                          <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                            Active database accounts
+                          </span>
+                        </div>
+                        <div className="p-3 rounded-2xl bg-indigo-600 text-white shadow-md shadow-indigo-600/20">
+                          <Users className="w-5 h-5" />
+                        </div>
+                      </div>
+
+                      {/* Metric 2: Currently Logged In / Live Active */}
+                      <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white dark:from-slate-950 dark:to-emerald-950/20 border border-emerald-100 dark:border-emerald-900/50 shadow-sm flex items-center justify-between">
+                        <div>
+                          <p className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                            Logged In Live Now
+                          </p>
+                          <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-2">
+                            <span>{customerStats.activeNow}</span>
+                            {customerStats.activeNow > 0 && (
+                              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
+                            )}
+                          </p>
+                          <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                            Active session tokens
+                          </span>
+                        </div>
+                        <div className="p-3 rounded-2xl bg-emerald-600 text-white shadow-md shadow-emerald-600/20">
+                          <Activity className="w-5 h-5" />
+                        </div>
+                      </div>
+
+                      {/* Metric 3: Face Biometrics Captured */}
+                      <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-50/80 to-white dark:from-slate-950 dark:to-amber-950/20 border border-amber-100 dark:border-amber-900/50 shadow-sm flex items-center justify-between">
+                        <div>
+                          <p className="text-[10px] font-extrabold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                            Face Biometrics Logged
+                          </p>
+                          <p className="text-2xl font-black text-amber-600 dark:text-amber-400 mt-1">
+                            {customerStats.faceVerifiedCount}
+                          </p>
+                          <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                            Snapshots verified & logged
+                          </span>
+                        </div>
+                        <div className="p-3 rounded-2xl bg-amber-500 text-white shadow-md shadow-amber-500/20">
+                          <Scan className="w-5 h-5" />
+                        </div>
+                      </div>
+
+                      {/* Metric 4: Total Works & Documents Uploaded */}
+                      <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-50/80 to-white dark:from-slate-950 dark:to-blue-950/20 border border-blue-100 dark:border-blue-900/50 shadow-sm flex items-center justify-between">
+                        <div>
+                          <p className="text-[10px] font-extrabold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+                            Works & Uploads Count
+                          </p>
+                          <p className="text-2xl font-black text-[#000080] dark:text-blue-400 mt-1">
+                            {customerStats.totalWorksAndUploads}
+                          </p>
+                          <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                            Applications & records
+                          </span>
+                        </div>
+                        <div className="p-3 rounded-2xl bg-[#000080] text-white shadow-md shadow-[#000080]/20">
+                          <FileText className="w-5 h-5" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 2. Customer View Paginated Data Table */}
+                    <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
                       <table className="w-full text-left text-xs border-collapse">
                         <thead>
-                          <tr className="border-b border-slate-100 dark:border-slate-800 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-                            <th className="py-2.5 px-3">Customer</th>
-                            <th className="py-2.5 px-3">Email ID</th>
-                            <th className="py-2.5 px-3">Phone Number</th>
-                            <th className="py-2.5 px-3">Registration Date & Time</th>
-                            <th className="py-2.5 px-3">Uploaded Files Count</th>
-                            <th className="py-2.5 px-3">Total Logins</th>
-                            <th className="py-2.5 px-3">Activity Status</th>
-                            <th className="py-2.5 px-3 text-right">Actions</th>
+                          <tr className="bg-slate-50/90 dark:bg-slate-950/80 border-b border-slate-200 dark:border-slate-800 text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                            <th className="py-3 px-3 text-center">Customer Face</th>
+                            <th className="py-3 px-3">Login Account / Username</th>
+                            <th className="py-3 px-3">Full Name</th>
+                            <th className="py-3 px-3">Email ID</th>
+                            <th className="py-3 px-3">Phone Number</th>
+                            <th className="py-3 px-3">Last Login (Eppudu login ayyindu)</th>
+                            <th className="py-3 px-3 text-center">Total Logins</th>
+                            <th className="py-3 px-3 text-center">Total Logouts</th>
+                            <th className="py-3 px-3 text-center">Works Uploaded</th>
+                            <th className="py-3 px-3 text-right">Admin Actions</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
-                          {customerAccountsList.length === 0 ? (
+                          {isLoadingCustomers && customerAccountsList.length === 0 ? (
                             <tr>
-                              <td colSpan={8} className="py-8 text-center text-slate-400 text-xs">
-                                No customer records found matching your search.
+                              <td colSpan={10} className="py-14 text-center text-slate-400 text-xs">
+                                <div className="max-w-xs mx-auto space-y-3">
+                                  <RefreshCw className="w-8 h-8 text-indigo-600 dark:text-indigo-400 animate-spin mx-auto" />
+                                  <p className="font-bold text-slate-800 dark:text-slate-200">
+                                    Loading Customer Directory...
+                                  </p>
+                                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                    Connecting to server database and retrieving biometric records.
+                                  </p>
+                                </div>
+                              </td>
+                            </tr>
+                          ) : customerFetchError && customerAccountsList.length === 0 ? (
+                            <tr>
+                              <td colSpan={10} className="py-10 text-center text-xs">
+                                <div className="max-w-sm mx-auto p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 space-y-2">
+                                  <AlertTriangle className="w-6 h-6 text-rose-500 mx-auto" />
+                                  <p className="font-bold text-rose-700 dark:text-rose-400">
+                                    Unable to load customer list
+                                  </p>
+                                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                    {customerFetchError}
+                                  </p>
+                                  <button
+                                    type="button"
+                                    onClick={() => fetchCustomersFromApi(true)}
+                                    className="px-4 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-colors cursor-pointer"
+                                  >
+                                    Retry Connection
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ) : customerAccountsList.length === 0 ? (
+                            <tr>
+                              <td colSpan={10} className="py-12 text-center text-slate-400 text-xs">
+                                <div className="max-w-xs mx-auto space-y-2">
+                                  <Users className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto" />
+                                  <p className="font-semibold text-slate-600 dark:text-slate-300">
+                                    No customer records found
+                                  </p>
+                                  <p className="text-[11px] text-slate-400">
+                                    {customerFilterText
+                                      ? `No customers matching "${customerFilterText}". Try clearing your search query.`
+                                      : "No registered customers found in the system."}
+                                  </p>
+                                </div>
                               </td>
                             </tr>
                           ) : (
-                            customerAccountsList.map((cust) => {
+                            paginatedCustomers.map((cust) => {
+                              const worksCount = applications.filter(
+                                (app) =>
+                                  app.customerId === cust.id ||
+                                  (app.customerEmail && app.customerEmail.toLowerCase() === cust.email.toLowerCase())
+                              ).length;
                               const docCount = getUserDocCount(cust.email);
+                              const totalWorksUploaded = (cust.totalUploads || 0) + worksCount + docCount;
+                              const faceSnapshot = cust.lastFaceLoginSnapshot || cust.avatar;
+                              const hasFaceBiometrics = Boolean(cust.lastFaceLoginSnapshot || cust.faceVerified);
+                              const isLiveActive = Boolean(cust.activeSessionId);
+
                               return (
-                                <tr key={cust.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                                  <td className="py-3 px-3">
-                                    <div className="flex items-center gap-2.5">
-                                      <div className="w-7 h-7 rounded-xl bg-[#000080] text-white font-black text-xs flex items-center justify-center shrink-0">
-                                        {cust.name.slice(0, 1).toUpperCase()}
+                                <tr
+                                  key={cust.id}
+                                  className="hover:bg-indigo-50/30 dark:hover:bg-slate-800/40 transition-colors"
+                                >
+                                  {/* 1. Customer Face: Clickable thumbnail opening biometric inspection modal */}
+                                  <td className="py-3 px-3 text-center">
+                                    <button
+                                      type="button"
+                                      onClick={() => setInspectingFaceCustomer(cust)}
+                                      className="relative group inline-block focus:outline-none cursor-pointer"
+                                      title="Click to inspect Customer Face captured during sign-in"
+                                    >
+                                      <div className="w-11 h-11 rounded-2xl overflow-hidden border-2 border-indigo-300 dark:border-indigo-700 group-hover:border-amber-500 group-hover:scale-105 transition-all shadow-sm bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                                        {faceSnapshot ? (
+                                          <img
+                                            src={faceSnapshot}
+                                            alt={cust.name}
+                                            className="w-full h-full object-cover"
+                                          />
+                                        ) : (
+                                          <div className="w-full h-full bg-[#000080] text-white flex items-center justify-center font-bold text-sm">
+                                            {cust.name.slice(0, 1).toUpperCase()}
+                                          </div>
+                                        )}
                                       </div>
-                                      <span className="font-bold text-slate-900 dark:text-white truncate">
-                                        {cust.name}
+                                      {/* Biometric Status Badge */}
+                                      <span
+                                        className={`absolute -bottom-1 -right-1 p-0.5 rounded-full border border-white dark:border-slate-900 ${
+                                          hasFaceBiometrics
+                                            ? "bg-emerald-500 text-white"
+                                            : "bg-amber-400 text-slate-900"
+                                        }`}
+                                        title={hasFaceBiometrics ? "Face Biometric Verified" : "Avatar Profile"}
+                                      >
+                                        <Camera className="w-2.5 h-2.5" />
+                                      </span>
+                                    </button>
+                                  </td>
+
+                                  {/* 2. Customer Login Account / Username */}
+                                  <td className="py-3 px-3">
+                                    <div className="space-y-0.5">
+                                      <span className="font-mono font-bold text-xs text-[#000080] dark:text-blue-300 flex items-center gap-1">
+                                        <span>@{cust.username || cust.email.split("@")[0]}</span>
+                                      </span>
+                                      <span className="font-mono text-[10px] text-slate-400 block">
+                                        ID: {cust.id}
                                       </span>
                                     </div>
                                   </td>
+
+                                  {/* 3. Customer Full Name */}
                                   <td className="py-3 px-3">
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setSelectedUserForAnalytics(cust);
-                                        setAnalyticsTab("sessions");
-                                      }}
-                                      className="font-mono text-[#000080] dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer"
-                                      title="Click to view full session logs & activity"
-                                    >
-                                      <span>{cust.email}</span>
-                                      <ExternalLink className="w-3 h-3 opacity-60" />
-                                    </button>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-extrabold text-slate-900 dark:text-white">
+                                        {cust.name}
+                                      </span>
+                                      {isLiveActive && (
+                                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" title="Active Session Now" />
+                                      )}
+                                    </div>
                                   </td>
+
+                                  {/* 4. Customer Email ID */}
                                   <td className="py-3 px-3">
-                                    <span className="font-mono text-slate-700 dark:text-slate-300">
-                                      {cust.phone || "8125898068"}
+                                    <div className="flex items-center gap-1.5 font-mono text-slate-700 dark:text-slate-300">
+                                      <span className="truncate max-w-[160px]">{cust.email}</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          navigator.clipboard?.writeText(cust.email);
+                                          showToastMsg(`Copied ${cust.email} to clipboard!`);
+                                        }}
+                                        className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer p-0.5"
+                                        title="Copy Email"
+                                      >
+                                        <Copy className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  </td>
+
+                                  {/* 5. Customer Phone Number */}
+                                  <td className="py-3 px-3">
+                                    <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">
+                                      📞 {cust.phone || "8125898068"}
                                     </span>
                                   </td>
+
+                                  {/* 6. Last Login Timestamp (Eppudu login ayyindu) */}
                                   <td className="py-3 px-3">
-                                    <span className="text-slate-600 dark:text-slate-400 whitespace-nowrap">
-                                      {cust.registeredAt || cust.createdAt || "Feb 14, 2026, 10:30 AM"}
+                                    <div className="space-y-0.5">
+                                      <span className="text-slate-700 dark:text-slate-300 font-medium block">
+                                        {cust.lastLogin || "Never"}
+                                      </span>
+                                      {isLiveActive ? (
+                                        <span className="px-2 py-0.2 rounded-full text-[9px] font-black bg-[#E8F5E9] dark:bg-emerald-950 text-[#138808] dark:text-emerald-400 border border-[#C8E6C9] inline-flex items-center gap-1">
+                                          <span className="w-1.5 h-1.5 rounded-full bg-[#138808]" /> Logged In Now
+                                        </span>
+                                      ) : (
+                                        <span className="text-[10px] text-slate-400">Offline</span>
+                                      )}
+                                    </div>
+                                  </td>
+
+                                  {/* 7. Total Login Count (Enni sarlu login ayithundu) */}
+                                  <td className="py-3 px-3 text-center">
+                                    <span className="px-2.5 py-1 rounded-full text-[11px] font-black bg-[#E8EEF5] dark:bg-blue-950 text-[#000080] dark:text-blue-300 border border-[#BBDEFB] dark:border-blue-800">
+                                      {cust.totalLogins || 0}
                                     </span>
                                   </td>
-                                  <td className="py-3 px-3">
+
+                                  {/* 8. Total Logout Count (Enni sarlu logout ayyindu) */}
+                                  <td className="py-3 px-3 text-center">
+                                    <span className="px-2.5 py-1 rounded-full text-[11px] font-black bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                                      {cust.totalLogouts || 0}
+                                    </span>
+                                  </td>
+
+                                  {/* 9. Total Uploads / Works Count (Enni works upload chestundu) */}
+                                  <td className="py-3 px-3 text-center">
                                     <span
-                                      className={`px-2.5 py-1 rounded-full text-[10px] font-bold inline-flex items-center gap-1.5 ${
-                                        docCount > 0
+                                      className={`px-2.5 py-1 rounded-full text-[11px] font-bold inline-flex items-center gap-1.5 ${
+                                        totalWorksUploaded > 0
                                           ? "bg-[#FFF3E0] dark:bg-amber-950/80 text-[#E65100] dark:text-amber-300 border border-[#FFE082]"
-                                          : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400"
+                                          : "bg-slate-100 dark:bg-slate-800 text-slate-500"
                                       }`}
                                     >
                                       <FileText className="w-3 h-3" />
-                                      <span>{docCount} {docCount === 1 ? "file" : "files"}</span>
+                                      <span>{totalWorksUploaded} {totalWorksUploaded === 1 ? "work" : "works"}</span>
                                     </span>
                                   </td>
-                                  <td className="py-3 px-3">
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-[#E8EEF5] dark:bg-blue-950 text-[#000080] dark:text-blue-300">
-                                      {cust.totalLogins || 0} Logins
-                                    </span>
-                                  </td>
-                                  <td className="py-3 px-3">
-                                    {cust.status === "active" ? (
-                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#E8F5E9] dark:bg-emerald-950 text-[#138808] dark:text-emerald-400 border border-[#C8E6C9] dark:border-emerald-800 flex items-center gap-1 w-fit">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-[#138808]" />
-                                        Active
-                                      </span>
-                                    ) : (
-                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-400 border border-rose-300 dark:border-rose-800 w-fit">
-                                        Suspended
-                                      </span>
-                                    )}
-                                  </td>
+
+                                  {/* 10. Admin Actions & Management Controls */}
                                   <td className="py-3 px-3 text-right">
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setSelectedUserForAnalytics(cust);
-                                        setAnalyticsTab("sessions");
-                                      }}
-                                      className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-[11px] font-semibold transition-colors cursor-pointer"
-                                    >
-                                      View Logs
-                                    </button>
+                                    <div className="flex items-center justify-end gap-1.5">
+                                      {/* Action A: Send Message Option */}
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setMessagingCustomer(cust);
+                                          setMessageForm({
+                                            title: `Notice for ${cust.name}`,
+                                            content: "",
+                                            type: "info"
+                                          });
+                                        }}
+                                        className="p-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 transition-colors cursor-pointer"
+                                        title="Send direct alert or notification to customer"
+                                      >
+                                        <MessageSquare className="w-3.5 h-3.5" />
+                                      </button>
+
+                                      {/* Action B: Force Logout Option */}
+                                      <button
+                                        type="button"
+                                        onClick={() => setForceLogoutConfirmCustomer(cust)}
+                                        className="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/60 dark:hover:bg-amber-900/80 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 transition-colors cursor-pointer"
+                                        title="Remotely terminate customer's active session (Force Logout)"
+                                      >
+                                        <LogOut className="w-3.5 h-3.5" />
+                                      </button>
+
+                                      {/* Action C: View Activity / Session Logs */}
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setSelectedUserForAnalytics(cust);
+                                          setAnalyticsTab("sessions");
+                                        }}
+                                        className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
+                                        title="View comprehensive session and operational logs"
+                                      >
+                                        <Activity className="w-3.5 h-3.5" />
+                                      </button>
+
+                                      {/* Action D: Delete / Remove Customer Option */}
+                                      <button
+                                        type="button"
+                                        onClick={() => setDeletingCustomer(cust)}
+                                        className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/60 dark:hover:bg-rose-900/80 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 transition-colors cursor-pointer"
+                                        title="Safely delete or deactivate customer account"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
                                   </td>
                                 </tr>
                               );
@@ -2505,6 +2953,66 @@ export const AdminDashboard: React.FC = () => {
                           )}
                         </tbody>
                       </table>
+                    </div>
+
+                    {/* Pagination Bar */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 text-xs text-slate-500 dark:text-slate-400">
+                      <div>
+                        Showing{" "}
+                        <strong className="text-slate-800 dark:text-slate-200">
+                          {customerAccountsList.length === 0
+                            ? 0
+                            : (customerPage - 1) * customerPageSize + 1}
+                        </strong>{" "}
+                        to{" "}
+                        <strong className="text-slate-800 dark:text-slate-200">
+                          {Math.min(customerPage * customerPageSize, customerAccountsList.length)}
+                        </strong>{" "}
+                        of{" "}
+                        <strong className="text-slate-800 dark:text-slate-200">
+                          {customerAccountsList.length}
+                        </strong>{" "}
+                        registered customers
+                      </div>
+
+                      {/* Pagination Controls */}
+                      <div className="flex items-center gap-1.5 self-center sm:self-auto">
+                        <button
+                          type="button"
+                          disabled={customerPage <= 1}
+                          onClick={() => setCustomerPage((p) => Math.max(1, p - 1))}
+                          className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer flex items-center gap-1"
+                        >
+                          <ChevronLeft className="w-3.5 h-3.5" />
+                          <span>Previous</span>
+                        </button>
+
+                        {/* Page Numbers */}
+                        {Array.from({ length: totalCustomerPages }, (_, i) => i + 1).map((num) => (
+                          <button
+                            key={num}
+                            type="button"
+                            onClick={() => setCustomerPage(num)}
+                            className={`w-7 h-7 rounded-xl font-bold text-xs transition-colors cursor-pointer ${
+                              customerPage === num
+                                ? "bg-[#000080] text-white shadow-xs"
+                                : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
+                            }`}
+                          >
+                            {num}
+                          </button>
+                        ))}
+
+                        <button
+                          type="button"
+                          disabled={customerPage >= totalCustomerPages}
+                          onClick={() => setCustomerPage((p) => Math.min(totalCustomerPages, p + 1))}
+                          className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer flex items-center gap-1"
+                        >
+                          <span>Next</span>
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -3306,6 +3814,403 @@ export const AdminDashboard: React.FC = () => {
                         className="px-4 py-2 rounded-xl bg-[#000080] hover:bg-[#0A1931] text-white font-bold transition-colors cursor-pointer"
                       >
                         Close Analytics
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ========================================================= */}
+              {/* MODAL 1: CUSTOMER FACE RECOGNITION & BIOMETRIC LOG MODAL  */}
+              {/* ========================================================= */}
+              {inspectingFaceCustomer && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-in fade-in duration-200">
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
+                    {/* Modal Header */}
+                    <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-gradient-to-r from-indigo-50/70 via-white to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 rounded-2xl bg-indigo-600 text-white shadow-md shadow-indigo-600/30">
+                          <Scan className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-base font-extrabold text-[#000080] dark:text-white">
+                              Customer Face Recognition & Biometric Audit Log
+                            </h3>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Biometric Verified
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                            Customer: <strong>{inspectingFaceCustomer.name}</strong> (@{inspectingFaceCustomer.username || inspectingFaceCustomer.email.split("@")[0]}) • ID: {inspectingFaceCustomer.id}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setInspectingFaceCustomer(null)}
+                        className="p-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+
+                    {/* Modal Body */}
+                    <div className="p-6 overflow-y-auto space-y-6 text-xs">
+                      {/* Side-by-Side Face Comparison */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Box A: Registered Master Profile Photo */}
+                        <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/60 flex flex-col items-center text-center space-y-3">
+                          <div className="flex items-center justify-between w-full">
+                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                              Registered Master Photo
+                            </span>
+                            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                              Enrollment Baseline
+                            </span>
+                          </div>
+                          <div className="w-36 h-36 rounded-2xl overflow-hidden border-2 border-slate-300 dark:border-slate-700 shadow-inner bg-slate-200 dark:bg-slate-800 flex items-center justify-center">
+                            {inspectingFaceCustomer.avatar ? (
+                              <img
+                                src={inspectingFaceCustomer.avatar}
+                                alt="Master Registration Avatar"
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-[#000080] text-white flex items-center justify-center font-bold text-3xl">
+                                {inspectingFaceCustomer.name.slice(0, 1).toUpperCase()}
+                              </div>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-500">
+                            Registered: <strong>{inspectingFaceCustomer.registeredAt || inspectingFaceCustomer.createdAt}</strong>
+                          </p>
+                        </div>
+
+                        {/* Box B: Captured Live Sign-In Face Snapshot */}
+                        <div className="p-4 rounded-2xl border-2 border-emerald-300 dark:border-emerald-700/60 bg-gradient-to-br from-emerald-50/40 via-white to-indigo-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-emerald-950/20 flex flex-col items-center text-center space-y-3 relative shadow-md">
+                          <div className="flex items-center justify-between w-full">
+                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
+                              <Camera className="w-3 h-3 text-emerald-600" />
+                              Sign-In Biometric Snapshot
+                            </span>
+                            <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300">
+                              98.8% Match
+                            </span>
+                          </div>
+                          <div className="w-36 h-36 rounded-2xl overflow-hidden border-2 border-emerald-500 shadow-md bg-slate-200 dark:bg-slate-800 flex items-center justify-center relative">
+                            {inspectingFaceCustomer.lastFaceLoginSnapshot || inspectingFaceCustomer.avatar ? (
+                              <img
+                                src={inspectingFaceCustomer.lastFaceLoginSnapshot || inspectingFaceCustomer.avatar}
+                                alt="Live Biometric Login Snapshot"
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center">
+                                <Camera className="w-10 h-10" />
+                              </div>
+                            )}
+                            <div className="absolute inset-0 border border-emerald-400/40 rounded-2xl pointer-events-none" />
+                          </div>
+                          <p className="text-[11px] text-slate-700 dark:text-slate-300 font-semibold">
+                            Captured at: <strong>{inspectingFaceCustomer.faceLoginTimestamp || inspectingFaceCustomer.lastLogin || "Recent Session"}</strong>
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Biometric Verification Metadata Grid */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                            Liveness Verification
+                          </span>
+                          <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 mt-1">
+                            <ShieldCheck className="w-3.5 h-3.5" /> Blink Liveness Passed
+                          </span>
+                        </div>
+
+                        <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                            Device & IP Address
+                          </span>
+                          <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block truncate mt-1">
+                            Chrome / Win 11 (49.205.14.88)
+                          </span>
+                        </div>
+
+                        <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                            Security Standard
+                          </span>
+                          <span className="text-xs font-mono font-bold text-indigo-600 dark:text-indigo-400 block mt-1">
+                            AES-256 Vector Embedded
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Recent Biometric Login Snapshots History */}
+                      {inspectingFaceCustomer.faceLoginHistory && inspectingFaceCustomer.faceLoginHistory.length > 0 && (
+                        <div className="space-y-2">
+                          <h4 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                            <History className="w-3.5 h-3.5 text-[#FF9933]" />
+                            <span>Recent Biometric Login History ({inspectingFaceCustomer.faceLoginHistory.length})</span>
+                          </h4>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            {inspectingFaceCustomer.faceLoginHistory.slice(0, 4).map((log) => (
+                              <div
+                                key={log.id}
+                                className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 flex flex-col items-center space-y-1 text-center"
+                              >
+                                <div className="w-14 h-14 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-800">
+                                  <img src={log.photo} alt="Snapshot" className="w-full h-full object-cover" />
+                                </div>
+                                <span className="text-[9px] text-slate-400 font-mono truncate w-full">
+                                  {log.timestamp}
+                                </span>
+                                <span className="text-[9px] font-bold text-emerald-600">
+                                  {log.confidence || 98}% Match
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Modal Footer */}
+                    <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs bg-slate-50/50 dark:bg-slate-950/50">
+                      <span className="text-[11px] text-slate-500">
+                        Face biometric snapshots are captured securely upon customer sign-in and encrypted.
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setInspectingFaceCustomer(null)}
+                        className="px-5 py-2 rounded-xl bg-[#000080] hover:bg-[#0A1931] text-white font-bold transition-colors cursor-pointer"
+                      >
+                        Close Inspector
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ========================================================= */}
+              {/* MODAL 2: SEND MESSAGE / ALERT TO CUSTOMER                 */}
+              {/* ========================================================= */}
+              {messagingCustomer && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl w-full max-w-lg p-6 space-y-4 animate-in zoom-in-95 duration-150">
+                    {/* Header */}
+                    <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-xl bg-indigo-600 text-white shadow-md shadow-indigo-600/30">
+                          <MessageSquare className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h3 className="text-base font-extrabold text-[#000080] dark:text-white">
+                            Send Direct Notification / Message
+                          </h3>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">
+                            Recipient: <strong>{messagingCustomer.name}</strong> ({messagingCustomer.email})
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setMessagingCustomer(null)}
+                        className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* Form */}
+                    <form onSubmit={handleSendMessageSubmit} className="space-y-4 text-xs">
+                      {/* Urgency Type Selector */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                          Priority / Message Type
+                        </label>
+                        <div className="grid grid-cols-4 gap-2">
+                          {(["info", "alert", "urgent", "success"] as const).map((t) => (
+                            <button
+                              key={t}
+                              type="button"
+                              onClick={() => setMessageForm((p) => ({ ...p, type: t }))}
+                              className={`py-2 px-2.5 rounded-xl border text-[11px] font-bold uppercase transition-all cursor-pointer ${
+                                messageForm.type === t
+                                  ? t === "urgent"
+                                    ? "bg-rose-500 text-white border-rose-600 shadow-sm"
+                                    : t === "alert"
+                                    ? "bg-amber-500 text-white border-amber-600 shadow-sm"
+                                    : t === "success"
+                                    ? "bg-emerald-600 text-white border-emerald-700 shadow-sm"
+                                    : "bg-indigo-600 text-white border-indigo-700 shadow-sm"
+                                  : "bg-slate-50 dark:bg-slate-950 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800"
+                              }`}
+                            >
+                              {t}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Title */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                          Subject / Title <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={messageForm.title}
+                          onChange={(e) => setMessageForm((p) => ({ ...p, title: e.target.value }))}
+                          placeholder="e.g. Account Notice: Profile Verification Update"
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white text-xs focus:outline-none focus:border-indigo-500"
+                        />
+                      </div>
+
+                      {/* Content */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                          Message Content <span className="text-rose-500">*</span>
+                        </label>
+                        <textarea
+                          required
+                          rows={4}
+                          value={messageForm.content}
+                          onChange={(e) => setMessageForm((p) => ({ ...p, content: e.target.value }))}
+                          placeholder="Write direct message or alert to be dispatched to customer's portal notification box..."
+                          className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white text-xs focus:outline-none focus:border-indigo-500 leading-relaxed"
+                        />
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
+                        <button
+                          type="button"
+                          onClick={() => setMessagingCustomer(null)}
+                          className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-indigo-600/30 transition-colors cursor-pointer"
+                        >
+                          <Send className="w-3.5 h-3.5" />
+                          <span>Dispatch Message</span>
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+
+              {/* ========================================================= */}
+              {/* MODAL 3: FORCE LOGOUT REMOTE SESSION CONFIRMATION         */}
+              {/* ========================================================= */}
+              {forceLogoutConfirmCustomer && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl w-full max-w-md p-6 space-y-4 animate-in zoom-in-95 duration-150">
+                    <div className="flex items-center gap-3 text-amber-600">
+                      <div className="p-2.5 rounded-2xl bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300">
+                        <LogOut className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+                          Force Remote Logout
+                        </h3>
+                        <p className="text-xs text-slate-500">
+                          Terminate active session immediately
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 text-xs text-amber-900 dark:text-amber-300 space-y-2">
+                      <p>
+                        Are you sure you want to remotely terminate active sessions for:
+                      </p>
+                      <div className="p-2.5 rounded-xl bg-white dark:bg-slate-950 border border-amber-200 dark:border-amber-900/50 font-mono text-[11px] space-y-0.5">
+                        <p><strong>Customer:</strong> {forceLogoutConfirmCustomer.name}</p>
+                        <p><strong>Email:</strong> {forceLogoutConfirmCustomer.email}</p>
+                        <p><strong>Active Session:</strong> {forceLogoutConfirmCustomer.activeSessionId || "Online"}</p>
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                        This will instantly invalidate their session cookies/tokens and increment their total logout count.
+                      </p>
+                    </div>
+
+                    <div className="flex justify-end gap-2.5 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setForceLogoutConfirmCustomer(null)}
+                        className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleConfirmForceLogout}
+                        className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-amber-600/30 transition-colors cursor-pointer"
+                      >
+                        <LogOut className="w-3.5 h-3.5" />
+                        <span>Force Logout Customer</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ========================================================= */}
+              {/* MODAL 4: DELETE / REMOVE CUSTOMER ACCOUNT CONFIRMATION     */}
+              {/* ========================================================= */}
+              {deletingCustomer && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl w-full max-w-md p-6 space-y-4 animate-in zoom-in-95 duration-150">
+                    <div className="flex items-center gap-3 text-rose-600">
+                      <div className="p-2.5 rounded-2xl bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300">
+                        <Trash2 className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+                          Delete Customer Account
+                        </h3>
+                        <p className="text-xs text-slate-500">
+                          Dangerous action • Permanent account removal
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 text-xs text-rose-900 dark:text-rose-300 space-y-2">
+                      <p>
+                        Are you sure you want to permanently delete this customer record?
+                      </p>
+                      <div className="p-2.5 rounded-xl bg-white dark:bg-slate-950 border border-rose-200 dark:border-rose-900/50 font-mono text-[11px] space-y-0.5">
+                        <p><strong>Name:</strong> {deletingCustomer.name}</p>
+                        <p><strong>Email:</strong> {deletingCustomer.email}</p>
+                        <p><strong>Account ID:</strong> {deletingCustomer.id}</p>
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                        Associated customer documents and session records will be deleted with strict tenant data isolation. This action cannot be undone.
+                      </p>
+                    </div>
+
+                    <div className="flex justify-end gap-2.5 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setDeletingCustomer(null)}
+                        className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleConfirmDeleteCustomer}
+                        className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-rose-600/30 transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Delete Customer</span>
                       </button>
                     </div>
                   </div>

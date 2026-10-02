@@ -3700,6 +3700,10 @@
         }
 
         function selectGoogleAccount(name, email, role) {
+            // Strict session isolation: prevent cross-account data bleeding on switch
+            if (MSN.currentUser && MSN.currentUser.email && MSN.currentUser.email.toLowerCase() !== email.toLowerCase()) {
+                MSN.uploadedLockerFiles = {};
+            }
             MSN.currentUser.isAuthenticated = true;
             MSN.currentUser.name = name;
             MSN.currentUser.email = email;

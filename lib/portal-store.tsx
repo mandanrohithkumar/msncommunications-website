@@ -20,7 +20,8 @@ import {
   OtpVerificationResult,
   PasswordResetRequest,
   PasswordChangeAuditLog,
-  Gender
+  Gender,
+  FaceLoginLog
 } from "@/types/portal";
 import { MEESEVA_SERVICES, ONLINE_CATEGORIES, DOCUMENT_CATEGORIES } from "./services-data";
 import { getTranslation, Language } from "./translations";
@@ -44,7 +45,13 @@ interface PortalContextType {
   selectedRole: UserRole;
   setSelectedRole: (role: UserRole) => void;
   login: (identifier: string, role?: UserRole) => boolean;
-  loginWithGoogle: (name: string, email: string, role?: UserRole) => void;
+  loginWithGoogle: (name: string, email: string, role?: UserRole) => { success: boolean; error?: string };
+  checkAccountExists: (email: string) => boolean;
+  registerCustomerWithGoogle: (data: { email: string; phone: string; name: string; password?: string; gender?: Gender; avatar?: string; }) => { success: boolean; message: string; customer?: UserAccount };
+  recordFaceLogin: (email: string, photo: string, confidence?: number) => void;
+  forceLogoutCustomer: (customerId: string) => { success: boolean; message: string };
+  deleteCustomerAccount: (customerId: string) => { success: boolean; message: string };
+  sendMessageToCustomer: (customerIdOrEmail: string, title: string, message: string, type?: 'info' | 'alert' | 'urgent' | 'success') => { success: boolean; message: string };
   logout: () => void;
   accounts: UserAccount[];
   addAccount: (acc: Omit<UserAccount, "id" | "lastLogin" | "dailyServiceCount" | "monthlyServiceCount" | "createdAt"> & { lastLogin?: string; dailyServiceCount?: number; monthlyServiceCount?: number; }) => UserAccount;
@@ -158,6 +165,7 @@ const INITIAL_ACCOUNTS: UserAccount[] = [
   {
     id: "usr-cust-1",
     name: "Rohith Kumar",
+    username: "rohith_kumar",
     email: "rohith.kumar@gmail.com",
     phone: "8125898068",
     password: "Password@23",
@@ -166,10 +174,14 @@ const INITIAL_ACCOUNTS: UserAccount[] = [
     avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80",
     faceEmbedding: "emb-face-usr-cust-1",
     faceVerified: true,
+    lastFaceLoginSnapshot: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=256&q=80",
+    faceLoginTimestamp: "Sep 28, 2026, 02:45 PM",
     lastLogin: "Sep 25, 2026, 05:15 PM",
     dailyServiceCount: 3,
     monthlyServiceCount: 14,
     totalLogins: 42,
+    totalLogouts: 38,
+    totalUploads: 6,
     totalTimeSpentSeconds: 4620,
     createdAt: "2026-02-14",
     registeredAt: "Feb 14, 2026, 10:30 AM",
@@ -220,6 +232,58 @@ const INITIAL_ACCOUNTS: UserAccount[] = [
         details: "Authenticated via SMS OTP on 8125898068"
       }
     ]
+  },
+  {
+    id: "usr-cust-2",
+    name: "Anjali Sharma",
+    username: "anjali_sharma",
+    email: "anjali.sharma@gmail.com",
+    phone: "9849011223",
+    password: "Password@23",
+    role: "customer",
+    status: "active",
+    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=256&q=80",
+    faceEmbedding: "emb-face-usr-cust-2",
+    faceVerified: true,
+    lastFaceLoginSnapshot: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=256&q=80",
+    faceLoginTimestamp: "Sep 27, 2026, 10:15 AM",
+    lastLogin: "Sep 27, 2026, 10:15 AM",
+    dailyServiceCount: 1,
+    monthlyServiceCount: 6,
+    totalLogins: 19,
+    totalLogouts: 17,
+    totalUploads: 4,
+    totalTimeSpentSeconds: 2850,
+    createdAt: "2026-03-01",
+    registeredAt: "Mar 01, 2026, 11:00 AM",
+    sessionLogs: [],
+    activityLogs: []
+  },
+  {
+    id: "usr-cust-3",
+    name: "Suresh Reddy",
+    username: "suresh_reddy",
+    email: "suresh.reddy@gmail.com",
+    phone: "9121098765",
+    password: "Password@23",
+    role: "customer",
+    status: "active",
+    avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=256&q=80",
+    faceEmbedding: "emb-face-usr-cust-3",
+    faceVerified: true,
+    lastFaceLoginSnapshot: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=256&q=80",
+    faceLoginTimestamp: "Sep 26, 2026, 03:40 PM",
+    lastLogin: "Sep 26, 2026, 03:40 PM",
+    dailyServiceCount: 0,
+    monthlyServiceCount: 3,
+    totalLogins: 8,
+    totalLogouts: 7,
+    totalUploads: 2,
+    totalTimeSpentSeconds: 1200,
+    createdAt: "2026-03-15",
+    registeredAt: "Mar 15, 2026, 02:20 PM",
+    sessionLogs: [],
+    activityLogs: []
   },
   {
     id: "usr-owner-1",
@@ -713,6 +777,45 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Auth state
   const [user, setUser] = useState<User | null>(null);
   const [selectedRole, setSelectedRole] = useState<UserRole>("customer");
+
+  // Secure Session Isolation: Sync user from HTTP-only session cookie on initial load
+  useEffect(() => {
+    let isMounted = true;
+    if (typeof window !== "undefined") {
+      fetch("/api/auth/session")
+        .then((res) => res.json())
+        .then((data) => {
+          if (!isMounted) return;
+          if (data?.authenticated && data?.session?.userId) {
+            setAccounts((currAccounts) => {
+              const matched = currAccounts.find(
+                (a) =>
+                  a.id === data.session.userId ||
+                  a.email.toLowerCase() === data.session.email?.toLowerCase()
+              );
+              if (matched) {
+                setUser({
+                  id: matched.id,
+                  name: matched.name,
+                  email: matched.email,
+                  phone: matched.phone,
+                  role: matched.role,
+                  avatar: matched.avatar,
+                  faceEmbedding: matched.faceEmbedding,
+                  faceVerified: matched.faceVerified,
+                  familyDetails: matched.familyDetails,
+                });
+              }
+              return currAccounts;
+            });
+          }
+        })
+        .catch((e) => console.debug("[Session Auth Check]", e));
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, []);
   const [passwordChangeAudits, setPasswordChangeAudits] = useState<PasswordChangeAuditLog[]>(() => {
     if (typeof window !== "undefined") {
       try {
@@ -1331,22 +1434,28 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     );
   };
 
+  // Check if an account exists by email (used for strict sign-up vs sign-in separation)
+  const checkAccountExists = (email: string): boolean => {
+    if (!email) return false;
+    const clean = email.trim().toLowerCase();
+    return accounts.some((a) => a.email.toLowerCase() === clean);
+  };
+
   // Auth functions with session recording and multi-tenant analytics
   const login = (identifier: string, roleOverride?: UserRole) => {
     const role = roleOverride || selectedRole;
     const cleanId = identifier.trim().toLowerCase();
 
-    // Check registered accounts
+    // Check registered accounts strictly
     const matched = accounts.find(
       (a) =>
         (a.email.toLowerCase() === cleanId || a.phone.replace(/\D/g, "") === cleanId.replace(/\D/g, "")) &&
         a.role === role
     );
 
-    let name = matched ? matched.name : (role === "owner" ? "MANDAN ROHITH KUMAR" : role === "superadmin" ? "Super Administrator" : "Rohith Kumar");
-    let email = matched ? matched.email : (role === "owner" ? "msncommunication23@gmail.com" : role === "superadmin" ? "mandan.rohithkumar23@gmail.com" : (identifier.includes("@") ? identifier : "rohith.kumar@gmail.com"));
-    let phone = matched ? matched.phone : (role === "owner" ? "8125898068" : "9848022338");
-    let userId = matched ? matched.id : (role === "owner" ? "owner-1" : role === "superadmin" ? "admin-1" : "cust-1");
+    if (!matched) {
+      return false;
+    }
 
     const sessionId = `sess-${Date.now()}`;
     const nowStr = new Date().toLocaleString("en-US", {
@@ -1360,7 +1469,7 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const newSession: UserSessionRecord = {
       id: `sr-${Date.now()}`,
       sessionId,
-      userEmail: email,
+      userEmail: matched.email,
       loginTime: nowStr,
       durationSeconds: 0,
       status: "active",
@@ -1370,68 +1479,58 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const newActivity: UserActivityLog = {
       id: `act-${Date.now()}`,
-      userEmail: email,
+      userEmail: matched.email,
       action: "User Logged In",
       timestamp: nowStr,
       details: `Authenticated as ${role.toUpperCase()} • Session initiated`
     };
 
-    setAccounts((prev) => {
-      const exists = prev.some(
-        (a) => a.email.toLowerCase() === email.toLowerCase() || (phone && a.phone === phone)
-      );
-      if (exists) {
-        return prev.map((a) => {
-          if (a.email.toLowerCase() === email.toLowerCase() || (phone && a.phone === phone)) {
-            return {
-              ...a,
-              lastLogin: nowStr,
-              activeSessionId: sessionId,
-              totalLogins: (a.totalLogins || 0) + 1,
-              sessionLogs: [newSession, ...(a.sessionLogs || [])],
-              activityLogs: [newActivity, ...(a.activityLogs || [])]
-            };
-          }
-          return a;
-        });
-      } else {
-        const createdCust: UserAccount = {
-          id: `usr-${Date.now().toString().slice(-6)}`,
-          name,
-          email,
-          phone: phone || "8125898068",
-          password: "Password@23",
-          role,
-          status: "active",
-          lastLogin: nowStr,
-          dailyServiceCount: 1,
-          monthlyServiceCount: 1,
-          createdAt: new Date().toISOString().split("T")[0],
-          totalLogins: 1,
-          totalTimeSpentSeconds: 0,
-          activeSessionId: sessionId,
-          sessionLogs: [newSession],
-          activityLogs: [newActivity]
-        };
-        return [createdCust, ...prev];
-      }
-    });
+    setAccounts((prev) =>
+      prev.map((a) => {
+        if (a.id === matched.id) {
+          return {
+            ...a,
+            lastLogin: nowStr,
+            activeSessionId: sessionId,
+            totalLogins: (a.totalLogins || 0) + 1,
+            sessionLogs: [newSession, ...(a.sessionLogs || [])],
+            activityLogs: [newActivity, ...(a.activityLogs || [])]
+          };
+        }
+        return a;
+      })
+    );
 
     const newUser: User = {
-      id: userId,
-      name,
-      email,
-      phone,
-      role,
-      avatar: matched?.avatar,
-      faceEmbedding: matched?.faceEmbedding,
-      faceVerified: matched?.faceVerified,
-      familyDetails: matched?.familyDetails
+      id: matched.id,
+      name: matched.name,
+      email: matched.email,
+      phone: matched.phone,
+      role: matched.role,
+      avatar: matched.avatar,
+      faceEmbedding: matched.faceEmbedding,
+      faceVerified: matched.faceVerified,
+      familyDetails: matched.familyDetails
     };
 
     setUser(newUser);
     // Ensure fresh login always defaults to English
     setLanguage("EN");
+
+    // Requirement 3: Set secure, HTTP-only session cookie strictly scoped to this user ID
+    if (typeof window !== "undefined") {
+      fetch("/api/auth/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: newUser.id,
+          email: newUser.email,
+          name: newUser.name,
+          role: newUser.role,
+        }),
+      }).catch((e) => console.error("[Session Cookie Error]", e));
+    }
+
     if (role === "owner") {
       setCurrentView("owner-dashboard");
     } else if (role === "superadmin") {
@@ -1442,8 +1541,25 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return true;
   };
 
-  const loginWithGoogle = (name: string, email: string, roleOverride?: UserRole) => {
+  // Google Login: strictly checks if account exists in database.
+  // Never auto-merges or auto-creates accounts silently.
+  const loginWithGoogle = (name: string, email: string, roleOverride?: UserRole): { success: boolean; error?: string } => {
     const role = roleOverride || selectedRole;
+    const cleanEmail = email.trim().toLowerCase();
+
+    // STRICT CHECK: Does account exist in database?
+    const matchedAccount = accounts.find(
+      (a) => a.email.toLowerCase() === cleanEmail
+    );
+
+    if (!matchedAccount) {
+      // Requirement 1 & 2: Account does NOT exist -> do NOT auto-create!
+      return {
+        success: false,
+        error: "ACCOUNT_NOT_FOUND",
+      };
+    }
+
     const sessionId = `sess-${Date.now()}`;
     const nowStr = new Date().toLocaleString("en-US", {
       month: "short",
@@ -1456,81 +1572,198 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const newSession: UserSessionRecord = {
       id: `sr-${Date.now()}`,
       sessionId,
-      userEmail: email,
+      userEmail: matchedAccount.email,
       loginTime: nowStr,
       durationSeconds: 0,
       status: "active",
-      device: "Google OAuth / Web",
+      device: "Google OAuth / Web (prompt: select_account)",
       ipAddress: "152.58.12.84"
     };
 
     const newActivity: UserActivityLog = {
       id: `act-${Date.now()}`,
-      userEmail: email,
+      userEmail: matchedAccount.email,
       action: "Google SSO Sign-In",
       timestamp: nowStr,
-      details: `Google authentication successful for ${name}`
+      details: `Google authentication successful for ${matchedAccount.name}`
     };
 
-    const matchedAccount = accounts.find((a) => a.email.toLowerCase() === email.toLowerCase());
-
-    setAccounts((prev) => {
-      const exists = prev.some((a) => a.email.toLowerCase() === email.toLowerCase());
-      if (exists) {
-        return prev.map((a) =>
-          a.email.toLowerCase() === email.toLowerCase()
-            ? {
-                ...a,
-                lastLogin: nowStr,
-                activeSessionId: sessionId,
-                totalLogins: (a.totalLogins || 0) + 1,
-                sessionLogs: [newSession, ...(a.sessionLogs || [])],
-                activityLogs: [newActivity, ...(a.activityLogs || [])]
-              }
-            : a
-        );
-      }
-      return [
-        {
-          id: `usr-${Date.now().toString().slice(-6)}`,
-          name,
-          email,
-          phone: "8125898068",
-          password: "Password@23",
-          role,
-          status: "active" as const,
-          lastLogin: nowStr,
-          dailyServiceCount: 1,
-          monthlyServiceCount: 1,
-          createdAt: new Date().toISOString().split("T")[0],
-          totalLogins: 1,
-          totalTimeSpentSeconds: 0,
-          activeSessionId: sessionId,
-          sessionLogs: [newSession],
-          activityLogs: [newActivity]
-        },
-        ...prev
-      ];
-    });
+    // Update only THIS account strictly (no merging, no data bleed)
+    setAccounts((prev) =>
+      prev.map((a) =>
+        a.id === matchedAccount.id
+          ? {
+              ...a,
+              lastLogin: nowStr,
+              activeSessionId: sessionId,
+              totalLogins: (a.totalLogins || 0) + 1,
+              sessionLogs: [newSession, ...(a.sessionLogs || [])],
+              activityLogs: [newActivity, ...(a.activityLogs || [])]
+            }
+          : a
+      )
+    );
 
     const newUser: User = {
-      id: `google-${Date.now()}`,
-      name,
-      email,
-      role,
-      avatar: matchedAccount?.avatar,
-      faceEmbedding: matchedAccount?.faceEmbedding,
-      faceVerified: matchedAccount?.faceVerified,
-      familyDetails: matchedAccount?.familyDetails
+      id: matchedAccount.id, // Strictly scoped to matched account ID
+      name: matchedAccount.name,
+      email: matchedAccount.email,
+      phone: matchedAccount.phone,
+      role: matchedAccount.role,
+      avatar: matchedAccount.avatar,
+      faceEmbedding: matchedAccount.faceEmbedding,
+      faceVerified: matchedAccount.faceVerified,
+      familyDetails: matchedAccount.familyDetails
     };
+
     setUser(newUser);
-    if (role === "owner") {
+
+    // Requirement 3: Set secure, HTTP-only session cookie strictly scoped to this user ID
+    if (typeof window !== "undefined") {
+      fetch("/api/auth/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: newUser.id,
+          email: newUser.email,
+          name: newUser.name,
+          role: newUser.role,
+        }),
+      }).catch((e) => console.error("[Session Cookie Error]", e));
+    }
+
+    if (matchedAccount.role === "owner") {
       setCurrentView("owner-dashboard");
-    } else if (role === "superadmin") {
+    } else if (matchedAccount.role === "superadmin") {
       setCurrentView("admin-dashboard");
     } else {
       setCurrentView("online-works");
     }
+
+    return { success: true };
+  };
+
+  // Google Registration: guides user through creating their distinct isolated account
+  const registerCustomerWithGoogle = (data: {
+    name: string;
+    email: string;
+    phone: string;
+    password?: string;
+    gender?: Gender;
+    avatar?: string;
+  }) => {
+    const cleanEmail = data.email.trim().toLowerCase();
+    const cleanPhone = data.phone.trim();
+
+    if (checkAccountExists(cleanEmail)) {
+      return {
+        success: false,
+        message: "An account with this email already exists. Please log in.",
+      };
+    }
+
+    const regTimeStr = new Date().toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+
+    const newId = `cust-g-${Date.now()}`;
+    const newCustomer: UserAccount = {
+      id: newId,
+      name: data.name.trim(),
+      email: cleanEmail,
+      phone: cleanPhone,
+      password: data.password || "GoogleAuth@2026",
+      gender: data.gender,
+      avatar: data.avatar,
+      role: "customer",
+      status: "active",
+      lastLogin: regTimeStr,
+      dailyServiceCount: 0,
+      monthlyServiceCount: 0,
+      totalLogins: 1,
+      totalTimeSpentSeconds: 0,
+      createdAt: new Date().toISOString().split("T")[0],
+      registeredAt: regTimeStr,
+      sessionLogs: [
+        {
+          id: `sr-${Date.now()}`,
+          sessionId: `sess-${Date.now()}`,
+          userEmail: cleanEmail,
+          loginTime: regTimeStr,
+          durationSeconds: 0,
+          status: "active",
+          device: "Google OAuth / Web Registration",
+          ipAddress: "152.58.12.84"
+        }
+      ],
+      activityLogs: [
+        {
+          id: `act-${Date.now()}`,
+          userEmail: cleanEmail,
+          action: "Customer Google Registration Completed",
+          timestamp: regTimeStr,
+          details: `Self-registered customer account created via Google OAuth for ${data.name}`
+        }
+      ]
+    };
+
+    setAccounts((prev) => {
+      const updated = [newCustomer, ...prev];
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("msn_portal_accounts", JSON.stringify(updated));
+        } catch (e) {}
+      }
+      return updated;
+    });
+
+    // Ensure completely empty, isolated document vault for this new user
+    setUserDocsMap((prev) => {
+      const updated = { ...prev, [cleanEmail]: {} };
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("msn_portal_user_documents", JSON.stringify(updated));
+        } catch (e) {}
+      }
+      return updated;
+    });
+
+    const newUser: User = {
+      id: newId,
+      name: newCustomer.name,
+      email: newCustomer.email,
+      phone: newCustomer.phone,
+      role: "customer",
+      avatar: newCustomer.avatar,
+    };
+
+    setUser(newUser);
+
+    // Requirement 3: Set secure, HTTP-only session cookie strictly scoped to this user ID
+    if (typeof window !== "undefined") {
+      fetch("/api/auth/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: newUser.id,
+          email: newUser.email,
+          name: newUser.name,
+          role: newUser.role,
+        }),
+      }).catch((e) => console.error("[Session Cookie Error]", e));
+    }
+
+    setCurrentView("online-works");
+
+    return {
+      success: true,
+      message: "Google registration completed successfully.",
+      customer: newCustomer,
+    };
   };
 
   const updateFacialProfile = (email: string, avatar: string, faceEmbedding: string) => {
@@ -1576,6 +1809,22 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const logout = () => {
+    // 1. Terminate server HTTP-only session cookies
+    if (typeof window !== "undefined") {
+      fetch("/api/auth/session", { method: "DELETE" }).catch((err) =>
+        console.error("[Session Delete Error]", err)
+      );
+
+      // 2. Disable Google auto-select if GSI script exists
+      const win = window as unknown as {
+        google?: { accounts?: { id?: { disableAutoSelect: () => void } } };
+      };
+      try {
+        win.google?.accounts?.id?.disableAutoSelect();
+      } catch (e) {}
+    }
+
+    // 3. Mark session ended in account logs
     if (user) {
       const nowStr = new Date().toLocaleString("en-US", {
         month: "short",
@@ -1605,6 +1854,7 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             };
             return {
               ...a,
+              totalLogouts: (a.totalLogouts || 0) + 1,
               activeSessionId: undefined,
               sessionLogs: updatedSessions,
               activityLogs: [logoutActivity, ...(a.activityLogs || [])]
@@ -1614,12 +1864,213 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         })
       );
     }
+
+    // 4. Secure Session Isolation: completely purge active session & state
     setUser(null);
     setLanguage("EN");
     setCurrentView("online-works");
     setIsProfileOpen(false);
     setIsSearchOpen(false);
     setSearchQuery("");
+    setPreviewDoc(null);
+    setActivePaymentApp(null);
+  };
+
+  // Customer Face Recognition Biometric Login Log
+  const recordFaceLogin = (email: string, photo: string, confidence: number = 98.5) => {
+    const cleanEmail = email.trim().toLowerCase();
+    const nowStr = new Date().toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+
+    const newFaceLog: FaceLoginLog = {
+      id: `face-log-${Date.now()}`,
+      photo,
+      timestamp: nowStr,
+      confidence,
+      status: "verified",
+      device: typeof navigator !== "undefined" && navigator.userAgent.includes("Windows") ? "Chrome / Windows 11" : "Web Camera",
+      ipAddress: "152.58.12.84"
+    };
+
+    setAccounts((prev) => {
+      const updated = prev.map((a) => {
+        if (a.email.toLowerCase() === cleanEmail) {
+          return {
+            ...a,
+            lastFaceLoginSnapshot: photo,
+            faceLoginTimestamp: nowStr,
+            faceVerified: true,
+            faceLoginHistory: [newFaceLog, ...(a.faceLoginHistory || [])]
+          };
+        }
+        return a;
+      });
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("msn_portal_accounts", JSON.stringify(updated));
+        } catch (e) {}
+      }
+      return updated;
+    });
+
+    // Send to backend API
+    fetch("/api/auth/face-login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: cleanEmail, photo, confidence })
+    }).catch((e) => console.error("[Face Login API Error]", e));
+  };
+
+  // Remote Force Logout Customer
+  const forceLogoutCustomer = (customerId: string): { success: boolean; message: string } => {
+    const nowStr = new Date().toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+
+    let customerName = customerId;
+    let customerEmail = "";
+
+    setAccounts((prev) => {
+      const updated = prev.map((a) => {
+        if (a.id === customerId || a.email.toLowerCase() === customerId.toLowerCase()) {
+          customerName = a.name;
+          customerEmail = a.email;
+          const updatedSessions = (a.sessionLogs || []).map((s) => ({
+            ...s,
+            status: "ended" as const,
+            logoutTime: s.status === "active" ? nowStr : s.logoutTime
+          }));
+
+          const forceActivity: UserActivityLog = {
+            id: `act-${Date.now()}`,
+            userEmail: a.email,
+            action: "Admin Force Logout",
+            timestamp: nowStr,
+            details: "Session terminated remotely by Super Admin"
+          };
+
+          return {
+            ...a,
+            totalLogouts: (a.totalLogouts || 0) + 1,
+            activeSessionId: undefined,
+            sessionLogs: updatedSessions,
+            activityLogs: [forceActivity, ...(a.activityLogs || [])]
+          };
+        }
+        return a;
+      });
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("msn_portal_accounts", JSON.stringify(updated));
+        } catch (e) {}
+      }
+      return updated;
+    });
+
+    fetch(`/api/admin/customers/${encodeURIComponent(customerId)}/force-logout`, {
+      method: "POST"
+    }).catch((e) => console.error("[Force Logout API Error]", e));
+
+    if (user && (user.id === customerId || (customerEmail && user.email.toLowerCase() === customerEmail.toLowerCase()))) {
+      logout();
+    }
+
+    return {
+      success: true,
+      message: `Active session for customer ${customerName} has been terminated remotely.`
+    };
+  };
+
+  // Delete Customer Account
+  const deleteCustomerAccount = (customerId: string): { success: boolean; message: string } => {
+    const target = accounts.find((a) => a.id === customerId);
+    const targetEmail = target?.email.toLowerCase() || "";
+
+    setAccounts((prev) => {
+      const updated = prev.filter((a) => a.id !== customerId);
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("msn_portal_accounts", JSON.stringify(updated));
+        } catch (e) {}
+      }
+      return updated;
+    });
+
+    if (targetEmail) {
+      setUserDocsMap((prev) => {
+        const copy = { ...prev };
+        delete copy[targetEmail];
+        if (typeof window !== "undefined") {
+          try {
+            localStorage.setItem("msn_portal_user_documents", JSON.stringify(copy));
+          } catch (e) {}
+        }
+        return copy;
+      });
+    }
+
+    fetch(`/api/admin/customers/${encodeURIComponent(customerId)}`, {
+      method: "DELETE"
+    }).catch((e) => console.error("[Delete Customer API Error]", e));
+
+    if (user && user.id === customerId) {
+      logout();
+    }
+
+    return {
+      success: true,
+      message: `Customer account ${target?.name || customerId} has been successfully deleted.`
+    };
+  };
+
+  // Direct Admin Message & Alert to Customer
+  const sendMessageToCustomer = (
+    customerIdOrEmail: string,
+    title: string,
+    content: string,
+    type: "info" | "alert" | "urgent" | "success" = "info"
+  ): { success: boolean; message: string } => {
+    const target = accounts.find(
+      (a) => a.id === customerIdOrEmail || a.email.toLowerCase() === customerIdOrEmail.toLowerCase()
+    );
+
+    const targetUserId = target ? target.id : customerIdOrEmail;
+    const nowTime = new Date().toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+
+    const newNotif: PortalNotification = {
+      id: `notif-admin-${Date.now()}`,
+      userId: targetUserId,
+      title: title.trim(),
+      message: content.trim(),
+      timestamp: nowTime || "Just now",
+      read: false,
+      type: type === "urgent" || type === "alert" ? "warning" : type === "success" ? "success" : "info"
+    };
+
+    setNotifications((prev) => [newNotif, ...prev]);
+
+    fetch(`/api/admin/customers/${encodeURIComponent(targetUserId)}/message`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title, content, type })
+    }).catch((e) => console.error("[Message API Error]", e));
+
+    return {
+      success: true,
+      message: `Notification dispatched directly to ${target?.name || "customer"} successfully.`
+    };
   };
 
   // Super Admin 6-Digit OTP Generator & Password Reset Management (60-second auto-expiry)
@@ -2751,6 +3202,8 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setSelectedRole,
         login,
         loginWithGoogle,
+        checkAccountExists,
+        registerCustomerWithGoogle,
         logout,
         currentView,
         setCurrentView,
@@ -2829,7 +3282,11 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         updateFacialProfile,
         passwordChangeAudits,
         recordPasswordChangeAudit,
-        changePasswordAfterFaceMatch
+        changePasswordAfterFaceMatch,
+        recordFaceLogin,
+        forceLogoutCustomer,
+        deleteCustomerAccount,
+        sendMessageToCustomer
       }}
     >
       {children}

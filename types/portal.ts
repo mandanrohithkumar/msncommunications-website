@@ -74,9 +74,20 @@ export interface UserActivityLog {
   details?: string;
 }
 
+export interface FaceLoginLog {
+  id: string;
+  photo: string;
+  timestamp: string;
+  confidence?: number;
+  status: 'verified' | 'failed';
+  device?: string;
+  ipAddress?: string;
+}
+
 export interface UserAccount {
   id: string;
   name: string;
+  username?: string;
   email: string;
   phone: string;
   password?: string;
@@ -89,6 +100,8 @@ export interface UserAccount {
   createdAt: string;
   registeredAt?: string;
   totalLogins?: number;
+  totalLogouts?: number;
+  totalUploads?: number;
   totalTimeSpentSeconds?: number;
   activeSessionId?: string;
   resetOtp?: string;
@@ -101,6 +114,9 @@ export interface UserAccount {
   avatar?: string;
   faceEmbedding?: string;
   faceVerified?: boolean;
+  lastFaceLoginSnapshot?: string;
+  faceLoginTimestamp?: string;
+  faceLoginHistory?: FaceLoginLog[];
 }
 
 export interface OtpVerificationResult {

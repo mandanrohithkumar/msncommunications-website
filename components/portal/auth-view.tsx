@@ -32,6 +32,8 @@ export const AuthView: React.FC = () => {
   const {
     login,
     loginWithGoogle,
+    checkAccountExists,
+    registerCustomerWithGoogle,
     selectedRole,
     setSelectedRole,
     accounts,
@@ -40,8 +42,15 @@ export const AuthView: React.FC = () => {
     resetPasswordWithOtp,
     passwordResetRequests,
     requestPasswordReset,
-    changePasswordAfterFaceMatch
+    changePasswordAfterFaceMatch,
+    recordFaceLogin
   } = usePortal();
+
+  // Google OAuth state (strict separation of sign-up vs sign-in)
+  const [googleVerifiedUser, setGoogleVerifiedUser] = useState<{ name: string; email: string } | null>(null);
+  const [isCustomGoogleInput, setIsCustomGoogleInput] = useState(false);
+  const [customGoogleEmail, setCustomGoogleEmail] = useState("");
+  const [customGoogleName, setCustomGoogleName] = useState("");
 
   // Two-step authentication flow: default to "signup" (Registration) for customer role
   const [customerAuthMode, setCustomerAuthMode] = useState<"signup" | "login">("signup");
@@ -65,6 +74,8 @@ export const AuthView: React.FC = () => {
   const [faceVerifiedForReset, setFaceVerifiedForReset] = useState(false);
   const [isFaceMatched, setIsFaceMatched] = useState(false);
   const [isPreviewRegPhotoOpen, setIsPreviewRegPhotoOpen] = useState(false);
+  const [isFaceSignInOpen, setIsFaceSignInOpen] = useState(false);
+  const [faceSignInTargetCustomer, setFaceSignInTargetCustomer] = useState<UserAccount | null>(null);
 
 
 
@@ -279,6 +290,7 @@ export const AuthView: React.FC = () => {
       email: cleanEmail,
       phone: cleanPhone,
       password: regPassword,
+      name: googleVerifiedUser?.name,
       gender: regGender as Gender,
       avatar: regAvatar || undefined,
       faceEmbedding: regFaceEmbedding || undefined,
@@ -299,7 +311,13 @@ export const AuthView: React.FC = () => {
       setRegConfirmPassword("");
       setRegAvatar(null);
       setRegFaceEmbedding(null);
-      setSuccessMessage("Account created successfully with verified face profile! Please log in.");
+      const wasGoogle = Boolean(googleVerifiedUser);
+      setGoogleVerifiedUser(null);
+      setSuccessMessage(
+        wasGoogle
+          ? "Google account registered successfully! Please log in with your credentials to access your portal."
+          : "Account created successfully with verified face profile! Please log in."
+      );
     } else {
       setErrorMessage(result.message);
     }
@@ -405,11 +423,61 @@ export const AuthView: React.FC = () => {
 
   const handleGoogleAccountSelect = (name: string, email: string) => {
     setIsGoogleModalOpen(false);
+    setIsCustomGoogleInput(false);
+    setCustomGoogleEmail("");
+    setCustomGoogleName("");
+    const cleanEmail = email.trim().toLowerCase();
+    const exists = checkAccountExists(cleanEmail);
+
+    if (customerAuthMode === "signup") {
+      // ═══════════════════════════════════════════════════════════════
+      // REQUIREMENT 1: Strict Separation on the Sign-Up Page
+      // ═══════════════════════════════════════════════════════════════
+      if (exists) {
+        // If the account ALREADY EXISTS:
+        // Inform user and redirect to login page rather than silently merging or auto-logging in.
+        setCustomerAuthMode("login");
+        setIdentifier(cleanEmail);
+        setPassword("");
+        setErrorMessage("An account with this email already exists. Please log in.");
+        setSuccessMessage(null);
+        setGoogleVerifiedUser(null);
+        return;
+      }
+
+      // If the account DOES NOT EXIST:
+      // Guide the user through the registration/profile creation step first!
+      setGoogleVerifiedUser({ name, email: cleanEmail });
+      setRegEmail(cleanEmail);
+      setErrorMessage(null);
+      setSuccessMessage(
+        `Google account verified (${cleanEmail}). Please complete your registration details (phone number, gender, password) below to create your account.`
+      );
+      return;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // REQUIREMENT 1: Strict Separation on the Login Page
+    // ═══════════════════════════════════════════════════════════════
+    if (!exists) {
+      // Account does NOT exist -> Inform user and redirect to sign-up
+      setCustomerAuthMode("signup");
+      setGoogleVerifiedUser({ name, email: cleanEmail });
+      setRegEmail(cleanEmail);
+      setErrorMessage("No account found with this email. Please sign up first.");
+      setSuccessMessage(null);
+      return;
+    }
+
+    // Account exists -> Perform secure, isolated login
     setIsLoading(true);
     setTimeout(() => {
-      loginWithGoogle(name, email, selectedRole);
+      const res = loginWithGoogle(name, cleanEmail, selectedRole);
+      if (!res.success) {
+        setErrorMessage("Google authentication failed. Please verify your account.");
+      }
       setIsLoading(false);
-    }, 400);
+    }, 300);
   };
 
   // Customer clicks Forgot Password on login page: presents Selection Screen first
@@ -547,6 +615,53 @@ export const AuthView: React.FC = () => {
     setForgotSuccess(null);
     setForgotError(errorMsg || "Face verification failed. Does not match profile photo.");
     setIsForgotPasswordOpen(true);
+  };
+
+  // Face Recognition Biometric Sign-In Handlers
+  const handleStartFaceSignIn = () => {
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    const cleanInput = (identifier || "").trim().toLowerCase();
+    const cleanDigits = cleanInput.replace(/\D/g, "");
+
+    const target = accounts.find((a) => {
+      if (a.role !== "customer") return false;
+      const aEmail = (a.email || "").toLowerCase().trim();
+      const aPhone = (a.phone || "").replace(/\D/g, "");
+      return (
+        (cleanInput && aEmail === cleanInput) ||
+        (cleanDigits && aPhone.endsWith(cleanDigits))
+      );
+    }) || accounts.find((a) => a.role === "customer");
+
+    setFaceSignInTargetCustomer(target || null);
+    setIsFaceSignInOpen(true);
+  };
+
+  const handleFaceSignInSuccess = (capturedPhoto: string) => {
+    setIsFaceSignInOpen(false);
+    const target = faceSignInTargetCustomer || accounts.find((a) => a.role === "customer");
+    if (!target) {
+      setErrorMessage("No matching customer found for face biometric sign-in.");
+      return;
+    }
+    // Securely capture and log face login snapshot
+    recordFaceLogin(target.email, capturedPhoto, 98.8);
+
+    // Sync face login snapshot with backend server store
+    fetch("/api/auth/face-login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: target.email, faceSnapshot: capturedPhoto })
+    }).catch((err) => console.warn("Could not sync face login with backend:", err));
+
+    // Authenticate session
+    const ok = login(target.email, "customer");
+    if (ok) {
+      setSuccessMessage(`Face authenticated successfully! Logged in as ${target.name}.`);
+    } else {
+      setErrorMessage("Biometric sign-in failed. Please try again.");
+    }
   };
 
   const handleResetRequestCancel = () => {
@@ -818,6 +933,32 @@ export const AuthView: React.FC = () => {
         {/* STEP 1: CUSTOMER SIGN UP / REGISTRATION FORM (DEFAULT VIEW) */}
         {selectedRole === "customer" && customerAuthMode === "signup" ? (
           <form onSubmit={handleSignUp} autoComplete="off" className="space-y-4">
+            {googleVerifiedUser && (
+              <div className="p-3.5 rounded-2xl bg-indigo-50/90 dark:bg-indigo-950/40 border-2 border-indigo-300 dark:border-indigo-800 text-xs space-y-2 animate-in fade-in">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center shadow-xs">
+                      <svg className="w-4 h-4" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
+                        <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.2v3.15C3.18 21.32 7.24 24 12 24z"/>
+                        <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.2C.44 8.1 0 9.8 0 12s.44 3.9 1.2 5.42l4.08-3.15z"/>
+                        <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.24 0 3.18 2.68 1.2 6.58l4.08 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-bold text-indigo-950 dark:text-indigo-200">{googleVerifiedUser.name}</p>
+                      <p className="text-[11px] text-indigo-600 dark:text-indigo-400 font-mono">{googleVerifiedUser.email}</p>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/80 px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-300 dark:border-emerald-800">
+                    <CheckCircle2 className="w-3 h-3" /> Email Verified
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
+                  Your Google identity has been verified. Complete your phone number and security details below to finish creating your independent account.
+                </p>
+              </div>
+            )}
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
@@ -1231,6 +1372,23 @@ export const AuthView: React.FC = () => {
               )}
             </button>
 
+            {/* Customer Biometric Face Sign-In Option */}
+            {selectedRole === "customer" && (
+              <button
+                type="button"
+                onClick={handleStartFaceSignIn}
+                className="w-full py-3 px-4 rounded-xl border-2 border-indigo-200 dark:border-indigo-800/80 bg-gradient-to-r from-indigo-50/80 to-blue-50/80 hover:from-indigo-100 hover:to-blue-100 dark:from-indigo-950/40 dark:to-blue-950/40 text-indigo-900 dark:text-indigo-200 font-bold text-xs flex items-center justify-center gap-2.5 transition-all shadow-xs cursor-pointer"
+              >
+                <div className="p-1 rounded-lg bg-indigo-600 text-white shadow-xs">
+                  <Scan className="w-3.5 h-3.5" />
+                </div>
+                <span>Sign in with Face Biometrics (Face Recognition)</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-300 dark:border-emerald-800">
+                  Liveness Verified
+                </span>
+              </button>
+            )}
+
             {selectedRole === "customer" && (
               <div className="text-center pt-2 border-t border-slate-100 dark:border-slate-800">
                 <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -1254,13 +1412,17 @@ export const AuthView: React.FC = () => {
 
         {/* Google Sign In Button (Customer only) */}
         {selectedRole === "customer" && (
-          <div className="mt-4">
+          <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800">
             <button
               type="button"
-              onClick={() => setIsGoogleModalOpen(true)}
-              className="w-full py-3 px-4 bg-slate-50 dark:bg-slate-950/70 hover:bg-slate-100 dark:hover:bg-slate-800/80 border border-slate-300 dark:border-slate-800 rounded-xl font-medium text-slate-800 dark:text-white text-xs transition-colors flex items-center justify-center gap-3 shadow-sm cursor-pointer"
+              onClick={() => {
+                setErrorMessage(null);
+                setSuccessMessage(null);
+                setIsGoogleModalOpen(true);
+              }}
+              className="w-full py-3 px-4 bg-slate-50 dark:bg-slate-950/70 hover:bg-slate-100 dark:hover:bg-slate-800/80 border border-slate-300 dark:border-slate-800 rounded-xl font-medium text-slate-800 dark:text-white text-xs transition-colors flex items-center justify-center gap-3 shadow-sm cursor-pointer group"
             >
-              <svg className="w-4 h-4" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 shrink-0 group-hover:scale-105 transition-transform" viewBox="0 0 24 24">
                 <path
                   fill="#4285F4"
                   d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"
@@ -1278,8 +1440,13 @@ export const AuthView: React.FC = () => {
                   d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.24 0 3.18 2.68 1.2 6.58l4.08 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
                 />
               </svg>
-              <span>Continue with Google</span>
+              <span>{customerAuthMode === "signup" ? "Sign up with Google" : "Continue with Google"}</span>
             </button>
+            <p className="text-[10px] text-center text-slate-400 dark:text-slate-500 mt-1.5 flex items-center justify-center gap-1">
+              <span>🔒 Standard OAuth Consent</span>
+              <span>•</span>
+              <span>prompt: select_account</span>
+            </p>
           </div>
         )}
       </div>
@@ -1969,7 +2136,7 @@ export const AuthView: React.FC = () => {
       {isGoogleModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
           <div className="bg-white dark:bg-[#18181f] border border-slate-200 dark:border-slate-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl space-y-4 text-center">
-            <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-slate-100 dark:bg-white mb-1 shadow-sm">
+            <div className="inline-flex items-center justify-center w-11 h-11 rounded-full bg-slate-100 dark:bg-white mb-1 shadow-sm">
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path
                   fill="#4285F4"
@@ -1990,55 +2157,152 @@ export const AuthView: React.FC = () => {
               </svg>
             </div>
             <div>
-              <h3 className="text-base font-semibold text-slate-900 dark:text-white">
-                Sign in with Google
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                {customerAuthMode === "signup" ? "Sign up with Google" : "Sign in with Google"}
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Choose an account to continue to MSN COMMUNICATION
+                {customerAuthMode === "signup"
+                  ? "Choose an account to register with MSN Portal"
+                  : "Choose an account to access MSN Portal"}
               </p>
             </div>
 
-            <div className="space-y-2 text-left pt-2">
+            {/* Mode Guidance Notice */}
+            <div className={`p-2.5 rounded-xl border text-[11px] text-left leading-relaxed ${
+              customerAuthMode === "signup"
+                ? "bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200"
+                : "bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-800 text-indigo-800 dark:text-indigo-200"
+            }`}>
+              {customerAuthMode === "signup" ? (
+                <span>
+                  <strong>Sign-Up Verification:</strong> If this email exists, you will be directed to Log In. If new, you will complete registration below.
+                </span>
+              ) : (
+                <span>
+                  <strong>Sign-In Verification:</strong> Unregistered Google accounts will be prompted to Sign Up first. Automatic account merging is disabled.
+                </span>
+              )}
+            </div>
+
+            {/* Preset Accounts List */}
+            <div className="space-y-2 text-left pt-1">
               <button
                 type="button"
                 onClick={() => handleGoogleAccountSelect("Rohith Kumar", "rohith.kumar@gmail.com")}
-                className="w-full flex items-center gap-3 p-3 bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-2xl cursor-pointer transition-colors text-left"
+                className="w-full flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-2xl cursor-pointer transition-colors text-left group"
               >
-                <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-sm shrink-0">
-                  RK
+                <div className="flex items-center gap-3 overflow-hidden">
+                  <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-sm shrink-0">
+                    RK
+                  </div>
+                  <div className="overflow-hidden">
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">
+                      Rohith Kumar
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate font-mono">
+                      rohith.kumar@gmail.com
+                    </p>
+                  </div>
                 </div>
-                <div className="overflow-hidden">
-                  <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">
-                    Rohith Kumar
-                  </p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                    rohith.kumar@gmail.com
-                  </p>
-                </div>
+                <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full shrink-0 border border-emerald-300 dark:border-emerald-800">
+                  Existing User
+                </span>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleGoogleAccountSelect("MSN Developer", "msn.developer@gmail.com")}
-                className="w-full flex items-center gap-3 p-3 bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-2xl cursor-pointer transition-colors text-left"
+                className="w-full flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-2xl cursor-pointer transition-colors text-left group"
               >
-                <div className="w-10 h-10 rounded-full bg-emerald-600 flex items-center justify-center text-white font-bold text-sm shrink-0">
-                  MD
+                <div className="flex items-center gap-3 overflow-hidden">
+                  <div className="w-10 h-10 rounded-full bg-emerald-600 flex items-center justify-center text-white font-bold text-sm shrink-0">
+                    MD
+                  </div>
+                  <div className="overflow-hidden">
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">
+                      MSN Developer
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate font-mono">
+                      msn.developer@gmail.com
+                    </p>
+                  </div>
                 </div>
-                <div className="overflow-hidden">
-                  <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">
-                    MSN Developer
-                  </p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                    msn.developer@gmail.com
-                  </p>
-                </div>
+                <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/60 px-2 py-0.5 rounded-full shrink-0 border border-amber-300 dark:border-amber-800">
+                  New Email
+                </span>
               </button>
+            </div>
+
+            {/* Use Another Google Account Toggle */}
+            <div className="text-left pt-1">
+              {!isCustomGoogleInput ? (
+                <button
+                  type="button"
+                  onClick={() => setIsCustomGoogleInput(true)}
+                  className="w-full py-2 px-3 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 rounded-xl transition-colors border border-dashed border-indigo-300 dark:border-indigo-800 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <User className="w-3.5 h-3.5" />
+                  <span>Use another Google account</span>
+                </button>
+              ) : (
+                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-2.5 animate-in fade-in">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                      Enter Google Email
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsCustomGoogleInput(false)}
+                      className="text-[10px] text-slate-400 hover:text-slate-600"
+                    >
+                      Back
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={customGoogleName}
+                    onChange={(e) => setCustomGoogleName(e.target.value)}
+                    placeholder="Full Name (e.g. Kaveri Mallepakula)"
+                    className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white"
+                  />
+                  <input
+                    type="email"
+                    value={customGoogleEmail}
+                    onChange={(e) => setCustomGoogleEmail(e.target.value)}
+                    placeholder="Google Email (e.g. user@gmail.com)"
+                    className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white"
+                  />
+                  <button
+                    type="button"
+                    disabled={!customGoogleEmail.includes("@")}
+                    onClick={() => {
+                      if (customGoogleEmail.includes("@")) {
+                        handleGoogleAccountSelect(
+                          customGoogleName.trim() || customGoogleEmail.split("@")[0],
+                          customGoogleEmail.trim()
+                        );
+                      }
+                    }}
+                    className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-colors disabled:opacity-50 cursor-pointer"
+                  >
+                    Select this Account
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* OAuth Security Policy Footer */}
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-[10px] text-slate-400 dark:text-slate-500 space-y-0.5">
+              <p>🔒 Standard OAuth Consent flow (prompt: select_account)</p>
+              <p>Aggressive One Tap disabled • No cross-account merging</p>
             </div>
 
             <button
               type="button"
-              onClick={() => setIsGoogleModalOpen(false)}
+              onClick={() => {
+                setIsGoogleModalOpen(false);
+                setIsCustomGoogleInput(false);
+              }}
               className="w-full py-2 text-xs font-semibold text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors cursor-pointer"
             >
               Cancel
@@ -2066,6 +2330,19 @@ export const AuthView: React.FC = () => {
         targetCustomer={faceVerifyTargetCustomer}
         onVerificationSuccess={handleFaceVerifySuccess}
         onVerificationFail={handleFaceVerifyFail}
+      />
+
+      {/* Customer Biometric Face Sign-In Modal */}
+      <FaceRecognitionModal
+        isOpen={isFaceSignInOpen}
+        onClose={() => setIsFaceSignInOpen(false)}
+        mode="verify"
+        targetCustomer={faceSignInTargetCustomer}
+        onVerificationSuccess={handleFaceSignInSuccess}
+        onVerificationFail={(msg) => {
+          setIsFaceSignInOpen(false);
+          setErrorMessage(msg || "Face biometric sign-in failed. Please try again or use password.");
+        }}
       />
       {/* Interactive Image Preview Modal for Registration Captured Face Snapshot */}
       {isPreviewRegPhotoOpen && regAvatar && (

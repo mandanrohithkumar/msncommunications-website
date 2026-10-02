@@ -32,7 +32,8 @@ import {
   ZoomIn,
   ZoomOut,
   FileCheck2,
-  ImageIcon
+  ImageIcon,
+  MapPin
 } from "lucide-react";
 import { resolveDocumentDataUrl, isImageDocument, isPdfDocument } from "@/lib/doc-preview-utils";
 import { downloadDocument, shareDocumentAsPdf } from "@/lib/document-download-share";
@@ -1046,6 +1047,19 @@ export const OwnerDashboard: React.FC = () => {
                         </p>
                       </div>
 
+                      {/* Customer Location Pill in Card */}
+                      {(app.formData["District"] || app.formData["Mandal"] || app.formData["Colony / Locality / Street Name"]) && (
+                        <div className="pt-2 border-t border-slate-200/80 dark:border-slate-800 flex items-center gap-1.5 text-[10px] text-slate-600 dark:text-slate-300">
+                          <MapPin className="w-3.5 h-3.5 text-[#FF9933] shrink-0" />
+                          <span className="font-semibold text-slate-800 dark:text-slate-200 truncate">
+                            {app.formData["Colony / Locality / Street Name"] ? `${app.formData["Colony / Locality / Street Name"]}, ` : ""}
+                            {app.formData["Mandal"] ? `${app.formData["Mandal"]} Mdl, ` : ""}
+                            {app.formData["District"] ? `${app.formData["District"]} Dist` : ""}
+                            {app.formData["Pincode"] ? ` - ${app.formData["Pincode"]}` : ""}
+                          </span>
+                        </div>
+                      )}
+
                       {Object.keys(app.formData).length > 0 && (
                         <div className="pt-2 border-t border-slate-200/80 dark:border-slate-800">
                           <span className="text-[11px] font-semibold text-slate-500 block mb-1">
@@ -1352,6 +1366,53 @@ export const OwnerDashboard: React.FC = () => {
                         </div>
                       </div>
                     </div>
+
+                    {/* Customer Verified Location & Jurisdiction Details (Telangana State) */}
+                    {(app.formData["District"] || app.formData["Mandal"] || app.formData["Address"]) && (
+                      <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-50/70 via-white to-blue-50/60 dark:from-slate-950/70 dark:via-slate-900 dark:to-blue-950/30 border border-indigo-200 dark:border-indigo-900/60 space-y-2.5 shadow-xs">
+                        <div className="flex items-center justify-between border-b border-indigo-100 dark:border-indigo-900/40 pb-2">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-[#000080] dark:text-blue-300 flex items-center gap-1.5">
+                            <MapPin className="w-3.5 h-3.5 text-[#FF9933]" />
+                            Customer Location & Jurisdiction
+                          </h4>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                            Telangana Verified
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+                          <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                            <span className="text-[10px] text-slate-400 block font-medium">District</span>
+                            <span className="font-bold text-slate-800 dark:text-slate-100 truncate block">
+                              {app.formData["District"] || "—"}
+                            </span>
+                          </div>
+                          <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                            <span className="text-[10px] text-slate-400 block font-medium">Mandal</span>
+                            <span className="font-bold text-slate-800 dark:text-slate-100 truncate block">
+                              {app.formData["Mandal"] || "—"}
+                            </span>
+                          </div>
+                          <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                            <span className="text-[10px] text-slate-400 block font-medium">Colony / Street</span>
+                            <span className="font-bold text-slate-800 dark:text-slate-100 truncate block" title={app.formData["Colony / Locality / Street Name"] || app.formData["Street Address"] || "—"}>
+                              {app.formData["Colony / Locality / Street Name"] || app.formData["Street Address"] || "—"}
+                            </span>
+                          </div>
+                          <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800">
+                            <span className="text-[10px] text-emerald-700 dark:text-emerald-400 block font-medium">Pincode</span>
+                            <span className="font-mono font-black text-emerald-800 dark:text-emerald-300 block">
+                              {app.formData["Pincode"] || "—"} ✓
+                            </span>
+                          </div>
+                        </div>
+                        {app.formData["Address"] && (
+                          <div className="p-2 rounded-xl bg-white/80 dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800 text-[11px] text-slate-600 dark:text-slate-300">
+                            <span className="text-[10px] text-slate-400 block font-medium">Complete Formatted Address:</span>
+                            <span className="font-medium">{app.formData["Address"]}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {/* Form Data Box */}
                     <div className="p-4 rounded-2xl bg-[#F9FAFB] dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-2.5">

@@ -29,10 +29,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Fetch all payments for this order from Cashfree
-    const response = await cashfree.PGOrderFetchPayments(
-      "2025-01-01",
-      orderId
-    );
+    const response = await cashfree.PGOrderFetchPayments(orderId);
     const payments = response.data;
 
     if (!payments || !Array.isArray(payments) || payments.length === 0) {

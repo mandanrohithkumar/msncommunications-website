@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
     };
 
     // Call Cashfree Create Order API
-    const response = await cashfree.PGCreateOrder("2025-01-01", orderRequest);
+    const response = await cashfree.PGCreateOrder(orderRequest);
     const data = response.data;
 
     return NextResponse.json({

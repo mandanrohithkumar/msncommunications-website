@@ -39,7 +39,12 @@ export const DynamicForm: React.FC = () => {
     "Full Name": user?.name || "Rohith Kumar",
     "Phone Number": user?.phone || "8125898068",
     "Email ID": user?.email || "rohith.kumar@gmail.com",
-    "State": "Telangana"
+    "State": "Telangana",
+    "District": "Nagarkurnool",
+    "Mandal": "Nagarkurnool",
+    "Colony / Locality / Street Name": "",
+    "Pincode": "509209",
+    "Address": "Nagarkurnool Mandal, Nagarkurnool Dist, Telangana - 509209"
   });
 
   const [attachedFiles, setAttachedFiles] = useState<Record<string, UploadedFileMeta>>({});
@@ -158,6 +163,13 @@ export const DynamicForm: React.FC = () => {
         setValidationError(phoneRes.error || "Phone Number must be exactly 10 digits.");
         return;
       }
+    }
+
+    // Validate Telangana Location Details (Colony / Locality / Street Name is Required *)
+    const colonyStreet = (formData["Colony / Locality / Street Name"] || "").trim();
+    if (!colonyStreet) {
+      setValidationError("Please enter your Colony / Locality / Street Name.");
+      return;
     }
 
     // Validate required documents
@@ -280,7 +292,10 @@ export const DynamicForm: React.FC = () => {
                   (f) =>
                     !f.label.toLowerCase().includes("website url") &&
                     f.label.toLowerCase() !== "website" &&
-                    f.label.toLowerCase() !== "portal url"
+                    f.label.toLowerCase() !== "portal url" &&
+                    !["district", "mandal", "pincode", "pin code", "colony / locality / street name", "colony", "locality", "street name", "street", "village / mandal"].includes(
+                      f.label.toLowerCase().trim()
+                    )
                 )
                 .map((field, idx) => {
                   const constraintType = getFieldConstraintType(field.label, field.type);
@@ -377,18 +392,21 @@ export const DynamicForm: React.FC = () => {
                   );
                 })}
 
-              {/* Cascading Location Dropdowns: District -> Mandal -> Auto-Pincode */}
+              {/* Cascading Location Dropdowns: District -> Mandal -> Colony/Street -> Auto-Pincode */}
               <div className="sm:col-span-2 pt-2">
                 <CascadingLocationSelector
                   initialDistrict={formData["District"] || "Nagarkurnool"}
                   initialMandal={formData["Mandal"] || "Nagarkurnool"}
+                  initialColonyStreet={formData["Colony / Locality / Street Name"] || ""}
                   initialPincode={formData["Pincode"] || "509209"}
-                  onLocationChange={({ district, mandal, pincode }) => {
+                  onLocationChange={({ district, mandal, colonyStreet, pincode, formattedAddress }) => {
                     setFormData((prev) => ({
                       ...prev,
                       "District": district,
                       "Mandal": mandal,
-                      "Pincode": pincode
+                      "Colony / Locality / Street Name": colonyStreet,
+                      "Pincode": pincode,
+                      "Address": formattedAddress
                     }));
                   }}
                 />
