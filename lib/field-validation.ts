@@ -2,13 +2,30 @@
  * Field Classification and Input Constraints Utilities
  */
 
-export type FieldConstraintType = "phone" | "aadhaar" | "pan" | "general";
+export type FieldConstraintType = "phone" | "aadhaar" | "pan" | "dob" | "pincode" | "general";
 
 /**
  * Determine the constraint type based on field label and input type
  */
 export function getFieldConstraintType(label: string, inputType?: string): FieldConstraintType {
   const norm = (label || "").trim().toLowerCase();
+
+  // Date of Birth check
+  if (
+    inputType === "date" ||
+    norm.includes("date of birth") ||
+    norm.includes("dob") ||
+    norm.includes("birth date") ||
+    norm === "birthdate" ||
+    norm.includes("date_of_birth")
+  ) {
+    return "dob";
+  }
+
+  // Pincode check
+  if (norm.includes("pincode") || norm.includes("pin code") || norm === "pin" || norm === "postal code") {
+    return "pincode";
+  }
 
   // Phone / Mobile number check
   if (inputType === "tel" || norm.includes("phone") || norm.includes("mobile") || norm === "contact number") {
@@ -142,4 +159,177 @@ export function validateEmailAddress(email: string): { valid: boolean; error?: s
     return { valid: false, error: "Please enter a valid email format (e.g. user@domain.com)." };
   }
   return { valid: true };
+}
+
+/**
+ * Sanitize Pincode: strictly numeric (0-9), maximum 6 digits
+ */
+export function sanitizePincode(value: string): string {
+  return value.replace(/\D/g, "").slice(0, 6);
+}
+
+/**
+ * Validate Pincode: strictly 6 digits
+ */
+export function validatePincode(pincode: string, label: string = "Pincode"): { valid: boolean; error?: string } {
+  const clean = sanitizePincode(pincode);
+  if (!clean) return { valid: false, error: `${label} is required.` };
+  if (clean.length !== 6) {
+    return { valid: false, error: `${label} must be exactly 6 digits (currently ${clean.length}/6).` };
+  }
+  if (/^0/.test(clean)) {
+    return { valid: false, error: `${label} cannot start with 0.` };
+  }
+  return { valid: true };
+}
+
+/**
+ * Calculate age from Date of Birth string (YYYY-MM-DD)
+ */
+export function calculateAge(dobString: string): number | null {
+  if (!dobString) return null;
+  const birthDate = new Date(dobString);
+  if (isNaN(birthDate.getTime())) return null;
+
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+
+  return age >= 0 ? age : null;
+}
+
+/**
+ * Validate Date of Birth (DOB) Field Constraints:
+ * 1. Strictly prevent future dates
+ * 2. Prevent invalid format
+ * 3. Enforce realistic age (max 125 years)
+ * 4. Optional minimum age restriction (e.g. 18+ for voter card or driving license)
+ */
+export function validateDateOfBirth(
+  dob: string,
+  label: string = "Date of Birth",
+  minAge?: number,
+  maxAge: number = 125
+): { valid: boolean; error?: string; age?: number } {
+  const clean = (dob || "").trim();
+  if (!clean) return { valid: false, error: `${label} is required.` };
+
+  const birthDate = new Date(clean);
+  if (isNaN(birthDate.getTime())) {
+    return { valid: false, error: `Please enter a valid date for ${label}.` };
+  }
+
+  // Prevent future dates
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+  if (birthDate > today) {
+    return { valid: false, error: `${label} cannot be a future date.` };
+  }
+
+  const age = calculateAge(clean);
+  if (age === null || age > maxAge) {
+    return { valid: false, error: `${label} indicates an age over ${maxAge} years. Please check the year.` };
+  }
+
+  if (minAge !== undefined && age < minAge) {
+    return { valid: false, error: `Applicant must be at least ${minAge} years old (currently ${age} years old).` };
+  }
+
+  return { valid: true, age };
+}
+
+/**
+ * Validate Colony / Locality / Street Name
+ */
+export function validateColonyStreet(street: string, label: string = "Colony / Street"): { valid: boolean; error?: string } {
+  const clean = (street || "").trim();
+  if (!clean) return { valid: false, error: `${label} is required.` };
+  if (clean.length < 3) {
+    return { valid: false, error: `${label} must be at least 3 characters long.` };
+  }
+  if (clean.length > 100) {
+    return { valid: false, error: `${label} cannot exceed 100 characters.` };
+  }
+  return { valid: true };
+}
+
+/**
+ * Standard Clean Formatted Address Builder:
+ * Format: [Colony/Street], [Mandal], [District], Telangana - [PINCODE]
+ * - Strips any redundant text tags (e.g. "Mandal", "Dist") from input values.
+ * - Filters out empty segments cleanly with standard comma separation.
+ * - Handles cases where Colony/Street is empty cleanly.
+ */
+export function buildSmartAddress(
+  street?: string | null,
+  mandal?: string | null,
+  district?: string | null,
+  state: string = "Telangana",
+  pincode?: string | null
+): string {
+  const cleanStreet = (street || "").trim();
+
+  // Strip redundant "Mandal" or "Dist" text tags if passed in the raw values
+  const cleanMandal = (mandal || "")
+    .replace(/\s+mandal$/i, "")
+    .replace(/\s+dist(rict)?$/i, "")
+    .trim();
+
+  const cleanDistrict = (district || "")
+    .replace(/\s+dist(rict)?$/i, "")
+    .replace(/\s+mandal$/i, "")
+    .trim();
+
+  const cleanState = (state || "Telangana")
+    .replace(/\s+state$/i, "")
+    .trim() || "Telangana";
+
+  const cleanPin = (pincode || "").trim();
+
+  // Standard clean format: [Colony/Street], [Mandal], [District], Telangana - [PINCODE]
+  const parts: string[] = [];
+
+  if (cleanStreet) {
+    parts.push(cleanStreet);
+  }
+  if (cleanMandal) {
+    parts.push(cleanMandal);
+  }
+  if (cleanDistrict) {
+    parts.push(cleanDistrict);
+  }
+  if (cleanState) {
+    parts.push(cleanState);
+  }
+
+  let address = parts.join(", ");
+  if (cleanPin) {
+    address += ` - ${cleanPin}`;
+  }
+
+  return address;
+}
+
+/**
+ * Format Jurisdiction Label cleanly without repeating identical strings:
+ * If Mandal and District are identical (e.g. Nagarkurnool, Nagarkurnool),
+ * returns "Nagarkurnool Mandal" instead of "Nagarkurnool, Nagarkurnool".
+ */
+export function formatJurisdictionLabel(mandal?: string | null, district?: string | null): string {
+  const cleanM = (mandal || "").trim();
+  const cleanD = (district || "").trim();
+
+  if (!cleanM && !cleanD) return "—";
+  if (!cleanM) return `${cleanD} Dist`;
+  if (!cleanD) return `${cleanM} Mandal`;
+
+  if (cleanM.toLowerCase() === cleanD.toLowerCase()) {
+    return `${cleanM} Mandal`;
+  }
+
+  return `${cleanM} Mandal, ${cleanD} Dist`;
 }

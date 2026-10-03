@@ -48,56 +48,86 @@ export const PaymentModal: React.FC = () => {
     setErrorMessage("");
 
     try {
-      // Step 1: Create order on our backend → Cashfree server
-      const orderId = `${activePaymentApp.id}-${Date.now()}`;
-      const orderResult = await createCashfreeOrder({
-        orderId,
-        orderAmount: activePaymentApp.price,
+      // Step 1: Create order on backend -> Cashfree PG API
+      const rawOrderId = `MSN_${activePaymentApp.id.replace(/[^a-zA-Z0-9_-]/g, "_")}_${Date.now()}`;
+      console.log("[Cashfree Checkout Flow] 1. Initiating order creation:", {
+        orderId: rawOrderId,
+        amount: activePaymentApp.price,
         customerName: activePaymentApp.customerName,
-        customerEmail: activePaymentApp.customerEmail,
         customerPhone: activePaymentApp.customerPhone,
+        service: activePaymentApp.serviceName,
+      });
+
+      const orderResult = await createCashfreeOrder({
+        orderId: rawOrderId,
+        orderAmount: activePaymentApp.price,
+        customerName: activePaymentApp.customerName || "Customer",
+        customerEmail: activePaymentApp.customerEmail || "customer@meeseva.telangana.gov.in",
+        customerPhone: activePaymentApp.customerPhone || "9848012345",
         serviceName: activePaymentApp.serviceName,
       });
 
+      console.log("[Cashfree Checkout Flow] 2. Order creation response:", orderResult);
+
       if (!orderResult.success || !orderResult.payment_session_id) {
+        const errorMsg =
+          orderResult.error ||
+          (orderResult.details as { message?: string })?.message ||
+          "Failed to generate payment session with Cashfree";
+
+        console.error("[Cashfree Checkout Flow] Order creation error:", {
+          error: errorMsg,
+          details: orderResult.details,
+        });
+
         setStage("error");
-        setErrorMessage(
-          orderResult.error || "Failed to create payment order. Please try again."
-        );
+        setErrorMessage(errorMsg);
         return;
       }
 
+      const activeOrderId = orderResult.order_id || rawOrderId;
+      const sessionId = orderResult.payment_session_id;
+
       // Step 2: Open Cashfree checkout modal
       setStage("checkout");
-      const checkoutResult = await openCashfreeCheckout(
-        orderResult.payment_session_id
-      );
+      console.log("[Cashfree Checkout Flow] 3. Opening Cashfree checkout modal with session:", sessionId);
+
+      const checkoutResult = await openCashfreeCheckout(sessionId);
+      console.log("[Cashfree Checkout Flow] 4. Checkout modal returned:", checkoutResult);
 
       if (checkoutResult.status === "cancelled") {
-        // User closed the modal — go back to selection
+        console.log("[Cashfree Checkout Flow] User dismissed or cancelled checkout");
         setStage("select");
         return;
       }
 
       if (checkoutResult.status === "failed") {
+        const failReason = checkoutResult.error || "Payment was declined by bank or gateway.";
+        console.warn("[Cashfree Checkout Flow] Payment checkout failed:", failReason);
+
+        // Record FAILED status in database / store
+        processPayment(activePaymentApp.id, selectedMethod, "Failed", {
+          transactionRef: `CF_FAIL_${Date.now()}`,
+          errorMessage: failReason,
+        });
+
         setStage("failed");
-        setErrorMessage(
-          checkoutResult.error || "Payment was declined. Please try a different method."
-        );
+        setErrorMessage(failReason);
         return;
       }
 
       // Step 3: Verify payment server-side (THE source of truth)
       setStage("verifying");
-      const verifyResult = await verifyCashfreePayment(
-        orderResult.order_id!
-      );
+      console.log("[Cashfree Checkout Flow] 5. Verifying payment server-side for order:", activeOrderId);
+
+      const verifyResult = await verifyCashfreePayment(activeOrderId);
+      console.log("[Cashfree Checkout Flow] 6. Server verification response:", verifyResult);
 
       if (verifyResult.success && verifyResult.status === "PAID") {
-        // ✅ Payment is verified — update the portal state
+        // SUCCESS: Update application & payment in database
+        console.log("[Cashfree Checkout Flow] ✅ Payment status SUCCESS confirmed.");
         setStage("success");
 
-        // Determine the payment method from Cashfree response
         const cfMethod = verifyResult.payment?.payment_method;
         let resolvedMethod: PaymentMethod = selectedMethod;
         if (cfMethod) {
@@ -107,34 +137,58 @@ export const PaymentModal: React.FC = () => {
           else if (methodStr.includes("card")) resolvedMethod = "Debit Card";
         }
 
-        // Update the portal store with real payment data
-        processPayment(activePaymentApp.id, resolvedMethod);
+        processPayment(activePaymentApp.id, resolvedMethod, "Successful", {
+          cfPaymentId: verifyResult.payment?.cf_payment_id,
+          transactionRef: verifyResult.payment?.bank_reference || `CF_${activeOrderId}`,
+        });
 
         // Show success briefly then navigate
         setTimeout(() => {
           setCurrentView("history");
         }, 1500);
       } else if (verifyResult.status === "PENDING") {
+        // PENDING: Update application & payment to Pending
+        console.warn("[Cashfree Checkout Flow] ⏳ Payment status is PENDING.");
+        processPayment(activePaymentApp.id, selectedMethod, "Pending", {
+          transactionRef: `CF_PENDING_${Date.now()}`,
+          errorMessage: verifyResult.message,
+        });
+
         setStage("verifying");
         setErrorMessage(
-          "Payment is being processed. You will be notified once confirmed."
+          "Payment confirmation is currently pending with your bank. Application status has been saved as Payment Pending."
         );
         setTimeout(() => {
           setCurrentView("history");
           setActivePaymentApp(null);
         }, 3000);
       } else {
+        // FAILED: Update application & payment to Failed
+        const failMessage =
+          verifyResult.message ||
+          verifyResult.error ||
+          "Payment verification failed. If your account was debited, it will be refunded within 3-5 business days.";
+
+        console.warn("[Cashfree Checkout Flow] ❌ Payment status verification returned FAILED:", failMessage);
+
+        processPayment(activePaymentApp.id, selectedMethod, "Failed", {
+          transactionRef: `CF_FAILED_${Date.now()}`,
+          errorMessage: failMessage,
+        });
+
         setStage("failed");
-        setErrorMessage(
-          verifyResult.message || "Payment verification failed. Contact support if amount was debited."
-        );
+        setErrorMessage(failMessage);
       }
-    } catch (err) {
-      console.error("[Payment Error]", err);
+    } catch (err: unknown) {
+      const errorMsg =
+        err instanceof Error ? err.message : "An unexpected payment error occurred.";
+      console.error("[Cashfree Checkout Critical Error]", {
+        error: err,
+        message: errorMsg,
+      });
+
       setStage("error");
-      setErrorMessage(
-        "An unexpected error occurred. Please check your internet connection and try again."
-      );
+      setErrorMessage(`Cashfree Payment Error: ${errorMsg}`);
     }
   };
 
@@ -209,11 +263,16 @@ export const PaymentModal: React.FC = () => {
             )}
           </div>
           <h3 className="text-lg font-bold text-red-600 dark:text-red-400">
-            {stage === "failed" ? "Payment Failed" : "Something Went Wrong"}
+            {stage === "failed" ? "Payment Failed" : "Cashfree Gateway Notice"}
           </h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            {errorMessage}
-          </p>
+          <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 text-left">
+            <span className="block text-[10px] uppercase font-bold tracking-wider text-slate-400 dark:text-slate-500 mb-1">
+              Gateway Diagnostic
+            </span>
+            <p className="text-xs font-medium text-slate-700 dark:text-slate-300 break-words leading-relaxed">
+              {errorMessage}
+            </p>
+          </div>
           <div className="flex gap-3">
             <button
               onClick={() => setActivePaymentApp(null)}

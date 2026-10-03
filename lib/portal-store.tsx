@@ -10,6 +10,7 @@ import {
   ApplicationStatus,
   PaymentRecord,
   PaymentMethod,
+  PaymentStatus,
   UploadedFileMeta,
   PortalNotification,
   PortalMessage,
@@ -124,7 +125,12 @@ interface PortalContextType {
   payments: PaymentRecord[];
   activePaymentApp: Application | null;
   setActivePaymentApp: (app: Application | null) => void;
-  processPayment: (applicationId: string, method: PaymentMethod) => void;
+  processPayment: (
+    applicationId: string,
+    method: PaymentMethod,
+    status?: PaymentStatus,
+    details?: { transactionRef?: string; cfPaymentId?: string; errorMessage?: string }
+  ) => void;
 
   // Messages & Notifications
   notifications: PortalNotification[];
@@ -2900,12 +2906,17 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return newApp;
   };
 
-  const processPayment = (applicationId: string, method: PaymentMethod) => {
+  const processPayment = (
+    applicationId: string,
+    method: PaymentMethod,
+    status: PaymentStatus = "Successful",
+    details?: { transactionRef?: string; cfPaymentId?: string; errorMessage?: string }
+  ) => {
     const targetApp = applications.find(a => a.id === applicationId);
     if (!targetApp) return;
 
-    const txRef = `${method.replace(/\s+/g, "").toUpperCase()}/${Date.now()}`;
-    const newPayId = `PAY-${Date.now().toString().slice(-6)}`;
+    const txRef = details?.transactionRef || details?.cfPaymentId || `${method.replace(/\s+/g, "").toUpperCase()}/${Date.now()}`;
+    const newPayId = details?.cfPaymentId || `PAY-${Date.now().toString().slice(-6)}`;
 
     const newPayment: PaymentRecord = {
       id: newPayId,
@@ -2913,44 +2924,116 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       serviceName: targetApp.serviceName,
       amount: `₹${targetApp.price}`,
       method,
-      status: "Successful",
+      status,
       timestamp: new Date().toLocaleString(),
       transactionRef: txRef,
       customerName: targetApp.customerName
     };
 
     setPayments(prev => [newPayment, ...prev]);
-    logUserActivity("Payment Completed", `Paid ₹${targetApp.price} via ${method} for ${targetApp.serviceName}`, targetApp.customerEmail || user?.email);
 
-    // Update application status to "Waiting for Owner"
-    setApplications(prev =>
-      prev.map(app =>
-        app.id === applicationId
-          ? {
-              ...app,
-              status: "Waiting for Owner",
-              paymentId: newPayId,
-              updatedAt: new Date().toLocaleString()
-            }
-          : app
-      )
-    );
+    if (status === "Successful") {
+      logUserActivity(
+        "Payment Completed",
+        `Paid ₹${targetApp.price} via ${method} for ${targetApp.serviceName} (Ref: ${txRef})`,
+        targetApp.customerEmail || user?.email
+      );
 
-    setActivePaymentApp(null);
+      // Update application status to "Waiting for Owner"
+      setApplications(prev =>
+        prev.map(app =>
+          app.id === applicationId
+            ? {
+                ...app,
+                status: "Waiting for Owner",
+                paymentId: newPayId,
+                updatedAt: new Date().toLocaleString()
+              }
+            : app
+        )
+      );
 
-    // Notify customer
-    setNotifications(prev => [
-      {
-        id: `notif-${Date.now()}`,
-        userId: targetApp.customerId,
-        title: "Payment Received",
-        message: `Payment of ₹${targetApp.price} via ${method} confirmed for ${targetApp.serviceName}.`,
-        timestamp: "Just now",
-        read: false,
-        type: "success"
-      },
-      ...prev
-    ]);
+      setActivePaymentApp(null);
+
+      // Notify customer
+      setNotifications(prev => [
+        {
+          id: `notif-${Date.now()}`,
+          userId: targetApp.customerId,
+          title: "Payment Received",
+          message: `Payment of ₹${targetApp.price} via ${method} confirmed for ${targetApp.serviceName}.`,
+          timestamp: "Just now",
+          read: false,
+          type: "success"
+        },
+        ...prev
+      ]);
+    } else if (status === "Failed") {
+      logUserActivity(
+        "Payment Failed",
+        `Payment of ₹${targetApp.price} via ${method} failed for ${targetApp.serviceName}: ${details?.errorMessage || "Transaction declined"}`,
+        targetApp.customerEmail || user?.email
+      );
+
+      // Keep application in "Payment Pending"
+      setApplications(prev =>
+        prev.map(app =>
+          app.id === applicationId
+            ? {
+                ...app,
+                status: "Payment Pending",
+                updatedAt: new Date().toLocaleString()
+              }
+            : app
+        )
+      );
+
+      // Notify customer
+      setNotifications(prev => [
+        {
+          id: `notif-${Date.now()}`,
+          userId: targetApp.customerId,
+          title: "Payment Declined",
+          message: `Payment of ₹${targetApp.price} via ${method} failed. You can re-attempt checkout anytime.`,
+          timestamp: "Just now",
+          read: false,
+          type: "error"
+        },
+        ...prev
+      ]);
+    } else if (status === "Pending") {
+      logUserActivity(
+        "Payment Processing",
+        `Payment of ₹${targetApp.price} via ${method} is awaiting banking confirmation`,
+        targetApp.customerEmail || user?.email
+      );
+
+      setApplications(prev =>
+        prev.map(app =>
+          app.id === applicationId
+            ? {
+                ...app,
+                status: "Payment Pending",
+                paymentId: newPayId,
+                updatedAt: new Date().toLocaleString()
+              }
+            : app
+        )
+      );
+
+      setNotifications(prev => [
+        {
+          id: `notif-${Date.now()}`,
+          userId: targetApp.customerId,
+          title: "Payment Awaiting Confirmation",
+          message: `Payment of ₹${targetApp.price} via ${method} is pending confirmation from the bank.`,
+          timestamp: "Just now",
+          read: false,
+          type: "info"
+        },
+        ...prev
+      ]);
+    }
   };
 
   const acceptTask = (applicationId: string) => {

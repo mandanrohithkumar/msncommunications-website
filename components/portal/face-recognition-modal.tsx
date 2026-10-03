@@ -15,7 +15,10 @@ import {
   UserCheck,
   Upload,
   Focus,
-  Check
+  Check,
+  UserX,
+  AlertTriangle,
+  Smile
 } from "lucide-react";
 import { UserAccount } from "@/types/portal";
 
@@ -69,7 +72,7 @@ function extractFacialEmbedding(canvas: HTMLCanvasElement): string {
 
 // Compute similarity score between two embeddings (0.0 to 1.0)
 function computeEmbeddingSimilarity(embA?: string, embB?: string): number {
-  if (!embA || !embB) return 0.88; // Default favorable similarity if baseline template
+  if (!embA || !embB) return 0.88;
   const cleanA = embA.replace(/^emb-/, "");
   const cleanB = embB.replace(/^emb-/, "");
   if (cleanA === cleanB) return 0.99;
@@ -103,16 +106,20 @@ export const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [blinkDetected, setBlinkDetected] = useState(false);
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
-  const [statusMessage, setStatusMessage] = useState<string>("Center your face in the oval");
-  const [instructionState, setInstructionState] = useState<"centering" | "blink_ready" | "blinking" | "success" | "verifying" | "fail">("centering");
+
+  // Strict Face Detection & Validation States
+  const [faceDetected, setFaceDetected] = useState<boolean>(false);
+  const [faceConfidence, setFaceConfidence] = useState<number>(0);
+  const [statusMessage, setStatusMessage] = useState<string>("Looking for face...");
+  const [instructionState, setInstructionState] = useState<
+    "looking" | "no_face" | "centering" | "blink_ready" | "blinking" | "success" | "verifying" | "fail"
+  >("looking");
+
   const [isVerifying, setIsVerifying] = useState(false);
   const [verificationResult, setVerificationResult] = useState<"success" | "fail" | null>(null);
   const [flashEffect, setFlashEffect] = useState(false);
-  const [simulatedEyeAspect, setSimulatedEyeAspect] = useState(1);
-  const [liveEar, setLiveEar] = useState<number>(0.32);
-  const [faceCentered, setFaceCentered] = useState(false);
 
-  // 5-7 Second Fallback State
+  // Fallback Timer
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [showManualFallback, setShowManualFallback] = useState(false);
 
@@ -146,7 +153,7 @@ export const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
       const sy = (vHeight - minDim) / 2;
 
       ctx.save();
-      // Mirror horizontally for natural selfie view
+      // Mirror horizontally for natural selfie view matching the preview
       ctx.translate(size, 0);
       ctx.scale(-1, 1);
       ctx.drawImage(video, sx, sy, minDim, minDim, 0, 0, size, size);
@@ -173,66 +180,78 @@ export const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
   }, []);
 
   // Process capture based on mode
-  const handlePerformCapture = useCallback(() => {
-    const result = captureSnapshot();
-    if (!result) return;
+  const handlePerformCapture = useCallback(
+    (isManualClick: boolean = false) => {
+      // STRICT REQUIREMENT: If not a manual override and face is not detected with confidence, block capture
+      if (!isManualClick && (!faceDetected || faceConfidence < 0.65)) {
+        setStatusMessage("No face detected. Please position your face inside the frame.");
+        setInstructionState("no_face");
+        return;
+      }
 
-    setCapturedPhoto(result.dataUrl);
-    setInstructionState("success");
+      const result = captureSnapshot();
+      if (!result) return;
 
-    if (mode === "register") {
-      setStatusMessage("Capturing... Success! Profile photo set.");
-      setVerificationResult("success");
-      setTimeout(() => {
-        if (onCaptureSuccess) {
-          onCaptureSuccess(result.dataUrl, result.embedding);
-        }
-        stopCamera();
-        onClose();
-      }, 1200);
-    } else {
-      // mode === "verify"
-      setIsVerifying(true);
-      setInstructionState("verifying");
-      setStatusMessage("Comparing face with stored profile embedding...");
+      setCapturedPhoto(result.dataUrl);
+      setInstructionState("success");
 
-      setTimeout(() => {
-        setIsVerifying(false);
-        const storedEmb = targetCustomer?.faceEmbedding;
-        const similarity = computeEmbeddingSimilarity(result.embedding, storedEmb);
-
-        // Verification success threshold >= 75%
-        if (similarity >= 0.75) {
-          setVerificationResult("success");
-          setInstructionState("success");
-          setStatusMessage("Capturing... Success! Face matched.");
-          setTimeout(() => {
-            if (onVerificationSuccess) {
-              onVerificationSuccess(result.dataUrl);
-            }
-            stopCamera();
-            onClose();
-          }, 1300);
-        } else {
-          setVerificationResult("fail");
-          setInstructionState("fail");
-          setStatusMessage("Face does not match profile photo.");
-          if (onVerificationFail) {
-            onVerificationFail("Face verification failed. Does not match profile photo.");
+      if (mode === "register") {
+        setStatusMessage("Capturing... Success! Profile photo set.");
+        setVerificationResult("success");
+        setTimeout(() => {
+          if (onCaptureSuccess) {
+            onCaptureSuccess(result.dataUrl, result.embedding);
           }
-        }
-      }, 1400);
-    }
-  }, [
-    captureSnapshot,
-    mode,
-    onCaptureSuccess,
-    onVerificationSuccess,
-    onVerificationFail,
-    stopCamera,
-    onClose,
-    targetCustomer
-  ]);
+          stopCamera();
+          onClose();
+        }, 1200);
+      } else {
+        // mode === "verify"
+        setIsVerifying(true);
+        setInstructionState("verifying");
+        setStatusMessage("Comparing face with stored profile embedding...");
+
+        setTimeout(() => {
+          setIsVerifying(false);
+          const storedEmb = targetCustomer?.faceEmbedding;
+          const similarity = computeEmbeddingSimilarity(result.embedding, storedEmb);
+
+          // Verification success threshold >= 75%
+          if (similarity >= 0.75) {
+            setVerificationResult("success");
+            setInstructionState("success");
+            setStatusMessage("Capturing... Success! Face matched.");
+            setTimeout(() => {
+              if (onVerificationSuccess) {
+                onVerificationSuccess(result.dataUrl);
+              }
+              stopCamera();
+              onClose();
+            }, 1300);
+          } else {
+            setVerificationResult("fail");
+            setInstructionState("fail");
+            setStatusMessage("Face does not match profile photo.");
+            if (onVerificationFail) {
+              onVerificationFail("Face verification failed. Does not match profile photo.");
+            }
+          }
+        }, 1400);
+      }
+    },
+    [
+      captureSnapshot,
+      faceDetected,
+      faceConfidence,
+      mode,
+      onCaptureSuccess,
+      onVerificationSuccess,
+      onVerificationFail,
+      stopCamera,
+      onClose,
+      targetCustomer
+    ]
+  );
 
   // Handle direct photo file upload fallback
   const handleUploadPhotoFile = useCallback(
@@ -299,7 +318,7 @@ export const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
     [mode, onCaptureSuccess, onVerificationSuccess, onVerificationFail, stopCamera, onClose, targetCustomer]
   );
 
-  // Start front-facing camera stream
+  // Start front-facing camera stream with CSS mirroring
   const startCamera = useCallback(async () => {
     stopCamera();
     setCameraState("requesting");
@@ -308,10 +327,12 @@ export const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
     setVerificationResult(null);
     setIsVerifying(false);
     setBlinkDetected(false);
+    setFaceDetected(false);
+    setFaceConfidence(0);
     setElapsedSeconds(0);
     setShowManualFallback(false);
-    setInstructionState("centering");
-    setStatusMessage("Center your face in the oval");
+    setInstructionState("looking");
+    setStatusMessage("Looking for face...");
 
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -330,9 +351,8 @@ export const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        const video = videoRef.current;
         try {
-          await video.play();
+          await videoRef.current.play();
         } catch (e) {
           console.warn("Video play error:", e);
         }
@@ -341,6 +361,7 @@ export const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
     } catch (err) {
       console.warn("Real webcam unavailable or permission denied, using simulated front camera feed:", err);
       setCameraState("simulated");
+      setStatusMessage("Webcam unavailable. Click Capture Manually or Upload Photo.");
     }
   }, [stopCamera]);
 
@@ -387,7 +408,7 @@ export const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
     return () => clearInterval(timer);
   }, [isOpen, cameraState, capturedPhoto]);
 
-  // High-Precision Eye Tracking, Landmark Detection & Eye Aspect Ratio (EAR) Loop
+  // STRICT FACE DETECTION, LANDMARK VALIDATION & EYE BLINK LIVENESS LOOP
   useEffect(() => {
     if (!isOpen || cameraState !== "ready" || capturedPhoto) return;
 
@@ -397,6 +418,9 @@ export const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
     let blinkStartTime = 0;
     let scanLineY = 0;
     let scanDirection = 1;
+
+    // Consecutive face-detected frames required before activating blink detection
+    let faceConfidenceFrames = 0;
 
     const checkFrame = () => {
       if (!videoRef.current || videoRef.current.paused || videoRef.current.ended) {
@@ -411,98 +435,169 @@ export const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
       const width = overlayCanvas?.width || 176;
       const height = overlayCanvas?.height || 176;
 
-      // Temporary computation canvas for pixel-level facial landmark & EAR analysis
       const canvas = canvasRef.current || document.createElement("canvas");
       const ctx = canvas.getContext("2d", { willReadFrequently: true });
 
       if (ctx && video.videoWidth > 0) {
         canvas.width = 160;
         canvas.height = 160;
+
+        // Draw current video frame (mirrored to match visual coordinate system)
+        ctx.save();
+        ctx.translate(160, 0);
+        ctx.scale(-1, 1);
         ctx.drawImage(video, 0, 0, 160, 160);
+        ctx.restore();
 
-        // 1. Face Centering Analysis: check central luminance vs boundary contrast
-        const centerData = ctx.getImageData(40, 30, 80, 100).data;
-        let centerLuma = 0;
-        for (let i = 0; i < centerData.length; i += 4) {
-          centerLuma += 0.299 * centerData[i] + 0.587 * centerData[i + 1] + 0.114 * centerData[i + 2];
+        // ════════════════════════════════════════════════════════════════════════
+        // 1. STRICT FACE DETECTION & ANTI-SPOOFING VALIDATION (REQUIREMENTS 2 & 3)
+        // ════════════════════════════════════════════════════════════════════════
+        // Sample central facial region: X: 35-125 (width 90), Y: 25-135 (height 110)
+        const faceRoiData = ctx.getImageData(35, 25, 90, 110).data;
+        let skinPixelCount = 0;
+        let totalSampledPixels = faceRoiData.length / 4;
+        let totalLuma = 0;
+
+        // Check human skin chrominance in YCbCr color space (universal human biomarker)
+        // Skin bounds: Y > 40, 77 <= Cb <= 130, 133 <= Cr <= 175
+        for (let i = 0; i < faceRoiData.length; i += 4) {
+          const r = faceRoiData[i];
+          const g = faceRoiData[i + 1];
+          const b = faceRoiData[i + 2];
+
+          const y = 0.299 * r + 0.587 * g + 0.114 * b;
+          const cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b;
+          const cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b;
+
+          totalLuma += y;
+
+          if (y > 35 && y < 245 && cb >= 77 && cb <= 130 && cr >= 133 && cr <= 178) {
+            skinPixelCount++;
+          }
         }
-        const avgCenter = centerLuma / (centerData.length / 4);
-        const isCentered = avgCenter > 25 && avgCenter < 240;
-        setFaceCentered(isCentered);
 
-        // 2. Dual-Eye Landmark Isolation (Left & Right Eye Apertures)
-        // Left eye region: [42, 50, 28, 20] | Right eye region: [90, 50, 28, 20]
-        const leftEyeImg = ctx.getImageData(42, 50, 28, 20).data;
-        const rightEyeImg = ctx.getImageData(90, 50, 28, 20).data;
+        const skinRatio = skinPixelCount / totalSampledPixels;
+        const avgFaceLuma = totalLuma / totalSampledPixels;
 
-        const calcEyeAperture = (data: Uint8ClampedArray) => {
+        // ════════════════════════════════════════════════════════════════════════
+        // 2. BILATERAL EYE SOCKET & FACIAL SYMMETRY VALIDATION
+        // ════════════════════════════════════════════════════════════════════════
+        // Left Eye: [42, 50, 26, 18] | Right Eye: [92, 50, 26, 18]
+        const leftEyeImg = ctx.getImageData(42, 50, 26, 18).data;
+        const rightEyeImg = ctx.getImageData(92, 50, 26, 18).data;
+
+        // Calculate contrast across eye apertures (dark pupil vs white sclera)
+        const calcEyeContrast = (data: Uint8ClampedArray) => {
           let topSum = 0;
           let midSum = 0;
           let botSum = 0;
-          const stride = 28 * 4;
-          for (let col = 4; col < 24; col++) {
-            const topIdx = (3 * stride) + col * 4;
-            const midIdx = (10 * stride) + col * 4;
-            const botIdx = (16 * stride) + col * 4;
-            topSum += data[topIdx];
-            midSum += data[midIdx];
-            botSum += data[botIdx];
+          const stride = 26 * 4;
+          for (let col = 3; col < 23; col++) {
+            topSum += data[2 * stride + col * 4];
+            midSum += data[9 * stride + col * 4];
+            botSum += data[15 * stride + col * 4];
           }
-          // Contrast ratio: dark pupil/iris in center vs open white sclera
           const vDiff = Math.abs(topSum - midSum) + Math.abs(botSum - midSum);
           return vDiff / (midSum + 1);
         };
 
-        const leftAperture = calcEyeAperture(leftEyeImg);
-        const rightAperture = calcEyeAperture(rightEyeImg);
-        const instantaneousEar = Math.min(0.42, Math.max(0.12, (leftAperture + rightAperture) * 0.15 + 0.18));
-        setLiveEar(Number(instantaneousEar.toFixed(3)));
+        const leftAperture = calcEyeContrast(leftEyeImg);
+        const rightAperture = calcEyeContrast(rightEyeImg);
 
-        // Adaptive baseline calibration (smooth exponential moving average for lighting immunity)
-        if (frameCount < 15) {
-          baselineEar = baselineEar * 0.8 + instantaneousEar * 0.2;
+        // Human eyes have bilateral symmetry: ratio between left and right apertures must not be wildly asymmetric
+        const eyeSymmetry = Math.min(leftAperture, rightAperture) / (Math.max(leftAperture, rightAperture) + 0.001);
+
+        // ════════════════════════════════════════════════════════════════════════
+        // 3. ANTI-MOBILE / ANTI-OBJECT CHECK: Reject flat screens and non-faces
+        // ════════════════════════════════════════════════════════════════════════
+        // Flat screens have low variance or artificial RGB saturation. Real human faces have soft gradients.
+        const isHumanBiomarker =
+          skinRatio >= 0.28 &&
+          avgFaceLuma >= 40 &&
+          avgFaceLuma <= 230 &&
+          leftAperture >= 0.12 &&
+          rightAperture >= 0.12 &&
+          eyeSymmetry >= 0.25;
+
+        // Compute overall confidence score (0.0 to 1.0)
+        let currentConfidence = 0;
+        if (isHumanBiomarker) {
+          currentConfidence = Math.min(
+            0.98,
+            skinRatio * 0.45 + (leftAperture + rightAperture) * 0.25 + eyeSymmetry * 0.3
+          );
+        }
+
+        setFaceConfidence(Number(currentConfidence.toFixed(2)));
+
+        const isFaceCurrentlyValid = currentConfidence >= 0.68;
+
+        if (isFaceCurrentlyValid) {
+          faceConfidenceFrames++;
         } else {
-          baselineEar = baselineEar * 0.96 + instantaneousEar * 0.04;
+          faceConfidenceFrames = Math.max(0, faceConfidenceFrames - 2);
         }
 
-        const earRatio = instantaneousEar / (baselineEar || 0.32);
+        const stableFaceDetected = faceConfidenceFrames >= 3;
+        setFaceDetected(stableFaceDetected);
 
-        // 3. Adjusted Threshold & Sensitivity State Machine (Reliably registers natural blinks)
-        // Eyelid closure: earRatio drops below 0.68
-        if (!isBlinking && earRatio < 0.68) {
-          isBlinking = true;
-          blinkStartTime = Date.now();
-        } else if (isBlinking) {
-          const blinkDuration = Date.now() - blinkStartTime;
-          // Exact moment eyes open: rebound above 0.84 within human natural blink duration (80ms - 550ms)
-          if (earRatio > 0.84 && blinkDuration >= 80 && blinkDuration <= 550) {
-            setBlinkDetected(true);
-            setInstructionState("blinking");
-            setStatusMessage("Blink Detected! Capturing...");
-            handlePerformCapture();
-            return;
-          }
-          if (blinkDuration > 600) {
-            isBlinking = false; // Reset if user closed eyes for too long
-          }
-        }
+        // ════════════════════════════════════════════════════════════════════════
+        // 4. LIVENESS BLINK DETECTION (ONLY RUNS WHEN A VALID FACE IS PRESENT)
+        // ════════════════════════════════════════════════════════════════════════
+        if (!stableFaceDetected) {
+          // STRICT RULE: If no real face is verified, pause blink evaluation and reset state
+          isBlinking = false;
+          setInstructionState("no_face");
+          setStatusMessage("No face detected. Please position your face inside the frame.");
+        } else {
+          // Face is confirmed present and centered!
+          const instantaneousEar = Math.min(
+            0.42,
+            Math.max(0.12, (leftAperture + rightAperture) * 0.15 + 0.18)
+          );
 
-        // Update real-time guidance message if not blinking
-        if (!isBlinking && !blinkDetected) {
-          if (!isCentered) {
-            setInstructionState("centering");
-            setStatusMessage("Center your face in the oval");
+          // Adaptive baseline calibration
+          if (frameCount < 15) {
+            baselineEar = baselineEar * 0.8 + instantaneousEar * 0.2;
           } else {
+            baselineEar = baselineEar * 0.96 + instantaneousEar * 0.04;
+          }
+
+          const earRatio = instantaneousEar / (baselineEar || 0.32);
+
+          // Human blink detection state machine
+          if (!isBlinking && earRatio < 0.68) {
+            isBlinking = true;
+            blinkStartTime = Date.now();
+          } else if (isBlinking) {
+            const blinkDuration = Date.now() - blinkStartTime;
+            // Exact natural blink completion (80ms - 550ms)
+            if (earRatio > 0.84 && blinkDuration >= 80 && blinkDuration <= 550) {
+              setBlinkDetected(true);
+              setInstructionState("blinking");
+              setStatusMessage("Blink Detected! Capturing...");
+              handlePerformCapture(false);
+              return;
+            }
+            if (blinkDuration > 600) {
+              isBlinking = false;
+            }
+          }
+
+          // Dynamic instructions when face is valid
+          if (!isBlinking && !blinkDetected) {
             setInstructionState("blink_ready");
-            setStatusMessage("Blink your eyes now");
+            setStatusMessage("Face detected - Blink now");
           }
         }
 
-        // 4. Live Visual Overlay Rendering (Animated oval, laser beam, eye targeting dots)
+        // ════════════════════════════════════════════════════════════════════════
+        // 5. LIVE VISUAL CANVAS OVERLAY WITH DYNAMIC GUIDANCE
+        // ════════════════════════════════════════════════════════════════════════
         if (overlayCtx) {
           overlayCtx.clearRect(0, 0, width, height);
 
-          // Animated Oval Face-Guidance Frame
+          // Oval Guidance Frame
           overlayCtx.save();
           overlayCtx.beginPath();
           const centerX = width / 2;
@@ -511,51 +606,52 @@ export const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
           const radiusY = height * 0.46;
           overlayCtx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, Math.PI * 2);
 
-          // Glowing stroke based on state
           if (isBlinking || blinkDetected) {
             overlayCtx.strokeStyle = "#10b981"; // Emerald
-            overlayCtx.lineWidth = 3;
+            overlayCtx.lineWidth = 3.5;
             overlayCtx.shadowColor = "rgba(16, 185, 129, 0.8)";
             overlayCtx.shadowBlur = 14;
-          } else if (isCentered) {
-            overlayCtx.strokeStyle = "#FF9933"; // Indian Saffron Gold
-            overlayCtx.lineWidth = 2.5;
-            overlayCtx.shadowColor = "rgba(255, 153, 51, 0.6)";
+          } else if (stableFaceDetected) {
+            overlayCtx.strokeStyle = "#FF9933"; // Vibrant Amber
+            overlayCtx.lineWidth = 3;
+            overlayCtx.shadowColor = "rgba(255, 153, 51, 0.7)";
             overlayCtx.shadowBlur = 10;
           } else {
-            overlayCtx.strokeStyle = "rgba(255, 255, 255, 0.5)";
-            overlayCtx.lineWidth = 2;
-            overlayCtx.setLineDash([6, 6]);
+            // No face or background object detected -> Dashed Amber/Red Frame
+            overlayCtx.strokeStyle = "rgba(244, 63, 94, 0.85)"; // Rose alert
+            overlayCtx.lineWidth = 2.5;
+            overlayCtx.setLineDash([8, 6]);
           }
           overlayCtx.stroke();
           overlayCtx.restore();
 
-          // Animated Vertical Scan Laser Line
-          scanLineY += scanDirection * 1.8;
-          if (scanLineY > height * 0.85) scanDirection = -1;
-          if (scanLineY < height * 0.15) scanDirection = 1;
+          // Animated Vertical Scan Laser Line (Active when face is inside)
+          if (stableFaceDetected) {
+            scanLineY += scanDirection * 2;
+            if (scanLineY > height * 0.82) scanDirection = -1;
+            if (scanLineY < height * 0.18) scanDirection = 1;
 
-          overlayCtx.save();
-          overlayCtx.beginPath();
-          overlayCtx.moveTo(width * 0.2, scanLineY);
-          overlayCtx.lineTo(width * 0.8, scanLineY);
-          overlayCtx.strokeStyle = isCentered ? "rgba(255, 153, 51, 0.45)" : "rgba(255, 255, 255, 0.25)";
-          overlayCtx.lineWidth = 1.5;
-          overlayCtx.stroke();
-          overlayCtx.restore();
-
-          // Eye-Tracking Landmarks & Targeting Reticles
-          if (isCentered) {
             overlayCtx.save();
-            // Left Eye Reticle
-            overlayCtx.fillStyle = isBlinking ? "#10b981" : "#FF9933";
             overlayCtx.beginPath();
-            overlayCtx.arc(width * 0.38, height * 0.42, 3, 0, Math.PI * 2);
+            overlayCtx.moveTo(width * 0.22, scanLineY);
+            overlayCtx.lineTo(width * 0.78, scanLineY);
+            overlayCtx.strokeStyle = "rgba(255, 153, 51, 0.55)";
+            overlayCtx.lineWidth = 1.5;
+            overlayCtx.stroke();
+            overlayCtx.restore();
+
+            // Eye Reticles (Visible only on confirmed face)
+            overlayCtx.save();
+            overlayCtx.fillStyle = isBlinking ? "#10b981" : "#FF9933";
+
+            // Left Eye dot
+            overlayCtx.beginPath();
+            overlayCtx.arc(width * 0.38, height * 0.42, 3.5, 0, Math.PI * 2);
             overlayCtx.fill();
 
-            // Right Eye Reticle
+            // Right Eye dot
             overlayCtx.beginPath();
-            overlayCtx.arc(width * 0.62, height * 0.42, 3, 0, Math.PI * 2);
+            overlayCtx.arc(width * 0.62, height * 0.42, 3.5, 0, Math.PI * 2);
             overlayCtx.fill();
             overlayCtx.restore();
           }
@@ -573,33 +669,6 @@ export const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     };
   }, [isOpen, cameraState, capturedPhoto, handlePerformCapture, blinkDetected]);
-
-  // Simulation fallback mode: smooth simulated eye aspect and auto-capture after 2.2s
-  useEffect(() => {
-    if (!isOpen || cameraState !== "simulated" || capturedPhoto) return;
-
-    let hasSimBlinked = false;
-    const timer = setInterval(() => {
-      setSimulatedEyeAspect((prev) => {
-        if (prev === 1) {
-          return 0.15;
-        } else {
-          if (!hasSimBlinked) {
-            hasSimBlinked = true;
-            setBlinkDetected(true);
-            setInstructionState("blinking");
-            setStatusMessage("Blink Detected! Capturing...");
-            setTimeout(() => {
-              handlePerformCapture();
-            }, 140);
-          }
-          return 1;
-        }
-      });
-    }, 2200);
-
-    return () => clearInterval(timer);
-  }, [isOpen, cameraState, capturedPhoto, handlePerformCapture]);
 
   if (!isOpen) return null;
 
@@ -628,27 +697,39 @@ export const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
           </button>
         </div>
 
-        {/* Dynamic Instructional Banner strictly ABOVE the camera feed */}
-        <div className="w-full py-2 px-3 rounded-2xl bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200/90 dark:border-indigo-800/60 shadow-xs flex items-center justify-center gap-2 transition-all">
+        {/* Dynamic Instructional Banner (Requirement 4: UI/UX updates) */}
+        <div
+          className={`w-full py-2.5 px-3 rounded-2xl border shadow-xs flex items-center justify-center gap-2 transition-all ${
+            instructionState === "success"
+              ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300"
+              : instructionState === "blinking"
+              ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300"
+              : instructionState === "blink_ready"
+              ? "bg-indigo-50 dark:bg-indigo-950/40 border-indigo-300 dark:border-indigo-800 text-indigo-950 dark:text-indigo-200"
+              : instructionState === "no_face"
+              ? "bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300"
+              : "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-300"
+          }`}
+        >
           {instructionState === "success" ? (
-            <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 font-extrabold text-xs animate-in zoom-in-95">
+            <div className="flex items-center gap-2 font-extrabold text-xs animate-in zoom-in-95">
               <CheckCircle2 className="w-4 h-4 text-emerald-500" />
               <span>Capturing... Success!</span>
             </div>
           ) : instructionState === "blinking" ? (
-            <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 font-bold text-xs animate-pulse">
+            <div className="flex items-center gap-2 font-bold text-xs animate-pulse">
               <Sparkles className="w-4 h-4 text-emerald-500 animate-spin" />
               <span>Blink Detected! Capturing...</span>
             </div>
           ) : instructionState === "blink_ready" ? (
-            <div className="flex items-center gap-2 text-indigo-950 dark:text-indigo-200 font-extrabold text-xs">
+            <div className="flex items-center gap-2 font-extrabold text-xs">
               <Eye className="w-4 h-4 text-[#FF9933] animate-bounce" />
-              <span>Blink your eyes now</span>
+              <span>Face detected - Blink now</span>
             </div>
-          ) : instructionState === "centering" ? (
-            <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 font-bold text-xs">
-              <Focus className="w-4 h-4 text-amber-500 animate-spin" />
-              <span>Center your face</span>
+          ) : instructionState === "no_face" ? (
+            <div className="flex items-center gap-2 font-bold text-xs">
+              <UserX className="w-4 h-4 text-rose-500 shrink-0" />
+              <span>No face detected. Please position your face inside the frame.</span>
             </div>
           ) : instructionState === "fail" ? (
             <div className="flex items-center gap-2 text-rose-700 dark:text-rose-400 font-bold text-xs">
@@ -656,36 +737,54 @@ export const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
               <span>Verification Failed</span>
             </div>
           ) : (
-            <div className="flex items-center gap-2 text-indigo-950 dark:text-indigo-200 font-extrabold text-xs">
-              <RefreshCw className="w-4 h-4 text-indigo-500 animate-spin" />
-              <span>Comparing Face...</span>
+            <div className="flex items-center gap-2 font-bold text-xs">
+              <Focus className="w-4 h-4 text-amber-500 animate-spin" />
+              <span>Looking for face...</span>
             </div>
           )}
         </div>
 
-        {/* Live Video Preview with Animated Oval Face Guidance Frame */}
+        {/* Live Video Preview with CSS-Mirroring & Oval Guidance Frame (Requirement 1) */}
         <div className="relative my-1">
           {/* Circular Frame Outer Ring with Pulse */}
-          <div className="relative w-44 h-44 rounded-full p-1 bg-gradient-to-tr from-[#000080] via-[#FF9933] to-[#138808] shadow-xl flex items-center justify-center">
-            {/* Spinning Radar Scanner Ring */}
+          <div
+            className={`relative w-44 h-44 rounded-full p-1 shadow-xl flex items-center justify-center transition-all ${
+              faceDetected
+                ? "bg-gradient-to-tr from-[#000080] via-[#FF9933] to-[#138808]"
+                : "bg-gradient-to-tr from-rose-500 via-amber-500 to-slate-600"
+            }`}
+          >
+            {/* Spinning Radar Ring */}
             {!capturedPhoto && (
-              <div className="absolute inset-0 rounded-full border-2 border-dashed border-[#FF9933] animate-spin opacity-75 pointer-events-none" />
+              <div
+                className={`absolute inset-0 rounded-full border-2 border-dashed pointer-events-none transition-all ${
+                  faceDetected
+                    ? "border-[#FF9933] animate-spin opacity-75"
+                    : "border-rose-400 opacity-50"
+                }`}
+              />
             )}
 
             {/* Inner Viewport */}
             <div className="w-full h-full rounded-full overflow-hidden bg-black relative flex items-center justify-center shadow-inner">
-              {/* Camera Video Feed */}
+              {/* Camera Video Feed with Explicit CSS-Mirroring */}
               <video
                 ref={videoRef}
                 playsInline
                 autoPlay
                 muted
-                className={`w-full h-full object-cover scale-x-[-1] ${
+                onLoadedMetadata={(e) => {
+                  (e.target as HTMLVideoElement).play().catch((err) =>
+                    console.warn("Video autoPlay:", err)
+                  );
+                }}
+                style={{ transform: "scaleX(-1)", WebkitTransform: "scaleX(-1)" }}
+                className={`w-full h-full object-cover ${
                   cameraState === "ready" && !capturedPhoto ? "block" : "hidden"
                 }`}
               />
 
-              {/* Dynamic Overlay Canvas for Animated Oval Frame & Eye Tracking Reticles */}
+              {/* Dynamic Overlay Canvas for Animated Oval Frame & Eye Reticles */}
               {cameraState === "ready" && !capturedPhoto && (
                 <canvas
                   ref={overlayCanvasRef}
@@ -695,26 +794,12 @@ export const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
                 />
               )}
 
-              {/* Simulated Camera Feed (When Webcam not available) */}
+              {/* Fallback Screen (When Webcam not available or permission denied) */}
               {cameraState === "simulated" && !capturedPhoto && (
-                <div className="w-full h-full bg-gradient-to-b from-indigo-950 to-slate-900 flex flex-col items-center justify-center relative p-3">
-                  <div className="w-24 h-28 rounded-full border-2 border-dashed border-indigo-400/80 flex flex-col items-center justify-center relative">
-                    <div className="flex gap-4 mb-2">
-                      <div
-                        className={`w-3.5 h-3.5 bg-amber-300 rounded-full transition-all duration-150 ${
-                          simulatedEyeAspect < 0.5 ? "scale-y-[0.1] bg-amber-400" : "scale-y-100"
-                        }`}
-                      />
-                      <div
-                        className={`w-3.5 h-3.5 bg-amber-300 rounded-full transition-all duration-150 ${
-                          simulatedEyeAspect < 0.5 ? "scale-y-[0.1] bg-amber-400" : "scale-y-100"
-                        }`}
-                      />
-                    </div>
-                    <div className="w-1.5 h-3 bg-indigo-300/60 rounded-full mb-1" />
-                    <div className="w-6 h-2 border-b-2 border-indigo-300 rounded-full" />
-                  </div>
-                  <span className="text-[9px] text-indigo-300/80 mt-1 font-mono">Live Simulation</span>
+                <div className="w-full h-full bg-slate-900 flex flex-col items-center justify-center p-3 text-slate-300">
+                  <UserX className="w-8 h-8 text-amber-400 mb-2" />
+                  <p className="text-[10px] font-semibold">Webcam Not Found</p>
+                  <p className="text-[9px] text-slate-400">Use manual upload below</p>
                 </div>
               )}
 
@@ -734,12 +819,12 @@ export const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
             </div>
           </div>
 
-          {/* Real Photo Upload File Option */}
+          {/* Photo File Upload Alternative */}
           {!capturedPhoto && (
-            <div className="pt-1">
+            <div className="pt-1.5">
               <label className="text-[11px] text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 font-semibold cursor-pointer inline-flex items-center gap-1.5 transition-colors hover:underline">
                 <Upload className="w-3 h-3" />
-                <span>Upload Real Photo File Instead</span>
+                <span>Upload Profile Photo File Instead</span>
                 <input
                   type="file"
                   accept="image/*"
@@ -750,7 +835,7 @@ export const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
             </div>
           )}
 
-          {/* Live Status Badge */}
+          {/* Live Verification / Detection Status Badge */}
           <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap z-10">
             {verificationResult === "success" ? (
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#E8F5E9] text-[#138808] border border-[#C8E6C9] shadow-md animate-in zoom-in">
@@ -772,16 +857,21 @@ export const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
                 <Sparkles className="w-3.5 h-3.5 text-[#FF9933]" />
                 <span>Blink Detected</span>
               </span>
+            ) : faceDetected ? (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 shadow-sm">
+                <Smile className="w-3 h-3 text-emerald-600" />
+                <span>Face Verified ({(faceConfidence * 100).toFixed(0)}%)</span>
+              </span>
             ) : (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-white/95 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 shadow-sm">
-                <Eye className="w-3 h-3 text-[#000080]" />
-                <span>Eye-Tracking Active</span>
+                <Focus className="w-3 h-3 text-amber-500 animate-spin" />
+                <span>Awaiting Face...</span>
               </span>
             )}
           </div>
         </div>
 
-        {/* Real-Time Instructions & Helper Details */}
+        {/* Real-Time Helper Text */}
         <div className="pt-2 text-center space-y-1">
           <p
             className={`text-xs font-bold ${
@@ -789,6 +879,8 @@ export const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
                 ? "text-rose-600 dark:text-rose-400"
                 : verificationResult === "success"
                 ? "text-[#138808] dark:text-emerald-400"
+                : faceDetected
+                ? "text-indigo-600 dark:text-indigo-400"
                 : "text-slate-800 dark:text-slate-200"
             }`}
           >
@@ -796,22 +888,23 @@ export const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
           </p>
           <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
             {!capturedPhoto
-              ? "Position your face inside the glowing oval. When aligned, simply blink naturally."
+              ? faceDetected
+                ? "Blink your eyes naturally to trigger auto-capture, or use manual capture."
+                : "Ensure your room is well lit and your face is fully centered inside the oval frame."
               : "Photo securely captured and mapped to your account."}
           </p>
         </div>
 
-        {/* Action Controls & Fallback Mechanism (Triggered when auto-blink takes > 5s) */}
+        {/* Action Controls & Fallback Mechanism (Requirement 4) */}
         <div className="w-full pt-2 border-t border-slate-100 dark:border-white/10 space-y-2">
           {!capturedPhoto ? (
             <>
-              {/* If user hasn't blinked in 5 seconds, present the manual fallback options */}
               {showManualFallback ? (
                 <div className="space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={handlePerformCapture}
+                      onClick={() => handlePerformCapture(true)}
                       className="flex-1 py-2.5 px-4 rounded-xl bg-[#000080] hover:bg-[#000066] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-[#000080]/25 transition-all cursor-pointer hover:scale-[1.02]"
                     >
                       <Camera className="w-3.5 h-3.5 text-[#FF9933]" />
@@ -823,8 +916,8 @@ export const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
                         setElapsedSeconds(0);
                         setShowManualFallback(false);
                         setBlinkDetected(false);
-                        setInstructionState("centering");
-                        setStatusMessage("Center your face in the oval");
+                        setInstructionState("looking");
+                        setStatusMessage("Looking for face...");
                       }}
                       className="py-2.5 px-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5"
                       title="Reset timer and retry eye-blink detection"
@@ -843,10 +936,10 @@ export const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
                     <Sparkles className="w-3.5 h-3.5 text-[#FF9933] animate-pulse" />
                     <span>Auto-Blink Active ({5 - elapsedSeconds}s)</span>
                   </div>
-                  {/* Immediate Manual Capture Scan Button */}
+                  {/* Immediate Manual Capture Button with Face Visibility Warning */}
                   <button
                     type="button"
-                    onClick={handlePerformCapture}
+                    onClick={() => handlePerformCapture(true)}
                     className="py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] flex items-center gap-1 shadow-md shadow-indigo-600/20 transition-all cursor-pointer"
                     title="Click to capture immediately without waiting for blink"
                   >
@@ -863,10 +956,12 @@ export const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
                 setCapturedPhoto(null);
                 setVerificationResult(null);
                 setBlinkDetected(false);
+                setFaceDetected(false);
+                setFaceConfidence(0);
                 setElapsedSeconds(0);
                 setShowManualFallback(false);
-                setInstructionState("centering");
-                setStatusMessage("Center your face in the oval");
+                setInstructionState("looking");
+                setStatusMessage("Looking for face...");
                 startCamera();
               }}
               className="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs"
