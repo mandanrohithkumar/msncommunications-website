@@ -45,6 +45,10 @@ interface PortalContextType {
   user: User | null;
   selectedRole: UserRole;
   setSelectedRole: (role: UserRole) => void;
+  isAuthOpen: boolean;
+  setIsAuthOpen: (open: boolean) => void;
+  openAuth: () => void;
+  closeAuth: () => void;
   login: (identifier: string, role?: UserRole) => boolean;
   loginWithGoogle: (name: string, email: string, role?: UserRole) => { success: boolean; error?: string };
   checkAccountExists: (email: string) => boolean;
@@ -101,7 +105,7 @@ interface PortalContextType {
 
   // Document Vault & Preview
   uploadedDocs: Record<string, UploadedFileMeta>;
-  uploadDocument: (docName: string, file: File) => void;
+  uploadDocument: (docName: string, file: File, fileMeta?: UploadedFileMeta) => void;
   removeDocument: (docName: string) => void;
   getUserUploadedDocs: (email: string) => Record<string, UploadedFileMeta>;
   getUserDocCount: (email: string) => number;
@@ -779,10 +783,58 @@ const INITIAL_PASSWORD_CHANGE_AUDITS: PasswordChangeAuditLog[] = [
   }
 ];
 
+const DEFAULT_DEMO_USER: User = {
+  id: INITIAL_ACCOUNTS[0].id,
+  name: INITIAL_ACCOUNTS[0].name,
+  email: INITIAL_ACCOUNTS[0].email,
+  phone: INITIAL_ACCOUNTS[0].phone,
+  role: INITIAL_ACCOUNTS[0].role,
+  avatar: INITIAL_ACCOUNTS[0].avatar,
+  faceEmbedding: INITIAL_ACCOUNTS[0].faceEmbedding,
+  faceVerified: INITIAL_ACCOUNTS[0].faceVerified,
+  familyDetails: INITIAL_ACCOUNTS[0].familyDetails,
+};
+
 export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Auth state
-  const [user, setUser] = useState<User | null>(null);
+  // Auth modal dialog state
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const openAuth = useCallback(() => setIsAuthOpen(true), []);
+  const closeAuth = useCallback(() => setIsAuthOpen(false), []);
+
+  // Auth state: persistent in localStorage, defaults to active demo customer so portal is directly usable without login blocker
+  const [user, setUser] = useState<User | null>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const loggedOut = localStorage.getItem("msn_portal_logged_out");
+        if (loggedOut === "true") {
+          return null;
+        }
+        const stored = localStorage.getItem("msn_portal_user");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed && (parsed.email || parsed.id)) {
+            return parsed;
+          }
+        }
+      } catch (e) {}
+    }
+    return DEFAULT_DEMO_USER;
+  });
   const [selectedRole, setSelectedRole] = useState<UserRole>("customer");
+
+  // Keep localStorage in sync with user state
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        if (user) {
+          localStorage.setItem("msn_portal_user", JSON.stringify(user));
+          localStorage.removeItem("msn_portal_logged_out");
+        } else {
+          localStorage.removeItem("msn_portal_user");
+        }
+      } catch (e) {}
+    }
+  }, [user]);
 
   // Secure Session Isolation: Sync user from HTTP-only session cookie on initial load
   useEffect(() => {
@@ -1091,9 +1143,8 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [userDocsMap]);
 
   // Dynamic user-scoped documents: only fetch and display files for the currently logged-in email
-  const currentUserEmail = (user?.email || "").toLowerCase().trim();
+  const currentUserEmail = (user?.email || user?.id || "rohith.kumar@gmail.com").toLowerCase().trim();
   const uploadedDocs = useMemo(() => {
-    if (!currentUserEmail) return {};
     return userDocsMap[currentUserEmail] || {};
   }, [currentUserEmail, userDocsMap]);
 
@@ -1520,6 +1571,7 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
 
     setUser(newUser);
+    setIsAuthOpen(false);
     // Ensure fresh login always defaults to English
     setLanguage("EN");
 
@@ -1623,6 +1675,7 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
 
     setUser(newUser);
+    setIsAuthOpen(false);
 
     // Requirement 3: Set secure, HTTP-only session cookie strictly scoped to this user ID
     if (typeof window !== "undefined") {
@@ -1748,6 +1801,7 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
 
     setUser(newUser);
+    setIsAuthOpen(false);
 
     // Requirement 3: Set secure, HTTP-only session cookie strictly scoped to this user ID
     if (typeof window !== "undefined") {
@@ -1872,7 +1926,14 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     // 4. Secure Session Isolation: completely purge active session & state
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.removeItem("msn_portal_user");
+        localStorage.setItem("msn_portal_logged_out", "true");
+      } catch (e) {}
+    }
     setUser(null);
+    setIsAuthOpen(false);
     setLanguage("EN");
     setCurrentView("online-works");
     setIsProfileOpen(false);
@@ -2723,10 +2784,51 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   // Documents - Scoped strictly to authenticated user's email with persistent storage
-  const uploadDocument = (docName: string, file: File) => {
-    const email = (user?.email || "rohith.kumar@gmail.com").toLowerCase().trim();
-    const reader = new FileReader();
+  const uploadDocument = (docName: string, file: File, maybeMeta?: UploadedFileMeta) => {
+    const email = (user?.email || user?.id || "rohith.kumar@gmail.com").toLowerCase().trim();
 
+    if (maybeMeta) {
+      const newDoc: UploadedFileMeta = {
+        ...maybeMeta,
+        docName,
+        customerId: user?.id || "cust-1",
+        dataUrl: maybeMeta.dataUrl || resolveDocumentDataUrl({ name: file.name, docName }, user?.name || "Rohith Kumar"),
+        fileUrl: maybeMeta.fileUrl || maybeMeta.dataUrl || resolveDocumentDataUrl({ name: file.name, docName }, user?.name || "Rohith Kumar")
+      };
+
+      setUserDocsMap((prev) => {
+        const userDocs = { ...(prev[email] || {}) };
+        userDocs[docName] = newDoc;
+        const updated = {
+          ...prev,
+          [email]: userDocs
+        };
+        if (typeof window !== "undefined") {
+          try {
+            localStorage.setItem("msn_portal_user_documents", JSON.stringify(updated));
+          } catch (err) {}
+        }
+        return updated;
+      });
+
+      setNotifications((prev) => [
+        {
+          id: `notif-${Date.now()}`,
+          userId: user?.id || "cust-1",
+          title: "Document Uploaded",
+          message: `${file.name} saved to your digital records vault.`,
+          timestamp: "Just now",
+          read: false,
+          type: "success"
+        },
+        ...prev
+      ]);
+
+      logUserActivity("Document Uploaded", `File: ${file.name} for ${docName}`, email);
+      return;
+    }
+
+    const reader = new FileReader();
     reader.onload = (e) => {
       const dataUrl = (e.target?.result as string) || resolveDocumentDataUrl({ name: file.name, docName }, user?.name || "Rohith Kumar");
       const newDoc: UploadedFileMeta = {
@@ -2784,10 +2886,16 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const removeDocument = (docName: string) => {
-    const email = (user?.email || "rohith.kumar@gmail.com").toLowerCase().trim();
+    const email = (user?.email || user?.id || "rohith.kumar@gmail.com").toLowerCase().trim();
     setUserDocsMap((prev) => {
       const userDocs = { ...(prev[email] || {}) };
       delete userDocs[docName];
+      const lower = docName.toLowerCase().trim();
+      Object.keys(userDocs).forEach((k) => {
+        if (k.toLowerCase().trim() === lower) {
+          delete userDocs[k];
+        }
+      });
       const updated = {
         ...prev,
         [email]: userDocs
@@ -3283,6 +3391,10 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         user,
         selectedRole,
         setSelectedRole,
+        isAuthOpen,
+        setIsAuthOpen,
+        openAuth,
+        closeAuth,
         login,
         loginWithGoogle,
         checkAccountExists,

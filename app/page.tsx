@@ -17,6 +17,8 @@ import { DocumentModal } from "@/components/portal/document-modal";
 import { NotificationMessageCenter } from "@/components/portal/notification-message-center";
 import { StarlightBackground } from "@/components/portal/starlight-background";
 
+import { X } from "lucide-react";
+
 function PortalApp() {
   const {
     user,
@@ -25,19 +27,9 @@ function PortalApp() {
     isProfileOpen,
     activePaymentApp,
     previewDoc,
+    isAuthOpen,
+    setIsAuthOpen,
   } = usePortal();
-
-  // Show auth/login screen if not logged in
-  if (!user) {
-    return (
-      <div className={`min-h-screen relative overflow-hidden transition-colors duration-200 ${theme === "light" ? "light bg-slate-50 text-slate-900" : "dark bg-[#08090f] text-slate-100"}`}>
-        <StarlightBackground />
-        <div className="relative z-10 min-h-screen flex items-center justify-center px-4">
-          <AuthView />
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className={`min-h-screen relative transition-colors duration-200 ${theme === "light" ? "light bg-slate-50 text-slate-900" : "dark bg-[#08090f] text-slate-100"}`}>
@@ -67,6 +59,29 @@ function PortalApp() {
       {activePaymentApp && <PaymentModal />}
       {previewDoc && <DocumentModal />}
       <NotificationMessageCenter />
+
+      {/* Explicit Customer Login Dialog (only triggered on deliberate user action) */}
+      {isAuthOpen && (
+        <div
+          onClick={() => setIsAuthOpen(false)}
+          className="fixed inset-0 z-[9999] bg-black/75 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-lg my-auto"
+          >
+            <button
+              type="button"
+              onClick={() => setIsAuthOpen(false)}
+              className="absolute -top-3 -right-3 z-50 p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-white cursor-pointer transition-colors shadow-lg border border-slate-700"
+              title="Close Login Window"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <AuthView />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

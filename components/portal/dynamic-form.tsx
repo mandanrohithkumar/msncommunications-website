@@ -46,6 +46,7 @@ export const DynamicForm: React.FC = () => {
     goBack,
     submitApplication,
     user,
+    setPreviewDoc,
     t
   } = usePortal();
 
@@ -463,6 +464,9 @@ export const DynamicForm: React.FC = () => {
                           delete copy[doc.label];
                           return copy;
                         });
+                      }}
+                      onView={(meta) => {
+                        setPreviewDoc(meta);
                       }}
                     />
                   </div>

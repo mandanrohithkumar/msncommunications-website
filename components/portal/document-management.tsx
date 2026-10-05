@@ -332,6 +332,39 @@ export const DocumentManagement: React.FC = () => {
     };
   }, [selectedMemberId, familyDetails, user, sonsList, daughtersList, t]);
 
+  // Helper to find an uploaded document with robust key & prefix matching
+  const findMemberDoc = React.useCallback(
+    (rawKey: string): UploadedFileMeta | null => {
+      const scopedKey =
+        selectedMemberId === "self"
+          ? rawKey
+          : `${activeMemberInfo.prefix} ${rawKey}`;
+
+      if (memberScopedDocs[scopedKey]) return memberScopedDocs[scopedKey];
+      if (uploadedDocs[scopedKey]) return uploadedDocs[scopedKey];
+      if (uploadedDocs[rawKey]) return uploadedDocs[rawKey];
+      if (memberScopedDocs[rawKey]) return memberScopedDocs[rawKey];
+
+      const lowerScoped = scopedKey.toLowerCase().trim();
+      const lowerRaw = rawKey.toLowerCase().trim();
+
+      const memberMatch = Object.entries(memberScopedDocs).find(([k]) => {
+        const kl = k.toLowerCase().trim();
+        return kl === lowerScoped || kl === lowerRaw;
+      });
+      if (memberMatch) return memberMatch[1];
+
+      const uploadedMatch = Object.entries(uploadedDocs).find(([k]) => {
+        const kl = k.toLowerCase().trim();
+        return kl === lowerScoped || kl === lowerRaw;
+      });
+      if (uploadedMatch) return uploadedMatch[1];
+
+      return null;
+    },
+    [memberScopedDocs, uploadedDocs, selectedMemberId, activeMemberInfo.prefix]
+  );
+
   // Predefined upload slots for specific family members
   const memberSlots: MemberDocSlot[] = useMemo(() => {
     if (selectedMemberId === "father") {
@@ -482,87 +515,128 @@ export const DocumentManagement: React.FC = () => {
         )}
 
         {/* Documents list grid - Interactive Clickable Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {activeCategory.items.map((rawDocName) => {
             const scopedKey =
               selectedMemberId === "self"
                 ? rawDocName
                 : `${activeMemberInfo.prefix} ${rawDocName}`;
 
-            const isUploaded = memberScopedDocs[scopedKey] || uploadedDocs[scopedKey];
+            const uploadedDoc = findMemberDoc(rawDocName);
+            const isUploaded = Boolean(uploadedDoc);
 
             return (
               <div
                 key={rawDocName}
-                onClick={() => {
-                  if (isUploaded) setPreviewDoc(isUploaded);
-                }}
-                className={`p-4 rounded-2xl border transition-all backdrop-blur-md shadow-sm flex flex-col justify-between ${
+                className={`p-3 rounded-xl border transition-all backdrop-blur-md shadow-xs flex flex-col justify-between min-w-0 overflow-hidden ${
                   isUploaded
-                    ? "bg-white dark:bg-slate-900/80 border-[#C8E6C9] hover:border-[#138808] hover:shadow-md cursor-pointer group"
+                    ? "bg-white dark:bg-slate-900/80 border-emerald-300 dark:border-emerald-800/80"
                     : "bg-white/70 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800"
                 }`}
               >
-                <div className="flex items-start justify-between gap-3 mb-3">
-                  <div className="flex items-center gap-3 overflow-hidden">
+                {/* Header: Document Name & Status */}
+                <div className="flex items-start justify-between gap-2.5 mb-2 min-w-0">
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1 overflow-hidden">
                     <div
-                      className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-sm transition-transform group-hover:scale-105 ${
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-xs transition-transform ${
                         isUploaded
                           ? "bg-[#E8F5E9] text-[#138808] border border-[#C8E6C9]"
                           : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400"
                       }`}
                     >
-                      <FileText className="w-5 h-5" />
+                      <FileText className="w-4 h-4" />
                     </div>
-                    <div className="overflow-hidden">
-                      <h4 className="text-sm font-bold text-slate-900 dark:text-white truncate">
+                    <div className="min-w-0 flex-1 overflow-hidden">
+                      <h4 className="text-xs font-bold text-slate-900 dark:text-white truncate" title={rawDocName}>
                         {rawDocName}
                       </h4>
-                      <p className="text-[11px] text-slate-500 truncate">
-                        {isUploaded ? isUploaded.name : `${activeMemberInfo.label} Document`}
+                      <p className="text-[10px] text-slate-500 truncate mt-0.5">
+                        {isUploaded && uploadedDoc ? uploadedDoc.name : `${activeMemberInfo.label} Document`}
                       </p>
                     </div>
                   </div>
 
-                  {isUploaded && (
-                    <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#E8F5E9] text-[#138808] border border-[#C8E6C9] flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3" />
-                      {t("upload.attached") || "Attached"}
+                  {isUploaded ? (
+                    <span className="shrink-0 px-2 py-0.5 rounded-full text-[9px] font-bold bg-[#E8F5E9] text-[#138808] border border-[#C8E6C9] flex items-center gap-1">
+                      <CheckCircle2 className="w-2.5 h-2.5" />
+                      <span>Attached</span>
+                    </span>
+                  ) : (
+                    <span className="shrink-0 text-[9px] text-slate-400 font-medium">
+                      Optional
                     </span>
                   )}
                 </div>
 
-                <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
-                  {isUploaded ? (
-                    <>
-                      <span className="text-[11px] font-semibold text-[#000080] dark:text-blue-300 group-hover:underline flex items-center gap-1">
-                        <Eye className="w-3.5 h-3.5" />
-                        Click Card to Inspect & Actions
-                      </span>
+                {/* Card Body: If uploaded -> Show preview indicator, file name, and View/Delete action buttons. If not uploaded -> Show FileUploadBox */}
+                {isUploaded && uploadedDoc ? (
+                  <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800/80 min-w-0">
+                    {/* Preview Indicator & Metadata */}
+                    <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800 flex items-center gap-2 min-w-0 overflow-hidden">
+                      <div className="w-7 h-7 rounded-md bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 flex items-center justify-center shrink-0 font-bold text-[10px] uppercase border border-emerald-200 dark:border-emerald-800">
+                        {uploadedDoc.previewType === "image" ? "IMG" : "PDF"}
+                      </div>
+                      <div className="min-w-0 flex-1 overflow-hidden">
+                        <p className="text-xs font-bold text-slate-900 dark:text-white truncate block w-full leading-tight" title={uploadedDoc.name}>
+                          {uploadedDoc.name}
+                        </p>
+                        <div className="flex items-center gap-1.5 text-[9px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">
+                          <span>{uploadedDoc.size}</span>
+                          <span>•</span>
+                          <span>{uploadedDoc.uploadedAt || "Verified"}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* View and Delete Action Buttons */}
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPreviewDoc(uploadedDoc);
+                        }}
+                        className="flex-1 py-1.5 px-2.5 rounded-lg bg-[#000080] hover:bg-[#000066] text-white text-[11px] font-bold flex items-center justify-center gap-1 shadow-xs transition-all cursor-pointer hover:shadow-sm"
+                        title="View Document"
+                      >
+                        <Eye className="w-3 h-3" />
+                        <span>View</span>
+                      </button>
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           removeDocument(scopedKey);
+                          removeDocument(rawDocName);
+                          if (uploadedDoc.docName) {
+                            removeDocument(uploadedDoc.docName);
+                          }
                         }}
-                        className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/15 transition-colors cursor-pointer"
-                        title="Remove Document"
+                        className="py-1.5 px-2.5 rounded-lg border border-rose-200 dark:border-rose-900/50 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 text-[11px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer"
+                        title="Delete Document"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Trash2 className="w-3 h-3" />
+                        <span>Delete</span>
                       </button>
-                    </>
-                  ) : (
-                    <div className="w-full">
-                      <FileUploadBox
-                        label={rawDocName}
-                        currentFile={null}
-                        onConfirmUpload={(file) => {
-                          uploadDocument(scopedKey, file);
-                        }}
-                      />
                     </div>
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  <div className="w-full pt-0.5 min-w-0">
+                    <FileUploadBox
+                      label={rawDocName}
+                      hideLabel={true}
+                      currentFile={null}
+                      onConfirmUpload={(file, fileMeta) => {
+                        uploadDocument(scopedKey, file, fileMeta);
+                      }}
+                      onView={(doc) => setPreviewDoc(doc)}
+                      onRemove={() => {
+                        removeDocument(scopedKey);
+                        removeDocument(rawDocName);
+                      }}
+                    />
+                  </div>
+                )}
               </div>
             );
           })}
@@ -1087,55 +1161,62 @@ export const DocumentManagement: React.FC = () => {
               <span className="text-[11px] text-[#138808] font-bold">
                 {
                   memberSlots.filter(
-                    (slot) => memberScopedDocs[slot.docKey] || uploadedDocs[slot.docKey]
+                    (slot) => Boolean(findMemberDoc(slot.docKey) || findMemberDoc(slot.label))
                   ).length
                 }{" "}
                 of {memberSlots.length} Attached
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {memberSlots.map((slot) => {
-                const currentDoc = memberScopedDocs[slot.docKey] || uploadedDocs[slot.docKey] || null;
+                const currentDoc = findMemberDoc(slot.docKey) || findMemberDoc(slot.label);
 
                 return (
                   <div
                     key={slot.docKey}
-                    className="p-4 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 shadow-xs flex flex-col justify-between space-y-3"
+                    className="p-3 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 shadow-xs flex flex-col justify-between space-y-2 min-w-0 overflow-hidden"
                   >
-                    <div>
-                      <div className="flex items-start justify-between gap-2">
-                        <h4 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                          <span>{slot.label}</span>
-                          {slot.required && <span className="text-rose-500 font-bold">*</span>}
+                    <div className="min-w-0 overflow-hidden">
+                      <div className="flex items-start justify-between gap-1.5 min-w-0">
+                        <h4 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1 min-w-0 overflow-hidden" title={slot.label}>
+                          <span className="truncate">{slot.label}</span>
+                          {slot.required && <span className="text-rose-500 font-bold shrink-0">*</span>}
                         </h4>
                         {currentDoc && (
                           <button
                             type="button"
                             onClick={() => setPreviewDoc(currentDoc)}
-                            className="text-[#000080] dark:text-blue-300 hover:underline text-[11px] font-semibold flex items-center gap-1 shrink-0"
+                            className="text-[#000080] dark:text-blue-300 hover:underline text-[10px] font-semibold flex items-center gap-0.5 shrink-0 cursor-pointer"
                           >
                             <Eye className="w-3 h-3" />
                             View
                           </button>
                         )}
                       </div>
-                      <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                      <p className="text-[10px] text-slate-500 mt-0.5 line-clamp-1" title={slot.description}>
                         {slot.description}
                       </p>
                     </div>
 
                     {/* Standalone Reusable FileUploadBox */}
-                    <div>
+                    <div className="min-w-0 w-full">
                       <FileUploadBox
                         label={slot.label}
+                        hideLabel={true}
                         required={slot.required}
                         currentFile={currentDoc}
-                        onConfirmUpload={(file) => {
-                          uploadDocument(slot.docKey, file);
+                        onConfirmUpload={(file, fileMeta) => {
+                          uploadDocument(slot.docKey, file, fileMeta);
                         }}
                         onRemove={() => {
                           removeDocument(slot.docKey);
+                          if (currentDoc?.docName) {
+                            removeDocument(currentDoc.docName);
+                          }
+                        }}
+                        onView={(doc) => {
+                          setPreviewDoc(doc);
                         }}
                       />
                     </div>
@@ -1211,73 +1292,73 @@ export const DocumentManagement: React.FC = () => {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {memberUploadedList.map(([docName, docMeta]) => (
                 <div
                   key={docName}
                   onClick={() => setPreviewDoc(docMeta)}
-                  className="p-5 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 hover:border-[#000080] dark:border-slate-800 dark:hover:border-blue-500 transition-all duration-200 transform hover:-translate-y-1 shadow-sm hover:shadow-md cursor-pointer flex flex-col justify-between space-y-4 group"
+                  className="p-3.5 rounded-xl bg-white dark:bg-slate-900/80 border border-slate-200 hover:border-[#000080] dark:border-slate-800 dark:hover:border-blue-500 transition-all duration-200 transform hover:-translate-y-0.5 shadow-xs hover:shadow-sm cursor-pointer flex flex-col justify-between space-y-2.5 group min-w-0 overflow-hidden"
                 >
-                  <div className="space-y-2.5">
+                  <div className="space-y-2 min-w-0">
                     <div className="flex items-center justify-between">
-                      <div className="w-10 h-10 rounded-xl bg-[#FFF3E0] text-[#E65100] border border-[#FFE082] flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <FileText className="w-5 h-5" />
+                      <div className="w-8 h-8 rounded-lg bg-[#FFF3E0] text-[#E65100] border border-[#FFE082] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                        <FileText className="w-4 h-4" />
                       </div>
-                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#E8F5E9] text-[#138808] border border-[#C8E6C9] flex items-center gap-1">
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-[#E8F5E9] text-[#138808] border border-[#C8E6C9] flex items-center gap-1 shrink-0">
                         <CheckCircle2 className="w-2.5 h-2.5" />
                         Verified
                       </span>
                     </div>
 
-                    <div>
-                      <h4 className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-[#000080] dark:group-hover:text-blue-300 transition-colors truncate">
+                    <div className="min-w-0 overflow-hidden">
+                      <h4 className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-[#000080] dark:group-hover:text-blue-300 transition-colors truncate" title={docMeta.docName || docName}>
                         {docMeta.docName || docName}
                       </h4>
-                      <p className="text-xs text-slate-500 font-mono truncate">{docMeta.name}</p>
+                      <p className="text-[10px] text-slate-500 font-mono truncate mt-0.5" title={docMeta.name}>{docMeta.name}</p>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 text-[11px] p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800">
+                    <div className="grid grid-cols-2 gap-2 text-[10px] p-2 rounded-lg bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800">
                       <div>
-                        <span className="text-slate-400 block text-[10px]">Size</span>
-                        <span className="font-semibold text-slate-700 dark:text-slate-300">{docMeta.size}</span>
+                        <span className="text-slate-400 block text-[9px]">Size</span>
+                        <span className="font-semibold text-slate-700 dark:text-slate-300 truncate block">{docMeta.size}</span>
                       </div>
                       <div>
-                        <span className="text-slate-400 block text-[10px]">Type</span>
-                        <span className="font-semibold text-slate-700 dark:text-slate-300">
+                        <span className="text-slate-400 block text-[9px]">Type</span>
+                        <span className="font-semibold text-slate-700 dark:text-slate-300 truncate block">
                           {docMeta.type.split("/")[1]?.toUpperCase() || "PDF"}
                         </span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
-                    <span className="text-xs font-bold text-[#000080] dark:text-blue-300 flex items-center gap-1.5 group-hover:underline">
-                      <Eye className="w-3.5 h-3.5" />
-                      Open Viewer & Actions
+                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between min-w-0">
+                    <span className="text-[11px] font-bold text-[#000080] dark:text-blue-300 flex items-center gap-1 group-hover:underline truncate">
+                      <Eye className="w-3 h-3 shrink-0" />
+                      <span>Open Viewer</span>
                     </span>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 shrink-0">
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           removeDocument(docName);
                         }}
-                        className="p-1 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+                        className="p-1 rounded-md text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
                         title="Delete Document"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Trash2 className="w-3 h-3" />
                       </button>
 
                       <div className="flex items-center gap-1 text-[#138808]">
                         {isAuthorized ? (
                           <>
-                            <span title="Download"><Download className="w-3.5 h-3.5" /></span>
-                            <span title="Print"><Printer className="w-3.5 h-3.5" /></span>
-                            <span title="Share"><Share2 className="w-3.5 h-3.5" /></span>
+                            <span title="Download"><Download className="w-3 h-3" /></span>
+                            <span title="Print"><Printer className="w-3 h-3" /></span>
+                            <span title="Share"><Share2 className="w-3 h-3" /></span>
                           </>
                         ) : (
-                          <span title="Actions Restricted"><Lock className="w-3.5 h-3.5 text-slate-400" /></span>
+                          <span title="Actions Restricted"><Lock className="w-3 h-3 text-slate-400" /></span>
                         )}
                       </div>
                     </div>
@@ -1291,7 +1372,7 @@ export const DocumentManagement: React.FC = () => {
 
       {/* Tab 2: 6 Statutory Categories Grid */}
       {activeTab === "categories" && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {DOCUMENT_CATEGORIES.map((cat) => {
             const uploadedCount = cat.items.filter((item) => {
               const scopedKey =
@@ -1305,33 +1386,33 @@ export const DocumentManagement: React.FC = () => {
               <div
                 key={cat.name}
                 onClick={() => setActiveCategory(cat)}
-                className="group p-5 rounded-2xl bg-white dark:bg-slate-900/70 hover:bg-slate-50/90 dark:hover:bg-slate-800/80 border border-slate-200/90 dark:border-slate-800 hover:border-[#000080] backdrop-blur-md transition-all duration-200 transform hover:-translate-y-1 cursor-pointer flex items-center justify-between shadow-sm hover:shadow-md"
+                className="group p-3.5 rounded-xl bg-white dark:bg-slate-900/70 hover:bg-slate-50/90 dark:hover:bg-slate-800/80 border border-slate-200/90 dark:border-slate-800 hover:border-[#000080] backdrop-blur-md transition-all duration-200 transform hover:-translate-y-0.5 cursor-pointer flex items-center justify-between shadow-xs hover:shadow-sm min-w-0"
               >
-                <div className="flex items-center gap-4">
-                  <span className="text-2xl p-2.5 rounded-xl bg-slate-100 border border-slate-200 dark:bg-slate-800/60 dark:border-slate-700/50 group-hover:scale-110 transition-transform">
+                <div className="flex items-center gap-3 min-w-0 flex-1 overflow-hidden">
+                  <span className="text-xl p-2 rounded-lg bg-slate-100 border border-slate-200 dark:bg-slate-800/60 dark:border-slate-700/50 group-hover:scale-105 transition-transform shrink-0">
                     {cat.icon}
                   </span>
-                  <div>
-                    <h3 className="text-sm font-semibold text-slate-900 dark:text-white group-hover:text-[#000080] dark:group-hover:text-blue-300 transition-colors">
+                  <div className="min-w-0 flex-1 overflow-hidden">
+                    <h3 className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-[#000080] dark:group-hover:text-blue-300 transition-colors truncate">
                       {cat.name}
                     </h3>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-xs text-slate-500 dark:text-slate-400">
+                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400">
                         {cat.items.length} {t("nav.documents")}
                       </span>
                       {uploadedCount > 0 ? (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#E8F5E9] text-[#138808] border border-[#C8E6C9]">
-                          {uploadedCount} Attached for {activeMemberInfo.label}
+                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-[#E8F5E9] text-[#138808] border border-[#C8E6C9]">
+                          {uploadedCount} Attached
                         </span>
                       ) : (
-                        <span className="text-[10px] text-slate-400">{t("docs.empty")}</span>
+                        <span className="text-[9px] text-slate-400">{t("docs.empty")}</span>
                       )}
                     </div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 text-slate-400 group-hover:text-[#000080] dark:group-hover:text-white transition-colors">
-                  <ArrowRight className="w-4 h-4" />
+                <div className="flex items-center text-slate-400 group-hover:text-[#000080] dark:group-hover:text-white transition-colors shrink-0 ml-2">
+                  <ArrowRight className="w-3.5 h-3.5" />
                 </div>
               </div>
             );

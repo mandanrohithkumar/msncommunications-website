@@ -23,7 +23,8 @@ import {
   Camera,
   Scan,
   Eye,
-  ShieldCheck
+  ShieldCheck,
+  LogIn
 } from "lucide-react";
 import { ExtendedFamilyModal } from "./extended-family-modal";
 import { FaceRecognitionModal } from "./face-recognition-modal";
@@ -46,6 +47,8 @@ export const PortalNavbar: React.FC = () => {
     setIsMessagesOpen,
     unreadCount,
     updateFacialProfile,
+    isAuthOpen,
+    setIsAuthOpen,
     t
   } = usePortal();
 
@@ -445,6 +448,18 @@ export const PortalNavbar: React.FC = () => {
 
         {/* Right: Face Recognition Quick Action & Three-Dots Menu */}
         <div className="flex items-center gap-1.5 shrink-0 relative" ref={menuRef}>
+          {!user && (
+            <button
+              type="button"
+              onClick={() => setIsAuthOpen(true)}
+              className="px-2.5 py-1 rounded-full bg-[#000080] hover:bg-[#000066] text-white text-[11px] font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1 shrink-0"
+              title="Sign In to Customer Portal"
+            >
+              <LogIn className="w-3 h-3" />
+              <span>Sign In</span>
+            </button>
+          )}
+
           {/* Dedicated Face Recognition Dynamic Bar Button */}
           <button
             type="button"
@@ -616,18 +631,32 @@ export const PortalNavbar: React.FC = () => {
                   <span>{t("nav.family_dependents")}</span>
                 </button>
 
-                {/* Sign Out / Logout button inside profile card */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    logout();
-                  }}
-                  className="w-full mt-2 flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs shadow-md shadow-rose-500/20 transition-all cursor-pointer"
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                  <span>{t("nav.sign_out")}</span>
-                </button>
+                {/* Sign In / Sign Out Button */}
+                {user ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      logout();
+                    }}
+                    className="w-full mt-2 flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs shadow-md shadow-rose-500/20 transition-all cursor-pointer"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>{t("nav.sign_out")}</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      setIsAuthOpen(true);
+                    }}
+                    className="w-full mt-2 flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-[#000080] hover:bg-[#000066] text-white font-bold text-xs shadow-md shadow-[#000080]/20 transition-all cursor-pointer"
+                  >
+                    <LogIn className="w-3.5 h-3.5" />
+                    <span>Customer Sign In / Login</span>
+                  </button>
+                )}
               </div>
 
               {/* Dedicated Face Recognition Management Block */}
