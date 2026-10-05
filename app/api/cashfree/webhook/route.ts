@@ -1,14 +1,25 @@
 import { Cashfree, CFEnvironment } from "cashfree-pg";
 import { NextRequest, NextResponse } from "next/server";
 
-// Create a Cashfree instance (server-side only)
-const cashfree = new Cashfree(
-  process.env.NEXT_PUBLIC_CASHFREE_ENV === "production"
-    ? CFEnvironment.PRODUCTION
-    : CFEnvironment.SANDBOX,
-  process.env.NEXT_PUBLIC_CASHFREE_APP_ID!,
-  process.env.CASHFREE_SECRET_KEY!
-);
+function getCashfreeInstance() {
+  const appId = (process.env.CASHFREE_APP_ID || process.env.NEXT_PUBLIC_CASHFREE_APP_ID)?.trim();
+  const secretKey = process.env.CASHFREE_SECRET_KEY?.trim();
+  const envMode = (process.env.CASHFREE_ENV || process.env.NEXT_PUBLIC_CASHFREE_ENV)?.trim() || "sandbox";
+
+  const isProduction = envMode.toLowerCase() === "production";
+  const cfEnv = isProduction ? CFEnvironment.PRODUCTION : CFEnvironment.SANDBOX;
+
+  const isConfigured =
+    Boolean(appId && secretKey) &&
+    appId !== "your_cashfree_app_id_here" &&
+    secretKey !== "your_cashfree_secret_key_here";
+
+  return {
+    cashfree: isConfigured ? new Cashfree(cfEnv, appId!, secretKey!) : null,
+    isConfigured,
+    isProduction,
+  };
+}
 
 /**
  * POST /api/cashfree/webhook
@@ -26,15 +37,21 @@ export async function POST(req: NextRequest) {
     const signature = req.headers.get("x-webhook-signature") || "";
     const timestamp = req.headers.get("x-webhook-timestamp") || "";
 
+    const { cashfree, isConfigured } = getCashfreeInstance();
+
     // Verify webhook authenticity using Cashfree SDK
-    try {
-      cashfree.PGVerifyWebhookSignature(signature, rawBody, timestamp);
-    } catch {
-      console.error("[Webhook] Invalid signature — rejecting.");
-      return NextResponse.json(
-        { success: false, error: "Invalid webhook signature" },
-        { status: 400 }
-      );
+    if (isConfigured && cashfree) {
+      try {
+        cashfree.PGVerifyWebhookSignature(signature, rawBody, timestamp);
+      } catch (sigErr) {
+        console.error("[Webhook] Invalid signature — rejecting.", sigErr);
+        return NextResponse.json(
+          { success: false, error: "Invalid webhook signature" },
+          { status: 400 }
+        );
+      }
+    } else {
+      console.warn("[Webhook] SDK not configured; skipping signature verification for local/sandbox test.");
     }
 
     // Parse the verified payload

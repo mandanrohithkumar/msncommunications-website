@@ -5,9 +5,9 @@ import { NextRequest, NextResponse } from "next/server";
  * Helper to get configured Cashfree instance
  */
 function getCashfreeInstance() {
-  const appId = process.env.NEXT_PUBLIC_CASHFREE_APP_ID?.trim();
+  const appId = (process.env.CASHFREE_APP_ID || process.env.NEXT_PUBLIC_CASHFREE_APP_ID)?.trim();
   const secretKey = process.env.CASHFREE_SECRET_KEY?.trim();
-  const envMode = process.env.NEXT_PUBLIC_CASHFREE_ENV?.trim() || "sandbox";
+  const envMode = (process.env.CASHFREE_ENV || process.env.NEXT_PUBLIC_CASHFREE_ENV)?.trim() || "sandbox";
 
   const isProduction = envMode.toLowerCase() === "production";
   const cfEnv = isProduction ? CFEnvironment.PRODUCTION : CFEnvironment.SANDBOX;
