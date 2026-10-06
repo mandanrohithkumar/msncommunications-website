@@ -120,7 +120,7 @@ export function generateAadhaarSvg(customerName: string = "Rohith Kumar", docId:
     <rect x="15" y="272" width="570" height="92" rx="12" fill="#F1F5F9" stroke="#E2E8F0" stroke-width="1.5"/>
     <text x="300" y="312" font-family="'Courier New', monospace" font-size="28" font-weight="900" fill="#000080" text-anchor="middle" letter-spacing="5">${docId}</text>
     <line x1="80" y1="328" x2="520" y2="328" stroke="#FF9933" stroke-width="2.5"/>
-    <text x="300" y="348" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#E65100" text-anchor="middle">ఆధార్ - సామాన్యుని హక్కు • Mera Aadhaar, Meri Pehchan</text>
+    <text x="300" y="348" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#E65100" text-anchor="middle">నా ఆధార్, నా గుర్తింపు • Aadhaar - My Identity</text>
   </svg>`;
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }

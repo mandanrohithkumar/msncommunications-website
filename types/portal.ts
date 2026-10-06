@@ -205,6 +205,9 @@ export interface UploadedFileMeta {
   categoryName?: string;
   docName?: string;
   previewType?: 'image' | 'pdf' | 'certificate';
+  verificationStatus?: 'APPROVED' | 'REJECTED';
+  verificationMessage?: string;
+  isGenuineAadhaar?: boolean;
 }
 
 export type ApplicationStatus =

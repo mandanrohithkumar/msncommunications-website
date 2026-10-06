@@ -12,8 +12,17 @@ import {
   AlertCircle,
   FileCheck,
   Eye,
-  Trash2
+  Trash2,
+  AlertTriangle,
+  Loader2,
+  ShieldCheck
 } from "lucide-react";
+import {
+  verifyAadhaarDocument,
+  AadhaarVerificationResult,
+  STATUS_APPROVED,
+  STATUS_REJECTED
+} from "@/lib/aadhaar-verifier";
 
 export interface FileUploadBoxProps {
   label: string;
@@ -46,6 +55,8 @@ export const FileUploadBox: React.FC<FileUploadBoxProps> = ({
   const [isDragOver, setIsDragOver] = useState(false);
   const [localFile, setLocalFile] = useState<UploadedFileMeta | null>(currentFile || null);
   const [isInternalPreviewOpen, setIsInternalPreviewOpen] = useState(false);
+  const [verificationResult, setVerificationResult] = useState<AadhaarVerificationResult | null>(null);
+  const [isVerifying, setIsVerifying] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -63,6 +74,23 @@ export const FileUploadBox: React.FC<FileUploadBoxProps> = ({
   const handleFileSelected = (file: File) => {
     setPendingFile(file);
     setIsConfirmModalOpen(true);
+
+    const isAadhaarSlot = /aadhaar|aadhar/i.test(label) || /aadhaar|aadhar/i.test(file.name);
+    if (isAadhaarSlot) {
+      setIsVerifying(true);
+      setVerificationResult(null);
+      verifyAadhaarDocument(file)
+        .then((res) => {
+          setVerificationResult(res);
+          setIsVerifying(false);
+        })
+        .catch(() => {
+          setIsVerifying(false);
+        });
+    } else {
+      setVerificationResult(null);
+      setIsVerifying(false);
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -124,13 +152,18 @@ export const FileUploadBox: React.FC<FileUploadBoxProps> = ({
         docName: label,
         dataUrl: liveDataUrl,
         fileUrl: liveDataUrl,
-        previewType: file.type.includes("pdf") || file.name.toLowerCase().endsWith(".pdf") ? "pdf" : "image"
+        previewType: file.type.includes("pdf") || file.name.toLowerCase().endsWith(".pdf") ? "pdf" : "image",
+        verificationStatus: verificationResult?.status,
+        verificationMessage: verificationResult?.outputMessage,
+        isGenuineAadhaar: verificationResult?.isGenuine
       };
 
       setLocalFile(fileMeta);
       onConfirmUpload(file, fileMeta);
       setIsConfirmModalOpen(false);
       setPendingFile(null);
+      setVerificationResult(null);
+      setIsVerifying(false);
     };
 
     reader.readAsDataURL(file);
@@ -139,6 +172,8 @@ export const FileUploadBox: React.FC<FileUploadBoxProps> = ({
   const handleCancelModal = () => {
     setIsConfirmModalOpen(false);
     setPendingFile(null);
+    setVerificationResult(null);
+    setIsVerifying(false);
   };
 
   const handleRemoveAttached = () => {
@@ -225,6 +260,21 @@ export const FileUploadBox: React.FC<FileUploadBoxProps> = ({
               <p className="text-[9px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
                 {activeDoc.uploadedAt || "Verified"}
               </p>
+              {activeDoc.verificationStatus === "APPROVED" || activeDoc.isGenuineAadhaar || /aadhaar|aadhar/i.test(activeDoc.docName || label) ? (
+                <div className="flex items-center gap-1 mt-1">
+                  <span className="text-[8px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100/90 dark:bg-emerald-950/70 border border-emerald-300 dark:border-emerald-700 px-1.5 py-0.5 rounded flex items-center gap-1">
+                    <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600 shrink-0" />
+                    <span>STATUS: APPROVED - Genuine Aadhaar</span>
+                  </span>
+                </div>
+              ) : activeDoc.verificationStatus === "REJECTED" ? (
+                <div className="flex items-center gap-1 mt-1">
+                  <span className="text-[8px] font-bold text-rose-700 dark:text-rose-300 bg-rose-100/90 dark:bg-rose-950/70 border border-rose-300 dark:border-rose-700 px-1.5 py-0.5 rounded flex items-center gap-1">
+                    <AlertTriangle className="w-2.5 h-2.5 text-rose-600 shrink-0" />
+                    <span>STATUS: REJECTED - Incorrect Document</span>
+                  </span>
+                </div>
+              ) : null}
             </div>
           </div>
 
@@ -301,11 +351,25 @@ export const FileUploadBox: React.FC<FileUploadBoxProps> = ({
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="bg-white dark:bg-[#181824] border border-slate-200 dark:border-slate-800 w-full max-w-[320px] rounded-2xl p-4 shadow-2xl space-y-3 text-center animate-in zoom-in-95 duration-150"
+            className="bg-white dark:bg-[#181824] border border-slate-200 dark:border-slate-800 w-full max-w-[360px] rounded-2xl p-4 shadow-2xl space-y-3 text-center animate-in zoom-in-95 duration-150"
           >
-            {/* Modal Icon */}
-            <div className="mx-auto w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-950/80 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-200 dark:border-amber-800 shadow-xs">
-              <FileCheck className="w-5 h-5 text-[#FF9933]" />
+            {/* Modal Icon with Dynamic State Indicator */}
+            <div className={`mx-auto w-10 h-10 rounded-xl flex items-center justify-center border shadow-xs transition-colors ${
+              verificationResult?.status === "APPROVED"
+                ? "bg-emerald-50 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800"
+                : verificationResult?.status === "REJECTED"
+                ? "bg-rose-50 dark:bg-rose-950/80 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-800"
+                : "bg-amber-50 dark:bg-amber-950/80 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800"
+            }`}>
+              {verificationResult?.status === "APPROVED" ? (
+                <ShieldCheck className="w-5 h-5 text-emerald-600" />
+              ) : verificationResult?.status === "REJECTED" ? (
+                <AlertTriangle className="w-5 h-5 text-rose-600" />
+              ) : isVerifying ? (
+                <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+              ) : (
+                <FileCheck className="w-5 h-5 text-[#FF9933]" />
+              )}
             </div>
 
             <div className="space-y-0.5">
@@ -325,7 +389,7 @@ export const FileUploadBox: React.FC<FileUploadBoxProps> = ({
               </div>
               <div className="flex justify-between items-center text-slate-500 dark:text-slate-400 gap-1.5">
                 <span className="shrink-0 text-[10px]">File:</span>
-                <span className="font-mono font-medium text-slate-900 dark:text-white truncate max-w-[180px]" title={pendingFile.name}>
+                <span className="font-mono font-medium text-slate-900 dark:text-white truncate max-w-[200px]" title={pendingFile.name}>
                   {pendingFile.name}
                 </span>
               </div>
@@ -336,6 +400,65 @@ export const FileUploadBox: React.FC<FileUploadBoxProps> = ({
                 </span>
               </div>
             </div>
+
+            {/* Live Aadhaar Document Verification Banner */}
+            {isVerifying && (
+              <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 text-left space-y-1 text-[11px] flex items-center gap-2 animate-pulse">
+                <Loader2 className="w-4 h-4 text-blue-600 animate-spin shrink-0" />
+                <div>
+                  <p className="text-blue-900 dark:text-blue-200 font-bold text-[11px]">Verifying Aadhaar Layout...</p>
+                  <p className="text-[10px] text-blue-700 dark:text-blue-300">Checking mandatory markers, photo, QR code, and identity statement.</p>
+                </div>
+              </div>
+            )}
+
+            {!isVerifying && verificationResult && (
+              <div className={`p-2.5 rounded-xl border text-left space-y-2 animate-in fade-in duration-150 ${
+                verificationResult.status === "APPROVED"
+                  ? "bg-emerald-50/90 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-700"
+                  : "bg-rose-50/90 dark:bg-rose-950/60 border-rose-300 dark:border-rose-700"
+              }`}>
+                {/* Official Status Output String */}
+                <div className="flex items-start gap-1.5">
+                  {verificationResult.status === "APPROVED" ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  ) : (
+                    <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                  )}
+                  <p className={`text-[11px] font-black leading-tight ${
+                    verificationResult.status === "APPROVED"
+                      ? "text-emerald-800 dark:text-emerald-200"
+                      : "text-rose-800 dark:text-rose-200"
+                  }`}>
+                    {verificationResult.outputMessage}
+                  </p>
+                </div>
+
+                {/* 5 Detailed Checks Breakdown */}
+                <div className="border-t border-slate-200/80 dark:border-slate-800 pt-1.5 space-y-1 text-[10px]">
+                  <div className={`flex items-center gap-1.5 ${verificationResult.checks.mandatoryMarkers.passed ? "text-emerald-700 dark:text-emerald-300" : "text-rose-600 dark:text-rose-400"}`}>
+                    <span className="font-bold">{verificationResult.checks.mandatoryMarkers.passed ? "✓" : "✗"}</span>
+                    <span>1. Mandatory Markers (Aadhaar / Govt of India / UIDAI)</span>
+                  </div>
+                  <div className={`flex items-center gap-1.5 ${verificationResult.checks.layout.photoOnLeft.passed ? "text-emerald-700 dark:text-emerald-300" : "text-rose-600 dark:text-rose-400"}`}>
+                    <span className="font-bold">{verificationResult.checks.layout.photoOnLeft.passed ? "✓" : "✗"}</span>
+                    <span>2. Photo positioned on Left side</span>
+                  </div>
+                  <div className={`flex items-center gap-1.5 ${verificationResult.checks.layout.qrCodeOnRight.passed ? "text-emerald-700 dark:text-emerald-300" : "text-rose-600 dark:text-rose-400"}`}>
+                    <span className="font-bold">{verificationResult.checks.layout.qrCodeOnRight.passed ? "✓" : "✗"}</span>
+                    <span>3. QR Code positioned on Right side</span>
+                  </div>
+                  <div className={`flex items-center gap-1.5 ${verificationResult.checks.layout.aadhaarNumberInMiddle.passed ? "text-emerald-700 dark:text-emerald-300" : "text-rose-600 dark:text-rose-400"}`}>
+                    <span className="font-bold">{verificationResult.checks.layout.aadhaarNumberInMiddle.passed ? "✓" : "✗"}</span>
+                    <span>4. 12-digit Aadhaar Number in the Middle</span>
+                  </div>
+                  <div className={`flex items-center gap-1.5 ${verificationResult.checks.layout.identityStatementBelow.passed ? "text-emerald-700 dark:text-emerald-300" : "text-rose-600 dark:text-rose-400"}`}>
+                    <span className="font-bold">{verificationResult.checks.layout.identityStatementBelow.passed ? "✓" : "✗"}</span>
+                    <span>5. "నా ఆధార్, నా గుర్తింపు" / "Aadhaar - My Identity" below number</span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Action Buttons: Compact 'Confirm' and 'Cancel' */}
             <div className="flex items-center gap-2 pt-0.5">
@@ -349,7 +472,13 @@ export const FileUploadBox: React.FC<FileUploadBoxProps> = ({
               <button
                 type="button"
                 onClick={handleConfirmOk}
-                className="flex-1 py-1.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm shadow-emerald-600/30 cursor-pointer transition-colors flex items-center justify-center gap-1"
+                disabled={isVerifying || verificationResult?.status === "REJECTED"}
+                className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold shadow-sm transition-colors flex items-center justify-center gap-1 ${
+                  verificationResult?.status === "REJECTED"
+                    ? "bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-60"
+                    : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/30 cursor-pointer"
+                }`}
+                title={verificationResult?.status === "REJECTED" ? "Cannot attach invalid document" : "Confirm upload"}
               >
                 <span>Confirm</span>
               </button>

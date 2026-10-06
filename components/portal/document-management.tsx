@@ -585,6 +585,12 @@ export const DocumentManagement: React.FC = () => {
                           <span>•</span>
                           <span>{uploadedDoc.uploadedAt || "Verified"}</span>
                         </div>
+                        {/aadhaar|aadhar/i.test(rawDocName) || uploadedDoc.verificationStatus === "APPROVED" || uploadedDoc.isGenuineAadhaar ? (
+                          <div className="flex items-center gap-1 text-[8px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100/90 dark:bg-emerald-950/70 border border-emerald-300 dark:border-emerald-700 px-1.5 py-0.5 rounded mt-1 w-fit">
+                            <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600 shrink-0" />
+                            <span>STATUS: APPROVED - Identified as a genuine Aadhaar card.</span>
+                          </div>
+                        ) : null}
                       </div>
                     </div>
 

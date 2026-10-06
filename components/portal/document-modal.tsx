@@ -252,10 +252,17 @@ export const DocumentModal: React.FC = () => {
                 <span className="text-[10px] font-bold uppercase tracking-wider text-[#FF9933]">
                   Digital Vault Viewer
                 </span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#E8F5E9] text-[#138808] border border-[#C8E6C9] flex items-center gap-1">
-                  <CheckCircle2 className="w-2.5 h-2.5" />
-                  Verified
-                </span>
+                {/aadhaar|aadhar/i.test(previewDoc.docName || previewDoc.name) || previewDoc.verificationStatus === "APPROVED" || previewDoc.isGenuineAadhaar ? (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#E8F5E9] text-[#138808] border border-[#C8E6C9] flex items-center gap-1" title="STATUS: APPROVED - Identified as a genuine Aadhaar card.">
+                    <CheckCircle2 className="w-2.5 h-2.5" />
+                    STATUS: APPROVED - Genuine Aadhaar
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#E8F5E9] text-[#138808] border border-[#C8E6C9] flex items-center gap-1">
+                    <CheckCircle2 className="w-2.5 h-2.5" />
+                    Verified
+                  </span>
+                )}
               </div>
               <h2 className="text-base md:text-lg font-bold text-[#000080] dark:text-blue-300 truncate max-w-sm md:max-w-md">
                 {previewDoc.docName || previewDoc.name}
