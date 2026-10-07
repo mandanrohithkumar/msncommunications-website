@@ -99,7 +99,8 @@ export function initGoogleAuthClient(
  */
 export function triggerGoogleAccountChooser(
   clientId: string,
-  onUserSelected: (user: GoogleAuthUser) => void
+  onUserSelected: (user: GoogleAuthUser) => void,
+  onFallback?: () => void
 ) {
   if (typeof window === "undefined") return;
 
@@ -120,32 +121,53 @@ export function triggerGoogleAccountChooser(
     };
   };
 
-  if (win.google?.accounts?.oauth2) {
-    const tokenClient = win.google.accounts.oauth2.initTokenClient({
-      client_id: clientId,
-      scope: "https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email",
-      prompt: "select_account", // Enforce account chooser prompt
-      callback: async (tokenResponse) => {
-        if (tokenResponse.access_token) {
-          try {
-            const userInfoRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
-              headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
-            });
-            const data = await userInfoRes.json();
-            onUserSelected({
-              name: data.name || data.given_name || "Google User",
-              email: data.email,
-              picture: data.picture,
-              sub: data.sub,
-            });
-          } catch (e) {
-            console.error("[Google Auth] Failed to fetch userinfo:", e);
-          }
-        }
-      },
-    });
+  const hasValidClientId = Boolean(
+    clientId &&
+    !clientId.includes("your_") &&
+    !clientId.includes("undefined") &&
+    clientId.trim().length > 10
+  );
 
-    // Request token with explicit prompt: 'select_account'
-    tokenClient.requestAccessToken({ prompt: "select_account" });
+  if (win.google?.accounts?.oauth2 && hasValidClientId) {
+    try {
+      const tokenClient = win.google.accounts.oauth2.initTokenClient({
+        client_id: clientId,
+        scope: "https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email",
+        prompt: "select_account", // Enforce native account chooser prompt
+        callback: async (tokenResponse) => {
+          if (tokenResponse.access_token) {
+            try {
+              const userInfoRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+                headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+              });
+              const data = await userInfoRes.json();
+              if (data?.email) {
+                onUserSelected({
+                  name: data.name || data.given_name || "Google User",
+                  email: data.email,
+                  picture: data.picture,
+                  sub: data.sub,
+                });
+                return;
+              }
+            } catch (e) {
+              console.error("[Google Auth] Failed to fetch userinfo:", e);
+            }
+          }
+          if (onFallback) onFallback();
+        },
+      });
+
+      // Request token with explicit prompt: 'select_account'
+      tokenClient.requestAccessToken({ prompt: "select_account" });
+      return;
+    } catch (err) {
+      console.warn("[Google Auth] Native client request failed:", err);
+    }
+  }
+
+  // Graceful fallback to the standard native-styled account chooser dialog
+  if (onFallback) {
+    onFallback();
   }
 }

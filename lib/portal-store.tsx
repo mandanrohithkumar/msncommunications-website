@@ -26,7 +26,7 @@ import {
 } from "@/types/portal";
 import { MEESEVA_SERVICES, ONLINE_CATEGORIES, DOCUMENT_CATEGORIES } from "./services-data";
 import { getTranslation, Language } from "./translations";
-import { resolveDocumentDataUrl, isImageDocument, isPdfDocument } from "./doc-preview-utils";
+import { resolveDocumentDataUrl, generateAadhaarSvg, isImageDocument, isPdfDocument } from "./doc-preview-utils";
 
 export type ViewType =
   | "meeseva"
@@ -43,6 +43,8 @@ export type ViewType =
 interface PortalContextType {
   // Auth & User
   user: User | null;
+  isLoggedIn: boolean;
+  isAuthChecking: boolean;
   selectedRole: UserRole;
   setSelectedRole: (role: UserRole) => void;
   isAuthOpen: boolean;
@@ -174,8 +176,8 @@ const PortalContext = createContext<PortalContextType | undefined>(undefined);
 const INITIAL_ACCOUNTS: UserAccount[] = [
   {
     id: "usr-cust-1",
-    name: "Rohith Kumar",
-    username: "rohith_kumar",
+    name: "Rahul Kumar",
+    username: "rahul_kumar",
     email: "rohith.kumar@gmail.com",
     phone: "8125898068",
     password: "Password@23",
@@ -672,21 +674,36 @@ const INITIAL_PAYMENTS: PaymentRecord[] = [
   }
 ];
 
+const RAHUL_KUMAR_AADHAAR_DOC: UploadedFileMeta = {
+  id: "vault-aadhaar-rahul-kumar",
+  name: "Rahul_Kumar_Aadhaar_Card_Masked.pdf",
+  size: "524.8 KB",
+  type: "application/pdf",
+  uploadedAt: "Oct 6, 2026, 04:39 PM",
+  categoryName: "Identity & Personal Documents",
+  docName: "Aadhaar card",
+  customerId: "usr-cust-1",
+  dataUrl: generateAadhaarSvg("Rahul Kumar", "XXXX XXXX 9821", {
+    dob: "01/01/1990",
+    gender: "పురుషుడు / MALE",
+    address: "123, Demo Street, Block A, Near Demo Park, New Delhi, Delhi - 110001",
+    vid: "9182 3019 4410 9821"
+  }),
+  fileUrl: generateAadhaarSvg("Rahul Kumar", "XXXX XXXX 9821", {
+    dob: "01/01/1990",
+    gender: "పురుషుడు / MALE",
+    address: "123, Demo Street, Block A, Near Demo Park, New Delhi, Delhi - 110001",
+    vid: "9182 3019 4410 9821"
+  }),
+  previewType: "image",
+  verificationStatus: "APPROVED",
+  verificationMessage: "STATUS: APPROVED - Identified as a genuine Aadhaar card.",
+  isGenuineAadhaar: true
+};
+
 const INITIAL_USER_DOCS: Record<string, Record<string, UploadedFileMeta>> = {
   "rohith.kumar@gmail.com": {
-    "Aadhaar card": {
-      id: "doc-vault-1",
-      name: "Rohith_Aadhaar_National_ID.pdf",
-      size: "620.4 KB",
-      type: "application/pdf",
-      uploadedAt: "2026-09-18 11:20 AM",
-      categoryName: "Identity & Personal Documents",
-      docName: "Aadhaar card",
-      customerId: "cust-1",
-      dataUrl: resolveDocumentDataUrl({ name: "Rohith_Aadhaar_National_ID.pdf", docName: "Aadhaar card", type: "application/pdf" }, "Rohith Kumar"),
-      fileUrl: resolveDocumentDataUrl({ name: "Rohith_Aadhaar_National_ID.pdf", docName: "Aadhaar card", type: "application/pdf" }, "Rohith Kumar"),
-      previewType: "pdf"
-    },
+    "Aadhaar card": RAHUL_KUMAR_AADHAAR_DOC,
     "Pan card": {
       id: "doc-vault-2",
       name: "PAN_Card_Scanned.jpg",
@@ -696,8 +713,24 @@ const INITIAL_USER_DOCS: Record<string, Record<string, UploadedFileMeta>> = {
       categoryName: "Identity & Personal Documents",
       docName: "Pan card",
       customerId: "cust-1",
-      dataUrl: resolveDocumentDataUrl({ name: "PAN_Card_Scanned.jpg", docName: "Pan card", type: "image/jpeg" }, "Rohith Kumar"),
-      fileUrl: resolveDocumentDataUrl({ name: "PAN_Card_Scanned.jpg", docName: "Pan card", type: "image/jpeg" }, "Rohith Kumar"),
+      dataUrl: resolveDocumentDataUrl({ name: "PAN_Card_Scanned.jpg", docName: "Pan card", type: "image/jpeg" }, "Rahul Kumar"),
+      fileUrl: resolveDocumentDataUrl({ name: "PAN_Card_Scanned.jpg", docName: "Pan card", type: "image/jpeg" }, "Rahul Kumar"),
+      previewType: "image"
+    }
+  },
+  "rahul.kumar@gmail.com": {
+    "Aadhaar card": RAHUL_KUMAR_AADHAAR_DOC,
+    "Pan card": {
+      id: "doc-vault-2-rahul",
+      name: "PAN_Card_Scanned.jpg",
+      size: "240.1 KB",
+      type: "image/jpeg",
+      uploadedAt: "2026-09-19 03:45 PM",
+      categoryName: "Identity & Personal Documents",
+      docName: "Pan card",
+      customerId: "cust-1",
+      dataUrl: resolveDocumentDataUrl({ name: "PAN_Card_Scanned.jpg", docName: "Pan card", type: "image/jpeg" }, "Rahul Kumar"),
+      fileUrl: resolveDocumentDataUrl({ name: "PAN_Card_Scanned.jpg", docName: "Pan card", type: "image/jpeg" }, "Rahul Kumar"),
       previewType: "image"
     }
   }
@@ -801,7 +834,7 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const openAuth = useCallback(() => setIsAuthOpen(true), []);
   const closeAuth = useCallback(() => setIsAuthOpen(false), []);
 
-  // Auth state: persistent in localStorage, defaults to active demo customer so portal is directly usable without login blocker
+  // Auth state: persistent in localStorage, strictly null by default unless authenticated session exists
   const [user, setUser] = useState<User | null>(() => {
     if (typeof window !== "undefined") {
       try {
@@ -818,8 +851,19 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
       } catch (e) {}
     }
-    return DEFAULT_DEMO_USER;
+    return null;
   });
+  const [isAuthChecking, setIsAuthChecking] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      const loggedOut = localStorage.getItem("msn_portal_logged_out");
+      const stored = localStorage.getItem("msn_portal_user");
+      if (loggedOut !== "true" && stored) {
+        return false;
+      }
+    }
+    return true;
+  });
+  const isLoggedIn = useMemo(() => Boolean(user && user.id), [user]);
   const [selectedRole, setSelectedRole] = useState<UserRole>("customer");
 
   // Keep localStorage in sync with user state
@@ -868,7 +912,12 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             });
           }
         })
-        .catch((e) => console.debug("[Session Auth Check]", e));
+        .catch((e) => console.debug("[Session Auth Check]", e))
+        .finally(() => {
+          if (isMounted) setIsAuthChecking(false);
+        });
+    } else {
+      setIsAuthChecking(false);
     }
     return () => {
       isMounted = false;
@@ -1126,7 +1175,17 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (stored) {
           const parsed = JSON.parse(stored);
           if (parsed && typeof parsed === "object") {
-            return parsed;
+            const merged: Record<string, Record<string, UploadedFileMeta>> = { ...INITIAL_USER_DOCS, ...parsed };
+            Object.keys(INITIAL_USER_DOCS).forEach((email) => {
+              merged[email] = {
+                ...INITIAL_USER_DOCS[email],
+                ...(parsed[email] || {})
+              };
+              if (INITIAL_USER_DOCS[email]["Aadhaar card"]) {
+                merged[email]["Aadhaar card"] = INITIAL_USER_DOCS[email]["Aadhaar card"];
+              }
+            });
+            return merged;
           }
         }
       } catch (e) {}
@@ -1142,11 +1201,12 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [userDocsMap]);
 
-  // Dynamic user-scoped documents: only fetch and display files for the currently logged-in email
-  const currentUserEmail = (user?.email || user?.id || "rohith.kumar@gmail.com").toLowerCase().trim();
+  // Dynamic user-scoped documents: strictly fetch and display files for the currently logged-in email
+  const currentUserEmail = (user?.email || "").toLowerCase().trim();
   const uploadedDocs = useMemo(() => {
+    if (!user || !currentUserEmail) return {};
     return userDocsMap[currentUserEmail] || {};
-  }, [currentUserEmail, userDocsMap]);
+  }, [user, currentUserEmail, userDocsMap]);
 
   const getUserUploadedDocs = useCallback((email: string): Record<string, UploadedFileMeta> => {
     const clean = String(email || "").toLowerCase().trim();
@@ -2717,9 +2777,9 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return updated;
     });
 
-    const customerName = targetCustomer?.name || "Rohith Kumar";
-    const customerEmail = targetCustomer?.email || (clean.includes("@") ? clean : "rohith.kumar@gmail.com");
-    const customerPhone = targetCustomer?.phone || "8125898068";
+    const customerName = targetCustomer?.name || (user?.name || "Customer");
+    const customerEmail = targetCustomer?.email || (clean.includes("@") ? clean : (user?.email || ""));
+    const customerPhone = targetCustomer?.phone || (user?.phone || "");
     const originalPhoto = targetCustomer?.avatar;
 
     recordPasswordChangeAudit({
@@ -2785,15 +2845,16 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Documents - Scoped strictly to authenticated user's email with persistent storage
   const uploadDocument = (docName: string, file: File, maybeMeta?: UploadedFileMeta) => {
-    const email = (user?.email || user?.id || "rohith.kumar@gmail.com").toLowerCase().trim();
+    const email = (user?.email || user?.id || "").toLowerCase().trim();
+    if (!email) return;
 
     if (maybeMeta) {
       const newDoc: UploadedFileMeta = {
         ...maybeMeta,
         docName,
         customerId: user?.id || "cust-1",
-        dataUrl: maybeMeta.dataUrl || resolveDocumentDataUrl({ name: file.name, docName }, user?.name || "Rohith Kumar"),
-        fileUrl: maybeMeta.fileUrl || maybeMeta.dataUrl || resolveDocumentDataUrl({ name: file.name, docName }, user?.name || "Rohith Kumar")
+        dataUrl: maybeMeta.dataUrl || resolveDocumentDataUrl({ name: file.name, docName }, user?.name || "Citizen"),
+        fileUrl: maybeMeta.fileUrl || maybeMeta.dataUrl || resolveDocumentDataUrl({ name: file.name, docName }, user?.name || "Citizen")
       };
 
       setUserDocsMap((prev) => {
@@ -2886,7 +2947,9 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const removeDocument = (docName: string) => {
-    const email = (user?.email || user?.id || "rohith.kumar@gmail.com").toLowerCase().trim();
+    const email = (user?.email || user?.id || "").toLowerCase().trim();
+    if (!email) return;
+
     setUserDocsMap((prev) => {
       const userDocs = { ...(prev[email] || {}) };
       delete userDocs[docName];
@@ -2919,10 +2982,10 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   ) => {
     const randomSuffix = Math.floor(100000 + Math.random() * 900000);
     const newId = `MSN-2026-${randomSuffix}`;
-    const custId = user?.id || "cust-1";
-    const custName = user?.name || "Rohith Kumar";
-    const custEmail = user?.email || "rohith.kumar@gmail.com";
-    const custPhone = user?.phone || "8125898068";
+    const custId = user?.id || `cust-${Date.now()}`;
+    const custName = user?.name || "Citizen";
+    const custEmail = user?.email || "";
+    const custPhone = user?.phone || "";
 
     const isMeeSeva =
       meesevaServices.some((s) => s.id === service.id || s.name.toLowerCase() === service.name.toLowerCase()) ||
@@ -3010,7 +3073,7 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       ]);
     }
 
-    logUserActivity("Submitted Application", `Applied for ${service.name} (${newId})`, user?.email || "rohith.kumar@gmail.com");
+    logUserActivity("Submitted Application", `Applied for ${service.name} (${newId})`, user?.email || "customer");
     return newApp;
   };
 
@@ -3389,6 +3452,8 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     <PortalContext.Provider
       value={{
         user,
+        isLoggedIn,
+        isAuthChecking,
         selectedRole,
         setSelectedRole,
         isAuthOpen,

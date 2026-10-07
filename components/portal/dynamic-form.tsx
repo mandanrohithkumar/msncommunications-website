@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { usePortal } from "@/lib/portal-store";
 import { ServiceItem, UploadedFileMeta } from "@/types/portal";
 import {
@@ -51,9 +51,9 @@ export const DynamicForm: React.FC = () => {
   } = usePortal();
 
   const [formData, setFormData] = useState<Record<string, string>>({
-    "Full Name": user?.name || "Rohith Kumar",
-    "Phone Number": user?.phone || "8125898068",
-    "Email ID": user?.email || "rohith.kumar@gmail.com",
+    "Full Name": user?.name || "",
+    "Phone Number": user?.phone || "",
+    "Email ID": user?.email || "",
     "State": "Telangana",
     "District": "Nagarkurnool",
     "Mandal": "Nagarkurnool",
@@ -61,6 +61,17 @@ export const DynamicForm: React.FC = () => {
     "Pincode": "509209",
     "Address": buildSmartAddress("", "Nagarkurnool", "Nagarkurnool", "Telangana", "509209")
   });
+
+  useEffect(() => {
+    if (user) {
+      setFormData((prev) => ({
+        ...prev,
+        "Full Name": user.name || prev["Full Name"] || "",
+        "Phone Number": user.phone || prev["Phone Number"] || "",
+        "Email ID": user.email || prev["Email ID"] || ""
+      }));
+    }
+  }, [user]);
 
   const [attachedFiles, setAttachedFiles] = useState<Record<string, UploadedFileMeta>>({});
   const [ownerNote, setOwnerNote] = useState("");

@@ -6,7 +6,37 @@ import { UploadedFileMeta } from "@/types/portal";
 /**
  * Generates an SVG Data URL that looks like an official Indian Aadhaar card
  */
-export function generateAadhaarSvg(customerName: string = "Rohith Kumar", docId: string = "9876 5432 1098"): string {
+export function generateAadhaarSvg(
+  customerName: string = "Rohith Kumar",
+  docId: string = "9876 5432 1098",
+  details?: {
+    dob?: string;
+    gender?: string;
+    address?: string;
+    vid?: string;
+  }
+): string {
+  const dobVal = details?.dob || (customerName.includes("Rahul") ? "01/01/1990" : "14/05/1998");
+  const genderVal = details?.gender || "పురుషుడు / MALE";
+  const addressVal = details?.address || (customerName.includes("Rahul") ? "123, Demo Street, Block A, Near Demo Park, New Delhi, Delhi - 110001" : "Telangana, INDIA");
+  const vidVal = details?.vid || "9182 3019 4410 9821";
+
+  let addrLine1 = addressVal;
+  let addrLine2 = "";
+  if (addressVal.length > 32) {
+    const commaIndex = addressVal.indexOf(",", 25);
+    if (commaIndex !== -1 && commaIndex < 48) {
+      addrLine1 = addressVal.substring(0, commaIndex + 1).trim();
+      addrLine2 = addressVal.substring(commaIndex + 1).trim();
+    } else {
+      const spaceIndex = addressVal.lastIndexOf(" ", 38);
+      if (spaceIndex > 15) {
+        addrLine1 = addressVal.substring(0, spaceIndex).trim();
+        addrLine2 = addressVal.substring(spaceIndex).trim();
+      }
+    }
+  }
+
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 380" width="100%" height="100%">
     <defs>
       <linearGradient id="flag" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -69,18 +99,21 @@ export function generateAadhaarSvg(customerName: string = "Rohith Kumar", docId:
     <!-- Citizen Demographic Details -->
     <g transform="translate(165, 82)">
       <text x="0" y="16" font-family="Arial, sans-serif" font-size="11" fill="#64748B" font-weight="700">పేరు / Name:</text>
-      <text x="0" y="38" font-family="Arial, sans-serif" font-size="20" font-weight="900" fill="#0A1931">${customerName}</text>
+      <text x="0" y="38" font-family="Arial, sans-serif" font-size="18" font-weight="900" fill="#0A1931">${customerName}</text>
 
-      <text x="0" y="70" font-family="Arial, sans-serif" font-size="11" fill="#64748B" font-weight="700">పుట్టిన తేదీ / DOB:</text>
-      <text x="120" y="70" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#0A1931">14/05/1998</text>
+      <text x="0" y="68" font-family="Arial, sans-serif" font-size="11" fill="#64748B" font-weight="700">పుట్టిన తేదీ / DOB:</text>
+      <text x="120" y="68" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#0A1931">${dobVal}</text>
 
-      <text x="0" y="96" font-family="Arial, sans-serif" font-size="11" fill="#64748B" font-weight="700">లింగము / Gender:</text>
-      <text x="120" y="96" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#0A1931">పురుషుడు / MALE</text>
+      <text x="0" y="92" font-family="Arial, sans-serif" font-size="11" fill="#64748B" font-weight="700">లింగము / Gender:</text>
+      <text x="120" y="92" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#0A1931">${genderVal}</text>
 
-      <text x="0" y="122" font-family="Arial, sans-serif" font-size="11" fill="#64748B" font-weight="700">చిరునామా / State:</text>
-      <text x="120" y="122" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#0A1931">Telangana, INDIA</text>
+      <text x="0" y="118" font-family="Arial, sans-serif" font-size="11" fill="#64748B" font-weight="700">చిరునామా / Address:</text>
+      <text x="120" y="118" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="#0A1931">
+        ${addrLine1}
+        ${addrLine2 ? `<tspan x="120" dy="13">${addrLine2}</tspan>` : ""}
+      </text>
 
-      <text x="0" y="148" font-family="Arial, sans-serif" font-size="10" fill="#94A3B8">Vid / వర్చువల్ ఐడి: 9182 3019 4410 8821</text>
+      <text x="0" y="152" font-family="Arial, sans-serif" font-size="10" fill="#94A3B8">Vid / వర్చువల్ ఐడి: ${vidVal}</text>
     </g>
 
     <!-- High-Resolution Secure QR Code Area -->

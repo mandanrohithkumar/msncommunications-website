@@ -1,5 +1,45 @@
 [
   {
+    "id": "audit_1791286065697_a1d84b",
+    "timestamp": "2026-10-06T11:15:00.000Z",
+    "userId": "usr-cust-1",
+    "userName": "Rahul Kumar",
+    "userRole": "customer",
+    "userIp": "::1",
+    "action": "DOCUMENT_PULL",
+    "status": "SUCCESS",
+    "details": "Queried UIDAI / DigiLocker repository for citizen 'Rahul Kumar' Identity & Personal Documents.",
+    "hmacSignature": "99dd8dea0cf1fa90aa88c0216b4adcfef9dc7722191c3581f68da65337028e76"
+  },
+  {
+    "id": "audit_1791286065698_a2d84c",
+    "timestamp": "2026-10-06T11:15:00.200Z",
+    "userId": "usr-cust-1",
+    "userName": "Rahul Kumar",
+    "userRole": "customer",
+    "userIp": "::1",
+    "action": "SIGNATURE_VERIFIED",
+    "documentName": "Aadhaar Card",
+    "documentUri": "in.gov.uidai-ADHAR-0098213456",
+    "status": "SUCCESS",
+    "details": "Verified authentic digital signature from [Unique Identification Authority of India (UIDAI)]. Alg: http://www.w3.org/2001/04/xmldsig-more#rsa-sha256",
+    "hmacSignature": "d5d7618bda9feee54c8abf74e808d93d9d9ead07a6e8008203173f2b61dc77e8"
+  },
+  {
+    "id": "audit_1791286065698_a3d84d",
+    "timestamp": "2026-10-06T11:15:00.400Z",
+    "userId": "usr-cust-1",
+    "userName": "Rahul Kumar",
+    "userRole": "customer",
+    "userIp": "::1",
+    "action": "VAULT_STORE_ENCRYPTED",
+    "documentName": "Aadhaar Card",
+    "documentUri": "in.gov.uidai-ADHAR-0098213456",
+    "status": "SUCCESS",
+    "details": "Document stored in AES-256-GCM encrypted vault under Identity & Personal Documents repository. File ID: vault_1790279028000_rahul_kumar_aadhaar. Checksum: 61fdf48fb08441133f27462598bc61664a876c9aa279394c64e2c0c35b584965",
+    "hmacSignature": "e608c0708deb73f9c24a5cea21ddfa5aa0be14e68ddd41e7853b09cb55c78a86"
+  },
+  {
     "id": "audit_1790278687187_c1d6b12d",
     "timestamp": "2026-09-24T19:38:07.187Z",
     "userId": "user_cust_default",

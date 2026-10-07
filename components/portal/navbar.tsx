@@ -137,8 +137,8 @@ export const PortalNavbar: React.FC = () => {
       (user?.phone && a.phone === user.phone)
   );
   const displayName = user?.name || currentAccount?.name || "Customer User";
-  const displayEmail = user?.email || currentAccount?.email || "customer@msnportal.gov.in";
-  const displayPhone = user?.phone || currentAccount?.phone || "8125898068";
+  const displayEmail = user?.email || currentAccount?.email || "";
+  const displayPhone = user?.phone || currentAccount?.phone || "";
   const displayRoleTag =
     user?.role === "superadmin"
       ? t("role.superadmin")

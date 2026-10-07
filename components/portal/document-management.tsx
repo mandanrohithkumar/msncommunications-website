@@ -37,10 +37,13 @@ import {
   AlertCircle,
   Info,
   Calendar,
-  CreditCard
+  CreditCard,
+  ChevronDown,
+  ChevronUp,
+  Tag
 } from "lucide-react";
 
-export type FamilyMemberType = "self" | "father" | "mother" | "spouse" | "son" | "daughter";
+export type FamilyMemberType = "self" | "father" | "mother" | "spouse" | "wife" | "husband" | "son" | "daughter" | "custom-other";
 
 export interface MemberDocSlot {
   label: string;
@@ -65,6 +68,15 @@ export const DocumentManagement: React.FC = () => {
   const [activeCategory, setActiveCategory] = useState<DocumentCategoryDef | null>(null);
   const [activeTab, setActiveTab] = useState<"vault" | "categories">("vault");
   const [selectedMemberId, setSelectedMemberId] = useState<string>("self");
+  const [isOtherExpanded, setIsOtherExpanded] = useState<boolean>(false);
+  const [customRelationName, setCustomRelationName] = useState<string>("");
+  const [customMemberFullName, setCustomMemberFullName] = useState<string>("");
+  const [customMemberAge, setCustomMemberAge] = useState<string>("");
+  const [customPresetCategory, setCustomPresetCategory] = useState<"all" | "siblings" | "elders" | "inlaws" | "guardians">("all");
+  const [savedCustomMembers, setSavedCustomMembers] = useState<Array<{ id: string; relation: string; name?: string; age?: string }>>([
+    { id: "custom-brother", relation: "Brother", name: "" },
+    { id: "custom-grandfather", relation: "Grandfather", name: "" }
+  ]);
   const [saveSuccessNotice, setSaveSuccessNotice] = useState(false);
 
   const isAuthorized = user?.role === "superadmin" || user?.role === "owner";
@@ -219,8 +231,11 @@ export const DocumentManagement: React.FC = () => {
         !docKey.startsWith("[Mother]") &&
         !docKey.startsWith("[Spouse]") &&
         !docKey.startsWith("[Wife]") &&
+        !docKey.startsWith("[Husband]") &&
         !docKey.startsWith("[Son") &&
-        !docKey.startsWith("[Daughter")
+        !docKey.startsWith("[Daughter") &&
+        !docKey.startsWith("[Other") &&
+        !(Boolean(customRelationName) && docKey.startsWith(`[${customRelationName}`))
       );
     }
     if (memberId === "father") {
@@ -229,16 +244,31 @@ export const DocumentManagement: React.FC = () => {
     if (memberId === "mother") {
       return docKey.includes("[Mother]");
     }
-    if (memberId === "spouse") {
-      return docKey.includes("[Spouse]") || docKey.includes("[Wife]");
+    if (memberId === "wife" || memberId === "spouse") {
+      return docKey.includes("[Wife]") || docKey.includes("[Spouse]");
     }
-    if (memberId.startsWith("son-")) {
-      const idx = parseInt(memberId.split("-")[1], 10) + 1;
-      return docKey.includes(`[Son ${idx}]`);
+    if (memberId === "husband") {
+      return docKey.includes("[Husband]");
     }
-    if (memberId.startsWith("daughter-")) {
+    if (memberId === "sons" || memberId.startsWith("son-")) {
+      if (memberId === "sons") return docKey.includes("[Son");
       const idx = parseInt(memberId.split("-")[1], 10) + 1;
-      return docKey.includes(`[Daughter ${idx}]`);
+      return docKey.includes(`[Son ${idx}]`) || docKey.includes("[Son");
+    }
+    if (memberId === "daughters" || memberId.startsWith("daughter-")) {
+      if (memberId === "daughters") return docKey.includes("[Daughter");
+      const idx = parseInt(memberId.split("-")[1], 10) + 1;
+      return docKey.includes(`[Daughter ${idx}]`) || docKey.includes("[Daughter");
+    }
+    if (memberId === "custom-other") {
+      const rel = customRelationName.trim();
+      if (Boolean(rel)) {
+        return docKey.includes(`[${rel}]`) || docKey.includes("[Other]");
+      }
+      return (
+        docKey.includes("[Other]") ||
+        savedCustomMembers.some((m) => docKey.includes(`[${m.relation}]`))
+      );
     }
     return true;
   };
@@ -286,20 +316,31 @@ export const DocumentManagement: React.FC = () => {
         relation: "Mother"
       };
     }
-    if (selectedMemberId === "spouse") {
+    if (selectedMemberId === "wife" || selectedMemberId === "spouse") {
       return {
-        label: t("docs.spouse") || "Wife / Spouse",
-        name: familyDetails?.spouseName || "Spouse Details",
-        icon: "💍",
-        prefix: "[Spouse]",
-        relation: "Spouse"
+        label: "Wife",
+        name: familyDetails?.spouseName || "Wife Details",
+        icon: "👰",
+        prefix: "[Wife]",
+        relation: "Wife"
       };
     }
-    if (selectedMemberId.startsWith("son-")) {
-      const idx = parseInt(selectedMemberId.split("-")[1], 10);
-      const child = sonsList[idx];
+    if (selectedMemberId === "husband") {
       return {
-        label: `Son ${idx + 1}`,
+        label: "Husband",
+        name: familyDetails?.spouseName || "Husband Details",
+        icon: "🤵",
+        prefix: "[Husband]",
+        relation: "Husband"
+      };
+    }
+    if (selectedMemberId === "sons" || selectedMemberId.startsWith("son-")) {
+      const idx = selectedMemberId.startsWith("son-")
+        ? parseInt(selectedMemberId.split("-")[1], 10)
+        : 0;
+      const child = sonsList[idx] || (sonsCount > 0 ? sonsList[0] : undefined);
+      return {
+        label: sonsCount > 1 ? `Son ${idx + 1}` : "Son",
         name: child?.name || `Son ${idx + 1}`,
         icon: "👦",
         prefix: `[Son ${idx + 1}]`,
@@ -309,11 +350,13 @@ export const DocumentManagement: React.FC = () => {
         gender: "Son" as const
       };
     }
-    if (selectedMemberId.startsWith("daughter-")) {
-      const idx = parseInt(selectedMemberId.split("-")[1], 10);
-      const child = daughtersList[idx];
+    if (selectedMemberId === "daughters" || selectedMemberId.startsWith("daughter-")) {
+      const idx = selectedMemberId.startsWith("daughter-")
+        ? parseInt(selectedMemberId.split("-")[1], 10)
+        : 0;
+      const child = daughtersList[idx] || (daughtersCount > 0 ? daughtersList[0] : undefined);
       return {
-        label: `Daughter ${idx + 1}`,
+        label: daughtersCount > 1 ? `Daughter ${idx + 1}` : "Daughter",
         name: child?.name || `Daughter ${idx + 1}`,
         icon: "👧",
         prefix: `[Daughter ${idx + 1}]`,
@@ -323,6 +366,18 @@ export const DocumentManagement: React.FC = () => {
         gender: "Daughter" as const
       };
     }
+    if (selectedMemberId === "custom-other") {
+      const rel = customRelationName.trim() || "Other Member";
+      const full = customMemberFullName.trim();
+      const displayName = full ? `${full} (${rel})` : rel;
+      return {
+        label: rel,
+        name: displayName,
+        icon: "🏷️",
+        prefix: `[${rel}]`,
+        relation: rel
+      };
+    }
     return {
       label: "You (Self)",
       name: user?.name || "Primary Citizen",
@@ -330,7 +385,7 @@ export const DocumentManagement: React.FC = () => {
       prefix: "[Self]",
       relation: "Account Holder"
     };
-  }, [selectedMemberId, familyDetails, user, sonsList, daughtersList, t]);
+  }, [selectedMemberId, familyDetails, user, sonsList, daughtersList, customRelationName, sonsCount, daughtersCount, t]);
 
   // Helper to find an uploaded document with robust key & prefix matching
   const findMemberDoc = React.useCallback(
@@ -417,28 +472,54 @@ export const DocumentManagement: React.FC = () => {
         }
       ];
     }
-    if (selectedMemberId === "spouse") {
+    if (selectedMemberId === "wife" || selectedMemberId === "spouse") {
       return [
         {
-          label: "Spouse's Aadhaar Card",
-          docKey: "[Spouse] Aadhaar Card",
-          description: "Official 12-digit Aadhaar card of spouse",
+          label: "Wife's Aadhaar Card",
+          docKey: "[Wife] Aadhaar Card",
+          description: "Official 12-digit Aadhaar card of Wife",
           required: true
         },
         {
           label: "Marriage Registration Certificate",
-          docKey: "[Spouse] Marriage Certificate",
+          docKey: "[Wife] Marriage Certificate",
           description: "Official Registration of Marriage under Hindu/Special Marriage Act",
           required: true
         },
         {
-          label: "Spouse's PAN Card",
-          docKey: "[Spouse] PAN Card",
+          label: "Wife's PAN Card",
+          docKey: "[Wife] PAN Card",
           description: "Permanent Account Number card"
         },
         {
-          label: "Spouse's Voter ID",
-          docKey: "[Spouse] Voter ID",
+          label: "Wife's Voter ID",
+          docKey: "[Wife] Voter ID",
+          description: "Election Photo ID card or Passport"
+        }
+      ];
+    }
+    if (selectedMemberId === "husband") {
+      return [
+        {
+          label: "Husband's Aadhaar Card",
+          docKey: "[Husband] Aadhaar Card",
+          description: "Official 12-digit Aadhaar card of Husband",
+          required: true
+        },
+        {
+          label: "Marriage Registration Certificate",
+          docKey: "[Husband] Marriage Certificate",
+          description: "Official Registration of Marriage under Hindu/Special Marriage Act",
+          required: true
+        },
+        {
+          label: "Husband's PAN Card",
+          docKey: "[Husband] PAN Card",
+          description: "Permanent Account Number card"
+        },
+        {
+          label: "Husband's Voter ID",
+          docKey: "[Husband] Voter ID",
           description: "Election Photo ID card or Passport"
         }
       ];
@@ -475,8 +556,235 @@ export const DocumentManagement: React.FC = () => {
         }
       ];
     }
+    if (selectedMemberId === "custom-other") {
+      const rel = customRelationName.trim() || "Other Member";
+      const pfx = `[${rel}]`;
+      const relLower = rel.toLowerCase();
+      const isSenior =
+        relLower.includes("grand") ||
+        relLower.includes("elder") ||
+        relLower.includes("senior") ||
+        relLower.includes("uncle") ||
+        relLower.includes("aunt");
+      const isGuardian =
+        relLower.includes("guardian") ||
+        relLower.includes("custod") ||
+        relLower.includes("ward");
+
+      if (isSenior) {
+        return [
+          {
+            label: `${rel}'s Aadhaar Card`,
+            docKey: `${pfx} Aadhaar Card`,
+            description: `Official 12-digit Aadhaar Card copy of ${rel}`,
+            required: true
+          },
+          {
+            label: `${rel}'s Senior Citizen / Voter ID`,
+            docKey: `${pfx} Senior Citizen or Voter ID`,
+            description: `Government Senior Citizen ID card or Voter Identity Proof for ${rel}`
+          },
+          {
+            label: `${rel}'s Pension / Health Insurance Card`,
+            docKey: `${pfx} Pension or Health Card`,
+            description: `Pension payment order (PPO), Ayushman Bharat, or Senior health policy document`
+          },
+          {
+            label: `${rel}'s Bank Passbook / Address Proof`,
+            docKey: `${pfx} Address Proof`,
+            description: `Bank account passbook front page or utility statement for ${rel}`
+          },
+          {
+            label: `${rel}'s Passport Size Photo`,
+            docKey: `${pfx} Passport Photo`,
+            description: `Recent passport photograph of ${rel}`
+          }
+        ];
+      }
+
+      if (isGuardian) {
+        return [
+          {
+            label: `${rel}'s Aadhaar Card`,
+            docKey: `${pfx} Aadhaar Card`,
+            description: `Official 12-digit Aadhaar Card copy of ${rel}`,
+            required: true
+          },
+          {
+            label: `Legal Guardianship Deed / Court Order`,
+            docKey: `${pfx} Guardianship Order`,
+            description: `Certified legal guardianship certificate, adoption decree, or court authorization`,
+            required: true
+          },
+          {
+            label: `${rel}'s Photo Identity Proof / PAN Card`,
+            docKey: `${pfx} Identity Proof`,
+            description: `Government issued Voter ID, PAN Card, or Passport of guardian`
+          },
+          {
+            label: `${rel}'s Address Proof`,
+            docKey: `${pfx} Address Proof`,
+            description: `Current proof of residence for ${rel}`
+          },
+          {
+            label: `${rel}'s Passport Size Photo`,
+            docKey: `${pfx} Passport Photo`,
+            description: `Recent passport photograph of ${rel}`
+          }
+        ];
+      }
+
+      return [
+        {
+          label: `${rel}'s Aadhaar Card`,
+          docKey: `${pfx} Aadhaar Card`,
+          description: `Official 12-digit Aadhaar Card copy of ${rel}`,
+          required: true
+        },
+        {
+          label: `${rel}'s Identity Proof / Voter ID`,
+          docKey: `${pfx} Identity Proof`,
+          description: `Government photo identity card (Voter ID, Passport, or DL) for ${rel}`
+        },
+        {
+          label: `${rel}'s PAN Card`,
+          docKey: `${pfx} PAN Card`,
+          description: `Income Tax PAN card copy for ${rel}`
+        },
+        {
+          label: `${rel}'s Address Proof`,
+          docKey: `${pfx} Address Proof`,
+          description: `Utility bill, bank statement or residential certificate for ${rel}`
+        },
+        {
+          label: `${rel}'s Passport Size Photo`,
+          docKey: `${pfx} Passport Photo`,
+          description: `Recent passport size photograph of ${rel}`
+        }
+      ];
+    }
     return [];
-  }, [selectedMemberId, activeMemberInfo.prefix]);
+  }, [selectedMemberId, activeMemberInfo.prefix, customRelationName]);
+
+  // Document counts for each family member slot
+  const selfDocCount = useMemo(
+    () => Object.keys(uploadedDocs).filter((k) => isDocForMember(k, "self")).length,
+    [uploadedDocs, customRelationName]
+  );
+  const fatherDocCount = useMemo(
+    () => Object.keys(uploadedDocs).filter((k) => isDocForMember(k, "father")).length,
+    [uploadedDocs]
+  );
+  const motherDocCount = useMemo(
+    () => Object.keys(uploadedDocs).filter((k) => isDocForMember(k, "mother")).length,
+    [uploadedDocs]
+  );
+  const wifeDocCount = useMemo(
+    () => Object.keys(uploadedDocs).filter((k) => isDocForMember(k, "wife") || isDocForMember(k, "spouse")).length,
+    [uploadedDocs]
+  );
+  const husbandDocCount = useMemo(
+    () => Object.keys(uploadedDocs).filter((k) => isDocForMember(k, "husband")).length,
+    [uploadedDocs]
+  );
+  const sonsDocCount = useMemo(
+    () => Object.keys(uploadedDocs).filter((k) => isDocForMember(k, "sons")).length,
+    [uploadedDocs]
+  );
+  const daughtersDocCount = useMemo(
+    () => Object.keys(uploadedDocs).filter((k) => isDocForMember(k, "daughters")).length,
+    [uploadedDocs]
+  );
+  const customOtherDocCount = useMemo(
+    () => Object.keys(uploadedDocs).filter((k) => isDocForMember(k, "custom-other")).length,
+    [uploadedDocs, customRelationName]
+  );
+  const otherTotalDocCount = useMemo(
+    () => Object.keys(uploadedDocs).filter((k) => !isDocForMember(k, "self")).length,
+    [uploadedDocs, customRelationName]
+  );
+
+  // Sub-options definitions for the consolidated 'Other' expandable dropdown/menu
+  const otherSubOptions = useMemo(() => [
+    {
+      id: "father",
+      number: "1",
+      label: t("docs.father") || "Father",
+      subtext: familyDetails?.fatherName || "Father Details",
+      icon: "👨",
+      docCount: fatherDocCount
+    },
+    {
+      id: "mother",
+      number: "2",
+      label: t("docs.mother") || "Mother",
+      subtext: familyDetails?.motherName || "Mother Details",
+      icon: "👩",
+      docCount: motherDocCount
+    },
+    {
+      id: "son-0",
+      number: "3",
+      label: t("docs.sons") || "Sons",
+      subtext: sonsCount > 0 ? `${sonsCount} Son${sonsCount > 1 ? "s" : ""}` : "Add Son",
+      icon: "👦",
+      docCount: sonsDocCount,
+      isChild: true,
+      childGender: "Son" as const,
+      childCount: sonsCount
+    },
+    {
+      id: "daughter-0",
+      number: "4",
+      label: t("docs.daughters") || "Daughters",
+      subtext: daughtersCount > 0 ? `${daughtersCount} Daughter${daughtersCount > 1 ? "s" : ""}` : "Add Daughter",
+      icon: "👧",
+      docCount: daughtersDocCount,
+      isChild: true,
+      childGender: "Daughter" as const,
+      childCount: daughtersCount
+    },
+    {
+      id: "wife",
+      number: "5",
+      label: "Wife",
+      subtext: familyDetails?.spouseName || "Wife Details",
+      icon: "👰",
+      docCount: wifeDocCount
+    },
+    {
+      id: "husband",
+      number: "6",
+      label: "Husband",
+      subtext: familyDetails?.spouseName || "Husband Details",
+      icon: "🤵",
+      docCount: husbandDocCount
+    },
+    {
+      id: "custom-other",
+      number: "7",
+      label: customRelationName.trim() ? customRelationName : "Other (Custom)",
+      subtext: customRelationName.trim()
+        ? `${customMemberFullName ? customMemberFullName + " • " : ""}Custom Profile`
+        : "Type custom name / presets",
+      icon: "🏷️",
+      docCount: customOtherDocCount,
+      isCustom: true
+    }
+  ], [
+    t,
+    familyDetails,
+    fatherDocCount,
+    motherDocCount,
+    wifeDocCount,
+    husbandDocCount,
+    sonsDocCount,
+    daughtersDocCount,
+    customOtherDocCount,
+    sonsCount,
+    daughtersCount,
+    customRelationName
+  ]);
 
   // If a category view is selected in Tab 2
   if (activeCategory) {
@@ -714,330 +1022,642 @@ export const DocumentManagement: React.FC = () => {
           </div>
         </div>
 
-        {/* Member Selection Buttons Row */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5">
-          {/* 1. You (Self) */}
+        {/* Consolidated Member Selection Row: You (Self) + Other */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          {/* 1. You (Self) Card */}
           <button
             type="button"
-            onClick={() => setSelectedMemberId("self")}
-            className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+            onClick={() => {
+              setSelectedMemberId("self");
+              setIsOtherExpanded(false);
+            }}
+            className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between gap-3 ${
               selectedMemberId === "self"
-                ? "bg-[#000080] text-white border-[#000080] shadow-md shadow-[#000080]/30 scale-[1.02]"
-                : "bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"
+                ? "bg-[#000080] text-white border-[#000080] shadow-lg shadow-[#000080]/30 scale-[1.01]"
+                : "bg-white dark:bg-slate-900/80 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/60 shadow-xs"
             }`}
           >
-            <div className="flex items-center justify-between mb-1.5">
-              {(currentAccount?.avatar || user?.avatar) ? (
-                <img
-                  src={currentAccount?.avatar || user?.avatar}
-                  alt="You"
-                  className="w-7 h-7 rounded-full object-cover border-2 border-[#FF9933]/80 shadow-xs"
-                />
-              ) : (
-                <span className="text-xl">👤</span>
-              )}
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="relative shrink-0">
+                {(currentAccount?.avatar || user?.avatar) ? (
+                  <img
+                    src={currentAccount?.avatar || user?.avatar}
+                    alt="You"
+                    className="w-10 h-10 rounded-full object-cover border-2 border-[#FF9933]/80 shadow-xs"
+                  />
+                ) : (
+                  <div
+                    className={`w-10 h-10 rounded-full flex items-center justify-center text-xl ${
+                      selectedMemberId === "self"
+                        ? "bg-white/15 text-white"
+                        : "bg-blue-50 dark:bg-slate-800 text-[#000080] dark:text-blue-300"
+                    }`}
+                  >
+                    👤
+                  </div>
+                )}
+                <span
+                  className={`absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold ${
+                    selectedMemberId === "self"
+                      ? "bg-[#FF9933] text-white"
+                      : "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300"
+                  }`}
+                  title="Item #1: Primary Account Holder"
+                >
+                  #1
+                </span>
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-bold truncate">{t("docs.self") || "You (Self)"}</span>
+                  {selectedMemberId === "self" && (
+                    <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-white/20 text-white">
+                      Active
+                    </span>
+                  )}
+                </div>
+                <span
+                  className={`text-xs block truncate ${
+                    selectedMemberId === "self" ? "text-blue-100" : "text-slate-500 dark:text-slate-400"
+                  }`}
+                >
+                  {user?.name || "Primary Citizen Profile"}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-col items-end shrink-0 gap-1">
               <span
-                className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                className={`text-[11px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 ${
                   selectedMemberId === "self"
                     ? "bg-white/20 text-white"
-                    : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                    : selfDocCount > 0
+                    ? "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800"
+                    : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700"
                 }`}
               >
-                {Object.keys(uploadedDocs).filter((k) => isDocForMember(k, "self")).length}
+                <CheckCircle2 className="w-3 h-3" />
+                <span>{selfDocCount} {selfDocCount === 1 ? "Doc" : "Docs"}</span>
               </span>
-            </div>
-            <div>
-              <span className="text-xs font-bold block">{t("docs.self") || "You (Self)"}</span>
               <span
-                className={`text-[10px] block truncate ${
-                  selectedMemberId === "self" ? "text-blue-100" : "text-slate-400"
+                className={`text-[10px] ${
+                  selectedMemberId === "self" ? "text-blue-200" : "text-slate-400"
                 }`}
               >
-                {user?.name || "Account Owner"}
+                Vault records
               </span>
             </div>
           </button>
 
-          {/* 2. Father */}
+          {/* 2. Consolidated 'Other' Card */}
           <button
             type="button"
-            onClick={() => setSelectedMemberId("father")}
-            className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-              selectedMemberId === "father"
-                ? "bg-[#000080] text-white border-[#000080] shadow-md shadow-[#000080]/30 scale-[1.02]"
-                : "bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"
+            onClick={() => {
+              if (selectedMemberId === "self") {
+                setSelectedMemberId("father");
+                setIsOtherExpanded(true);
+              } else {
+                setIsOtherExpanded((prev) => !prev);
+              }
+            }}
+            className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between gap-3 ${
+              selectedMemberId !== "self"
+                ? "bg-[#000080] text-white border-[#000080] shadow-lg shadow-[#000080]/30 scale-[1.01]"
+                : "bg-white dark:bg-slate-900/80 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/60 shadow-xs"
             }`}
           >
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xl">👨</span>
-              <span
-                className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                  selectedMemberId === "father"
-                    ? "bg-white/20 text-white"
-                    : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
-                }`}
-              >
-                {Object.keys(uploadedDocs).filter((k) => isDocForMember(k, "father")).length}
-              </span>
-            </div>
-            <div>
-              <span className="text-xs font-bold block">{t("docs.father") || "Father"}</span>
-              <span
-                className={`text-[10px] block truncate ${
-                  selectedMemberId === "father" ? "text-blue-100" : "text-slate-400"
-                }`}
-              >
-                {familyDetails?.fatherName || "Father"}
-              </span>
-            </div>
-          </button>
-
-          {/* 3. Mother */}
-          <button
-            type="button"
-            onClick={() => setSelectedMemberId("mother")}
-            className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-              selectedMemberId === "mother"
-                ? "bg-[#000080] text-white border-[#000080] shadow-md shadow-[#000080]/30 scale-[1.02]"
-                : "bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"
-            }`}
-          >
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xl">👩</span>
-              <span
-                className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                  selectedMemberId === "mother"
-                    ? "bg-white/20 text-white"
-                    : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
-                }`}
-              >
-                {Object.keys(uploadedDocs).filter((k) => isDocForMember(k, "mother")).length}
-              </span>
-            </div>
-            <div>
-              <span className="text-xs font-bold block">{t("docs.mother") || "Mother"}</span>
-              <span
-                className={`text-[10px] block truncate ${
-                  selectedMemberId === "mother" ? "text-blue-100" : "text-slate-400"
-                }`}
-              >
-                {familyDetails?.motherName || "Mother"}
-              </span>
-            </div>
-          </button>
-
-          {/* 4. Wife / Spouse (Conditionally Revealed if Marital Status is Married) */}
-          {isMarried && (
-            <button
-              type="button"
-              onClick={() => setSelectedMemberId("spouse")}
-              className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                selectedMemberId === "spouse"
-                  ? "bg-[#000080] text-white border-[#000080] shadow-md shadow-[#000080]/30 scale-[1.02]"
-                  : "bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"
-              }`}
-            >
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xl">💍</span>
-                <span
-                  className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                    selectedMemberId === "spouse"
-                      ? "bg-white/20 text-white"
-                      : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="relative shrink-0">
+                <div
+                  className={`w-10 h-10 rounded-full flex items-center justify-center text-xl ${
+                    selectedMemberId !== "self"
+                      ? "bg-white/15 text-white"
+                      : "bg-indigo-50 dark:bg-slate-800 text-[#000080] dark:text-indigo-300"
                   }`}
                 >
-                  {Object.keys(uploadedDocs).filter((k) => isDocForMember(k, "spouse")).length}
+                  👥
+                </div>
+                <span
+                  className={`absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold ${
+                    selectedMemberId !== "self"
+                      ? "bg-[#FF9933] text-white"
+                      : "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300"
+                  }`}
+                  title="Item #2: Family & Other Members"
+                >
+                  #2
                 </span>
               </div>
-              <div>
-                <span className="text-xs font-bold block">{t("docs.spouse") || "Wife / Spouse"}</span>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-bold truncate">Other (Family Members)</span>
+                  <span
+                    className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold flex items-center gap-0.5 ${
+                      selectedMemberId !== "self"
+                        ? "bg-white/20 text-white"
+                        : "bg-blue-100 dark:bg-blue-900/50 text-[#000080] dark:text-blue-300"
+                    }`}
+                  >
+                    <span>7 Sub-Options</span>
+                  </span>
+                </div>
                 <span
-                  className={`text-[10px] block truncate ${
-                    selectedMemberId === "spouse" ? "text-blue-100" : "text-slate-400"
+                  className={`text-xs block truncate ${
+                    selectedMemberId !== "self" ? "text-blue-100" : "text-slate-500 dark:text-slate-400"
                   }`}
                 >
-                  {familyDetails?.spouseName || "Spouse"}
+                  {selectedMemberId !== "self"
+                    ? `Selected: ${activeMemberInfo.icon} ${activeMemberInfo.label}`
+                    : "Father, Mother, Sons, Daughters, Wife, Husband & Custom"}
                 </span>
               </div>
-            </button>
-          )}
-
-          {/* 5. Sons with Interactive Stepper (+ / -) */}
-          <div
-            onClick={() => {
-              if (sonsCount > 0) setSelectedMemberId("son-0");
-            }}
-            className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-              selectedMemberId.startsWith("son-")
-                ? "bg-[#000080] text-white border-[#000080] shadow-md shadow-[#000080]/30 scale-[1.02]"
-                : "bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"
-            }`}
-          >
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xl">👦</span>
-
-              {/* Quantity Stepper (+ / -) */}
-              <div
-                onClick={(e) => e.stopPropagation()}
-                className="flex items-center gap-1 bg-white/20 dark:bg-slate-700/80 rounded-lg p-0.5 border border-slate-300/40"
-              >
-                <button
-                  type="button"
-                  onClick={() => handleUpdateChildCount("Son", -1)}
-                  disabled={sonsCount === 0}
-                  className="w-5 h-5 flex items-center justify-center rounded bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-bold hover:bg-slate-200 disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
-                  title="Decrease Son Count"
-                >
-                  -
-                </button>
-                <span className="w-4 text-center font-bold text-xs">{sonsCount}</span>
-                <button
-                  type="button"
-                  onClick={() => handleUpdateChildCount("Son", 1)}
-                  className="w-5 h-5 flex items-center justify-center rounded bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-bold hover:bg-slate-200 cursor-pointer"
-                  title="Add Son"
-                >
-                  +
-                </button>
-              </div>
             </div>
-            <div>
-              <span className="text-xs font-bold block">{t("docs.sons") || "Sons"}</span>
+
+            <div className="flex flex-col items-end shrink-0 gap-1.5">
               <span
-                className={`text-[10px] block truncate ${
-                  selectedMemberId.startsWith("son-") ? "text-blue-100" : "text-slate-400"
+                className={`text-[11px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 ${
+                  selectedMemberId !== "self"
+                    ? "bg-white/20 text-white"
+                    : otherTotalDocCount > 0
+                    ? "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800"
+                    : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700"
                 }`}
               >
-                {sonsCount > 0 ? `${sonsCount} Son${sonsCount > 1 ? "s" : ""}` : "Click + to Add"}
+                <Layers className="w-3 h-3" />
+                <span>{otherTotalDocCount} {otherTotalDocCount === 1 ? "Doc" : "Docs"}</span>
               </span>
-            </div>
-          </div>
-
-          {/* 6. Daughters with Interactive Stepper (+ / -) */}
-          <div
-            onClick={() => {
-              if (daughtersCount > 0) setSelectedMemberId("daughter-0");
-            }}
-            className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-              selectedMemberId.startsWith("daughter-")
-                ? "bg-[#000080] text-white border-[#000080] shadow-md shadow-[#000080]/30 scale-[1.02]"
-                : "bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"
-            }`}
-          >
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xl">👧</span>
-
-              {/* Quantity Stepper (+ / -) */}
               <div
-                onClick={(e) => e.stopPropagation()}
-                className="flex items-center gap-1 bg-white/20 dark:bg-slate-700/80 rounded-lg p-0.5 border border-slate-300/40"
-              >
-                <button
-                  type="button"
-                  onClick={() => handleUpdateChildCount("Daughter", -1)}
-                  disabled={daughtersCount === 0}
-                  className="w-5 h-5 flex items-center justify-center rounded bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-bold hover:bg-slate-200 disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
-                  title="Decrease Daughter Count"
-                >
-                  -
-                </button>
-                <span className="w-4 text-center font-bold text-xs">{daughtersCount}</span>
-                <button
-                  type="button"
-                  onClick={() => handleUpdateChildCount("Daughter", 1)}
-                  className="w-5 h-5 flex items-center justify-center rounded bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-bold hover:bg-slate-200 cursor-pointer"
-                  title="Add Daughter"
-                >
-                  +
-                </button>
-              </div>
-            </div>
-            <div>
-              <span className="text-xs font-bold block">{t("docs.daughters") || "Daughters"}</span>
-              <span
-                className={`text-[10px] block truncate ${
-                  selectedMemberId.startsWith("daughter-") ? "text-blue-100" : "text-slate-400"
+                className={`flex items-center gap-1 text-[10px] font-semibold ${
+                  selectedMemberId !== "self" ? "text-blue-200" : "text-[#000080] dark:text-blue-400"
                 }`}
               >
-                {daughtersCount > 0
-                  ? `${daughtersCount} Daughter${daughtersCount > 1 ? "s" : ""}`
-                  : "Click + to Add"}
-              </span>
+                <span>{isOtherExpanded ? "Hide options" : "Expand options"}</span>
+                {isOtherExpanded ? (
+                  <ChevronUp className="w-3.5 h-3.5 transition-transform" />
+                ) : (
+                  <ChevronDown className="w-3.5 h-3.5 transition-transform" />
+                )}
+              </div>
             </div>
-          </div>
+          </button>
         </div>
 
-        {/* Dynamic Individual Child Sub-Pills (When Sons or Daughters > 0) */}
-        {(sonsCount > 0 || daughtersCount > 0) && (
-          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1 mr-1">
-              <Baby className="w-3.5 h-3.5 text-[#FF9933]" />
-              Select Individual Child:
-            </span>
+        {/* Expandable Sub-Menu containing 7 Sub-Options: Father, Mother, Sons, Daughters, Wife, Husband, Other (Custom) */}
+        {isOtherExpanded && (
+          <div className="p-4 sm:p-5 rounded-3xl bg-slate-50/90 dark:bg-slate-900/90 border border-slate-200/90 dark:border-slate-800/90 shadow-md space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-200/80 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <span className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <Users className="w-4 h-4 text-[#000080] dark:text-blue-400" />
+                  Select Family Member / Relationship Sub-Option
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                  7 Available
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Click any member card to view or attach dedicated records
+              </p>
+            </div>
 
-            {/* Individual Sons */}
-            {sonsList.map((son, idx) => {
-              const tabId = `son-${idx}`;
-              const isSelected = selectedMemberId === tabId;
-              const sonDocCount = Object.keys(uploadedDocs).filter((k) =>
-                isDocForMember(k, tabId)
-              ).length;
+            {/* Sub-Options Grid with Numbering & Counters */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2.5">
+              {otherSubOptions.map((opt) => {
+                const isSelected =
+                  selectedMemberId === opt.id ||
+                  (opt.isChild && opt.childGender === "Son" && selectedMemberId.startsWith("son-")) ||
+                  (opt.isChild && opt.childGender === "Daughter" && selectedMemberId.startsWith("daughter-"));
 
-              return (
-                <button
-                  key={son.id || idx}
-                  type="button"
-                  onClick={() => setSelectedMemberId(tabId)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    isSelected
-                      ? "bg-[#FF9933] text-white shadow-md shadow-[#FF9933]/30 scale-105"
-                      : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 border border-slate-200 dark:border-slate-700"
-                  }`}
-                >
-                  <span>👦</span>
-                  <span>{son.name || `Son ${idx + 1}`}</span>
-                  <span
-                    className={`px-1.5 py-0.2 rounded-full text-[10px] ${
-                      isSelected ? "bg-white/20 text-white" : "bg-slate-200 dark:bg-slate-700 text-slate-600"
+                return (
+                  <div
+                    key={opt.id}
+                    onClick={() => {
+                      if (opt.id === "son-0" && sonsCount === 0) {
+                        handleUpdateChildCount("Son", 1);
+                      }
+                      if (opt.id === "daughter-0" && daughtersCount === 0) {
+                        handleUpdateChildCount("Daughter", 1);
+                      }
+                      setSelectedMemberId(opt.id);
+                    }}
+                    className={`p-2.5 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between relative group ${
+                      isSelected
+                        ? "bg-[#000080] text-white border-[#000080] shadow-md shadow-[#000080]/30 scale-[1.02]"
+                        : "bg-white dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
                     }`}
                   >
-                    {sonDocCount}
-                  </span>
-                </button>
-              );
-            })}
+                    {/* Header: Numbering Badge + Icon + Doc Counter */}
+                    <div className="flex items-center justify-between mb-1.5 gap-1">
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold ${
+                            isSelected
+                              ? "bg-white/20 text-white"
+                              : "bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400"
+                          }`}
+                        >
+                          #{opt.number}
+                        </span>
+                        <span className="text-lg">{opt.icon}</span>
+                      </div>
 
-            {/* Individual Daughters */}
-            {daughtersList.map((daughter, idx) => {
-              const tabId = `daughter-${idx}`;
-              const isSelected = selectedMemberId === tabId;
-              const dauDocCount = Object.keys(uploadedDocs).filter((k) =>
-                isDocForMember(k, tabId)
-              ).length;
+                      {/* Item/Doc Counter Badge */}
+                      <span
+                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                          isSelected
+                            ? "bg-white/20 text-white"
+                            : opt.docCount > 0
+                            ? "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800"
+                            : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                        }`}
+                        title={`${opt.docCount} documents attached`}
+                      >
+                        {opt.docCount}
+                      </span>
+                    </div>
 
-              return (
-                <button
-                  key={daughter.id || idx}
-                  type="button"
-                  onClick={() => setSelectedMemberId(tabId)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    isSelected
-                      ? "bg-[#FF9933] text-white shadow-md shadow-[#FF9933]/30 scale-105"
-                      : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 border border-slate-200 dark:border-slate-700"
-                  }`}
-                >
-                  <span>👧</span>
-                  <span>{daughter.name || `Daughter ${idx + 1}`}</span>
-                  <span
-                    className={`px-1.5 py-0.2 rounded-full text-[10px] ${
-                      isSelected ? "bg-white/20 text-white" : "bg-slate-200 dark:bg-slate-700 text-slate-600"
-                    }`}
-                  >
-                    {dauDocCount}
-                  </span>
-                </button>
-              );
-            })}
+                    {/* Member Label & Subtext */}
+                    <div>
+                      <span className="text-xs font-bold block truncate" title={opt.label}>
+                        {opt.label}
+                      </span>
+                      <span
+                        className={`text-[10px] block truncate ${
+                          isSelected ? "text-blue-100" : "text-slate-400"
+                        }`}
+                        title={opt.subtext}
+                      >
+                        {opt.subtext}
+                      </span>
+                    </div>
+
+                    {/* Stepper (+ / -) for Sons & Daughters */}
+                    {opt.isChild && (
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        className={`mt-2 flex items-center justify-between gap-1 rounded-lg p-0.5 border ${
+                          isSelected
+                            ? "bg-white/10 border-white/20"
+                            : "bg-slate-50 dark:bg-slate-700/60 border-slate-200 dark:border-slate-600"
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateChildCount(opt.childGender!, -1)}
+                          disabled={opt.childCount === 0}
+                          className="w-4 h-4 flex items-center justify-center rounded bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-[10px] font-bold hover:bg-slate-200 disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+                          title={`Decrease ${opt.childGender} count`}
+                        >
+                          -
+                        </button>
+                        <span className="text-[10px] font-bold px-1">{opt.childCount}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateChildCount(opt.childGender!, 1)}
+                          className="w-4 h-4 flex items-center justify-center rounded bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-[10px] font-bold hover:bg-slate-200 cursor-pointer"
+                          title={`Add ${opt.childGender}`}
+                        >
+                          +
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Custom Name Filling Option: Rich Customization & Presets when 'custom-other' is selected */}
+            {selectedMemberId === "custom-other" && (
+              <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-blue-50/90 via-indigo-50/70 to-purple-50/90 dark:from-slate-900 dark:via-slate-900/90 dark:to-indigo-950/40 border border-blue-200/90 dark:border-indigo-800/70 shadow-sm space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                {/* Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-blue-200/60 dark:border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">🏷️</span>
+                    <div>
+                      <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                        <span>Custom Family Member & Relationship Profile</span>
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-[#000080] text-white">
+                          #7 Sub-Option
+                        </span>
+                      </h4>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                        Choose a relationship preset below or type any custom family member, in-law, or legal dependent.
+                      </p>
+                    </div>
+                  </div>
+                  {customRelationName.trim() && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] px-2.5 py-1 rounded-full bg-[#000080] text-white font-bold shadow-2xs flex items-center gap-1">
+                        <Tag className="w-3 h-3" />
+                        <span>Scoped As: [{customRelationName.trim()}]</span>
+                      </span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-300 dark:border-emerald-800">
+                        {customOtherDocCount} {customOtherDocCount === 1 ? "Doc" : "Docs"} Attached
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Preset Category Filter Tabs */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-1">Categories:</span>
+                  {[
+                    { id: "all", label: "All Presets" },
+                    { id: "siblings", label: "Siblings" },
+                    { id: "elders", label: "Elders & Extended" },
+                    { id: "inlaws", label: "In-Laws" },
+                    { id: "guardians", label: "Guardians & Others" }
+                  ].map((cat) => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => setCustomPresetCategory(cat.id as any)}
+                      className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                        customPresetCategory === cat.id
+                          ? "bg-[#000080] text-white shadow-xs"
+                          : "bg-white/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 border border-slate-200 dark:border-slate-700"
+                      }`}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Filtered Preset Chips Grid */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {[
+                    { name: "Brother", icon: "👨‍🦱", cat: "siblings" },
+                    { name: "Sister", icon: "👩‍🦰", cat: "siblings" },
+                    { name: "Grandfather", icon: "👴", cat: "elders" },
+                    { name: "Grandmother", icon: "👵", cat: "elders" },
+                    { name: "Uncle", icon: "👨‍🦳", cat: "elders" },
+                    { name: "Aunt", icon: "👩‍🦳", cat: "elders" },
+                    { name: "Father-in-law", icon: "👴", cat: "inlaws" },
+                    { name: "Mother-in-law", icon: "👵", cat: "inlaws" },
+                    { name: "Brother-in-law", icon: "👨‍🦱", cat: "inlaws" },
+                    { name: "Sister-in-law", icon: "👩‍🦰", cat: "inlaws" },
+                    { name: "Legal Guardian", icon: "⚖️", cat: "guardians" },
+                    { name: "Cousin", icon: "🧑", cat: "guardians" },
+                    { name: "Nephew", icon: "👦", cat: "guardians" },
+                    { name: "Niece", icon: "👧", cat: "guardians" },
+                    { name: "Dependent / Ward", icon: "🤝", cat: "guardians" }
+                  ]
+                    .filter((p) => customPresetCategory === "all" || p.cat === customPresetCategory)
+                    .map((preset) => {
+                      const isSelected = customRelationName.toLowerCase() === preset.name.toLowerCase();
+                      const presetDocCount = Object.keys(uploadedDocs).filter((k) =>
+                        k.includes(`[${preset.name}]`)
+                      ).length;
+
+                      return (
+                        <button
+                          key={preset.name}
+                          type="button"
+                          onClick={() => setCustomRelationName(preset.name)}
+                          className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                            isSelected
+                              ? "bg-[#000080] text-white shadow-md scale-105"
+                              : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:border-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700"
+                          }`}
+                        >
+                          <span>{preset.icon}</span>
+                          <span>{preset.name}</span>
+                          {presetDocCount > 0 && (
+                            <span
+                              className={`px-1 py-0.2 rounded-full text-[9px] font-bold ${
+                                isSelected ? "bg-white/20 text-white" : "bg-emerald-100 text-emerald-700"
+                              }`}
+                            >
+                              {presetDocCount}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                </div>
+
+                {/* Input Fields: Relationship Name, Full Name & Age */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                  {/* Field 1: Custom Relationship */}
+                  <div className="relative">
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                      Relationship / Title *
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={customRelationName}
+                        onChange={(e) => setCustomRelationName(e.target.value)}
+                        placeholder="e.g. Brother, Grandmother, Guardian"
+                        className="w-full pl-3 pr-8 py-2 rounded-xl text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#000080]/30 font-semibold"
+                      />
+                      {customRelationName && (
+                        <button
+                          type="button"
+                          onClick={() => setCustomRelationName("")}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
+                          title="Clear relationship"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Field 2: Custom Person Full Name (Optional) */}
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                      Member Full Name (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={customMemberFullName}
+                      onChange={(e) => setCustomMemberFullName(e.target.value)}
+                      placeholder="e.g. Ramesh Kumar, Sunita Devi"
+                      className="w-full px-3 py-2 rounded-xl text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#000080]/30"
+                    />
+                  </div>
+
+                  {/* Field 3: Age / DOB (Optional) */}
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                      Age / Details (Optional)
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={customMemberAge}
+                        onChange={(e) => setCustomMemberAge(e.target.value)}
+                        placeholder="e.g. 68 Years, DOB: 1956"
+                        className="w-full px-3 py-2 rounded-xl text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#000080]/30"
+                      />
+
+                      {/* Save to My Members Button */}
+                      {customRelationName.trim() && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const trimmedRel = customRelationName.trim();
+                            if (!savedCustomMembers.some((m) => m.relation.toLowerCase() === trimmedRel.toLowerCase())) {
+                              setSavedCustomMembers((prev) => [
+                                ...prev,
+                                {
+                                  id: `custom-${Date.now()}`,
+                                  relation: trimmedRel,
+                                  name: customMemberFullName.trim(),
+                                  age: customMemberAge.trim()
+                                }
+                              ]);
+                            }
+                            setSaveSuccessNotice(true);
+                            setTimeout(() => setSaveSuccessNotice(false), 2000);
+                          }}
+                          className="px-3 py-2 rounded-xl bg-[#000080] text-white text-xs font-bold hover:bg-[#000066] transition-colors shrink-0 flex items-center gap-1 cursor-pointer shadow-xs"
+                          title="Save this custom relation to quick list"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Save</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Saved Custom Profiles List */}
+                {savedCustomMembers.length > 0 && (
+                  <div className="pt-2 border-t border-blue-200/60 dark:border-slate-800 flex items-center gap-2 flex-wrap">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
+                      <span>Saved Members:</span>
+                    </span>
+                    {savedCustomMembers.map((member) => {
+                      const isActive = customRelationName.toLowerCase() === member.relation.toLowerCase();
+                      const docCount = Object.keys(uploadedDocs).filter((k) =>
+                        k.includes(`[${member.relation}]`)
+                      ).length;
+
+                      return (
+                        <div
+                          key={member.id}
+                          className={`inline-flex items-center rounded-xl border text-xs font-semibold transition-all ${
+                            isActive
+                              ? "bg-[#000080] text-white border-[#000080] shadow-xs"
+                              : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50"
+                          }`}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCustomRelationName(member.relation);
+                              if (member.name) setCustomMemberFullName(member.name);
+                              if (member.age) setCustomMemberAge(member.age);
+                            }}
+                            className="px-2.5 py-1 flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <span>🏷️</span>
+                            <span>{member.name ? `${member.name} (${member.relation})` : member.relation}</span>
+                            <span
+                              className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${
+                                isActive
+                                  ? "bg-white/20 text-white"
+                                  : docCount > 0
+                                  ? "bg-emerald-100 text-emerald-700"
+                                  : "bg-slate-100 text-slate-500"
+                              }`}
+                            >
+                              {docCount}
+                            </span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSavedCustomMembers((prev) => prev.filter((m) => m.id !== member.id));
+                            }}
+                            className={`pr-2 pl-0.5 text-[10px] hover:text-red-500 cursor-pointer ${
+                              isActive ? "text-blue-200" : "text-slate-400"
+                            }`}
+                            title="Remove saved member"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Individual Child Sub-Pills (When Sons or Daughters > 0) */}
+            {(sonsCount > 0 || daughtersCount > 0) && (
+              <div className="pt-3 border-t border-slate-200/80 dark:border-slate-800 flex flex-wrap items-center gap-2">
+                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1 mr-1">
+                  <Baby className="w-3.5 h-3.5 text-[#FF9933]" />
+                  Select Specific Child:
+                </span>
+
+                {sonsList.map((son, idx) => {
+                  const tabId = `son-${idx}`;
+                  const isSelected = selectedMemberId === tabId;
+                  const sonDocCount = Object.keys(uploadedDocs).filter((k) =>
+                    isDocForMember(k, tabId)
+                  ).length;
+
+                  return (
+                    <button
+                      key={son.id || idx}
+                      type="button"
+                      onClick={() => setSelectedMemberId(tabId)}
+                      className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                        isSelected
+                          ? "bg-[#FF9933] text-white shadow-sm shadow-[#FF9933]/30 scale-105"
+                          : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 border border-slate-200 dark:border-slate-700"
+                      }`}
+                    >
+                      <span>👦</span>
+                      <span>{son.name || `Son ${idx + 1}`}</span>
+                      <span
+                        className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                          isSelected ? "bg-white/20 text-white" : "bg-slate-200 dark:bg-slate-700 text-slate-600"
+                        }`}
+                      >
+                        {sonDocCount}
+                      </span>
+                    </button>
+                  );
+                })}
+
+                {daughtersList.map((daughter, idx) => {
+                  const tabId = `daughter-${idx}`;
+                  const isSelected = selectedMemberId === tabId;
+                  const dauDocCount = Object.keys(uploadedDocs).filter((k) =>
+                    isDocForMember(k, tabId)
+                  ).length;
+
+                  return (
+                    <button
+                      key={daughter.id || idx}
+                      type="button"
+                      onClick={() => setSelectedMemberId(tabId)}
+                      className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                        isSelected
+                          ? "bg-[#FF9933] text-white shadow-sm shadow-[#FF9933]/30 scale-105"
+                          : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 border border-slate-200 dark:border-slate-700"
+                      }`}
+                    >
+                      <span>👧</span>
+                      <span>{daughter.name || `Daughter ${idx + 1}`}</span>
+                      <span
+                        className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                          isSelected ? "bg-white/20 text-white" : "bg-slate-200 dark:bg-slate-700 text-slate-600"
+                        }`}
+                      >
+                        {dauDocCount}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </section>

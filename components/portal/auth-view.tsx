@@ -31,9 +31,7 @@ import { FaceRecognitionModal } from "./face-recognition-modal";
 export const AuthView: React.FC = () => {
   const {
     login,
-    loginWithGoogle,
     checkAccountExists,
-    registerCustomerWithGoogle,
     selectedRole,
     setSelectedRole,
     accounts,
@@ -46,14 +44,8 @@ export const AuthView: React.FC = () => {
     recordFaceLogin
   } = usePortal();
 
-  // Google OAuth state (strict separation of sign-up vs sign-in)
-  const [googleVerifiedUser, setGoogleVerifiedUser] = useState<{ name: string; email: string } | null>(null);
-  const [isCustomGoogleInput, setIsCustomGoogleInput] = useState(false);
-  const [customGoogleEmail, setCustomGoogleEmail] = useState("");
-  const [customGoogleName, setCustomGoogleName] = useState("");
-
-  // Two-step authentication flow: default to "signup" (Registration) for customer role
-  const [customerAuthMode, setCustomerAuthMode] = useState<"signup" | "login">("signup");
+  // Two-step authentication flow: default to "login" (Sign In) for customer role
+  const [customerAuthMode, setCustomerAuthMode] = useState<"signup" | "login">("login");
 
   // Registration Form State (Sign Up first)
   const [regEmail, setRegEmail] = useState("");
@@ -87,7 +79,6 @@ export const AuthView: React.FC = () => {
   const [otpValue, setOtpValue] = useState("");
   const [generatedOtp, setGeneratedOtp] = useState<string | null>(null);
   const [otpCountdown, setOtpCountdown] = useState(0);
-  const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -290,7 +281,7 @@ export const AuthView: React.FC = () => {
       email: cleanEmail,
       phone: cleanPhone,
       password: regPassword,
-      name: googleVerifiedUser?.name,
+      name: cleanEmail.split("@")[0],
       gender: regGender as Gender,
       avatar: regAvatar || undefined,
       faceEmbedding: regFaceEmbedding || undefined,
@@ -311,12 +302,8 @@ export const AuthView: React.FC = () => {
       setRegConfirmPassword("");
       setRegAvatar(null);
       setRegFaceEmbedding(null);
-      const wasGoogle = Boolean(googleVerifiedUser);
-      setGoogleVerifiedUser(null);
       setSuccessMessage(
-        wasGoogle
-          ? "Google account registered successfully! Please log in with your credentials to access your portal."
-          : "Account created successfully with verified face profile! Please log in."
+        "Account created successfully with verified face profile! Please log in with your credentials to access your portal."
       );
     } else {
       setErrorMessage(result.message);
@@ -419,65 +406,6 @@ export const AuthView: React.FC = () => {
 
     login(identifier.trim(), selectedRole);
     setIsLoading(false);
-  };
-
-  const handleGoogleAccountSelect = (name: string, email: string) => {
-    setIsGoogleModalOpen(false);
-    setIsCustomGoogleInput(false);
-    setCustomGoogleEmail("");
-    setCustomGoogleName("");
-    const cleanEmail = email.trim().toLowerCase();
-    const exists = checkAccountExists(cleanEmail);
-
-    if (customerAuthMode === "signup") {
-      // ═══════════════════════════════════════════════════════════════
-      // REQUIREMENT 1: Strict Separation on the Sign-Up Page
-      // ═══════════════════════════════════════════════════════════════
-      if (exists) {
-        // If the account ALREADY EXISTS:
-        // Inform user and redirect to login page rather than silently merging or auto-logging in.
-        setCustomerAuthMode("login");
-        setIdentifier(cleanEmail);
-        setPassword("");
-        setErrorMessage("An account with this email already exists. Please log in.");
-        setSuccessMessage(null);
-        setGoogleVerifiedUser(null);
-        return;
-      }
-
-      // If the account DOES NOT EXIST:
-      // Guide the user through the registration/profile creation step first!
-      setGoogleVerifiedUser({ name, email: cleanEmail });
-      setRegEmail(cleanEmail);
-      setErrorMessage(null);
-      setSuccessMessage(
-        `Google account verified (${cleanEmail}). Please complete your registration details (phone number, gender, password) below to create your account.`
-      );
-      return;
-    }
-
-    // ═══════════════════════════════════════════════════════════════
-    // REQUIREMENT 1: Strict Separation on the Login Page
-    // ═══════════════════════════════════════════════════════════════
-    if (!exists) {
-      // Account does NOT exist -> Inform user and redirect to sign-up
-      setCustomerAuthMode("signup");
-      setGoogleVerifiedUser({ name, email: cleanEmail });
-      setRegEmail(cleanEmail);
-      setErrorMessage("No account found with this email. Please sign up first.");
-      setSuccessMessage(null);
-      return;
-    }
-
-    // Account exists -> Perform secure, isolated login
-    setIsLoading(true);
-    setTimeout(() => {
-      const res = loginWithGoogle(name, cleanEmail, selectedRole);
-      if (!res.success) {
-        setErrorMessage("Google authentication failed. Please verify your account.");
-      }
-      setIsLoading(false);
-    }, 300);
   };
 
   // Customer clicks Forgot Password on login page: presents Selection Screen first
@@ -761,31 +689,31 @@ export const AuthView: React.FC = () => {
   };
 
   return (
-    <div className="w-full flex items-center justify-center p-4 my-auto min-h-[85vh] z-10">
-      <div className="w-full max-w-md bg-white dark:bg-[#121217] border border-slate-200 dark:border-[#22222c] rounded-3xl p-6 sm:p-8 shadow-xl relative overflow-hidden">
+    <div className="w-full flex items-center justify-center z-10">
+      <div className="w-full max-w-lg bg-white dark:bg-[#121217] border border-slate-200/90 dark:border-[#22222c] rounded-2xl sm:rounded-3xl p-5 sm:p-7 shadow-xl relative max-h-[88vh] overflow-y-auto custom-scrollbar">
         {/* Decorative Top Accent Glow (Indian Flag Tricolor) */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-56 h-1 bg-gradient-to-r from-[#FF9933] via-white to-[#138808] rounded-full blur-xs" />
 
         {/* Top Header & Clickable MSN Logo */}
-        <div className="text-center mb-6">
+        <div className="text-center mb-3">
           <div className="flex justify-center">
             <button
               type="button"
               onClick={() => setShowRoleSelector((prev) => !prev)}
-              className="group relative inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-tr from-[#FF9933] via-[#000080] to-[#138808] text-white font-black text-xl mb-3 shadow-lg shadow-[#FF9933]/25 hover:shadow-[#FF9933]/40 hover:scale-105 active:scale-95 transition-all cursor-pointer border-2 border-white/40"
+              className="group relative inline-flex items-center justify-center w-11 h-11 rounded-xl bg-gradient-to-tr from-[#FF9933] via-[#000080] to-[#138808] text-white font-black text-lg mb-1.5 shadow-md shadow-[#FF9933]/25 hover:shadow-[#FF9933]/40 hover:scale-105 active:scale-95 transition-all cursor-pointer border border-white/40"
               title="Click MSN logo to reveal / change user role access"
             >
               <span>MSN</span>
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#138808] border-2 border-white dark:border-slate-900 rounded-full flex items-center justify-center text-[8px] font-bold text-white shadow-sm">
+              <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-[#138808] border-2 border-white dark:border-slate-900 rounded-full flex items-center justify-center text-[7px] font-bold text-white shadow-sm">
                 ✓
               </span>
             </button>
           </div>
 
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
             MSN COMMUNICATION
           </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
             {selectedRole === "customer"
               ? "Official Citizen & Customer Services Sign-In"
               : selectedRole === "owner"
@@ -793,7 +721,7 @@ export const AuthView: React.FC = () => {
               : "Root Super Administrator Console"}
           </p>
 
-          <p className="text-[11px] text-[#000080] dark:text-[#93C5FD] font-medium mt-1">
+          <p className="text-[10px] text-[#000080] dark:text-[#93C5FD] font-medium mt-0.5">
             Tip: Click the <strong>MSN logo</strong> above to reveal / switch access roles
           </p>
         </div>
@@ -894,71 +822,96 @@ export const AuthView: React.FC = () => {
           </div>
         )}
 
-        {/* Customer Two-Step Navigation Indicator */}
+        {/* Customer Two-Step Navigation Indicator with Circle Option Badges */}
         {selectedRole === "customer" && (
-          <div className="flex rounded-2xl bg-slate-100 dark:bg-slate-900 p-1 mb-5 border border-slate-200 dark:border-slate-800">
-            <button
-              type="button"
-              onClick={() => {
-                setCustomerAuthMode("signup");
-                setErrorMessage(null);
-                setSuccessMessage(null);
-              }}
-              className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
-                customerAuthMode === "signup"
-                  ? "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm"
-                  : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
-              }`}
-            >
-              1. Sign Up (Registration)
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setCustomerAuthMode("login");
-                setErrorMessage(null);
-                setSuccessMessage(null);
-              }}
-              className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+          <div className="space-y-2 mb-4">
+            <div className="grid grid-cols-2 p-1.5 rounded-2xl bg-slate-100/90 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-inner">
+              <button
+                type="button"
+                id="btnToggleCustomerLogin"
+                onClick={() => {
+                  setCustomerAuthMode("login");
+                  setErrorMessage(null);
+                  setSuccessMessage(null);
+                }}
+                className={`flex items-center justify-center gap-2.5 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  customerAuthMode === "login"
+                    ? "bg-white dark:bg-slate-800 text-[#000080] dark:text-blue-300 shadow-md shadow-indigo-500/10 border border-slate-200/80 dark:border-slate-700 ring-2 ring-[#000080]/15"
+                    : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-800/40"
+                }`}
+              >
+                <div
+                  className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors shrink-0 ${
+                    customerAuthMode === "login"
+                      ? "bg-[#000080] text-white shadow-xs"
+                      : "bg-slate-200 dark:bg-slate-800 text-slate-500"
+                  }`}
+                >
+                  <Lock className="w-3 h-3" />
+                </div>
+                <div className="text-left">
+                  <div className="leading-tight">1. Citizen Log In</div>
+                  <div className="text-[9px] font-normal opacity-75">Existing Account</div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                id="btnToggleCustomerSignup"
+                onClick={() => {
+                  setCustomerAuthMode("signup");
+                  setErrorMessage(null);
+                  setSuccessMessage(null);
+                }}
+                className={`flex items-center justify-center gap-2.5 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  customerAuthMode === "signup"
+                    ? "bg-white dark:bg-slate-800 text-[#E65100] dark:text-[#FFB74D] shadow-md shadow-[#FF9933]/10 border border-slate-200/80 dark:border-slate-700 ring-2 ring-[#FF9933]/20"
+                    : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-800/40"
+                }`}
+              >
+                <div
+                  className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors shrink-0 ${
+                    customerAuthMode === "signup"
+                      ? "bg-[#FF9933] text-white shadow-xs"
+                      : "bg-slate-200 dark:bg-slate-800 text-slate-500"
+                  }`}
+                >
+                  <Sparkles className="w-3 h-3" />
+                </div>
+                <div className="text-left">
+                  <div className="leading-tight">2. Sign Up</div>
+                  <div className="text-[9px] font-normal opacity-75">New Registration</div>
+                </div>
+              </button>
+            </div>
+
+            {/* Clear Mode Status Indicator Banner */}
+            <div
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[11px] transition-colors ${
                 customerAuthMode === "login"
-                  ? "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm"
-                  : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                  ? "bg-blue-50/70 dark:bg-blue-950/30 border-blue-200/60 dark:border-blue-900/40 text-blue-900 dark:text-blue-300"
+                  : "bg-amber-50/70 dark:bg-amber-950/30 border-amber-200/60 dark:border-amber-900/40 text-amber-900 dark:text-amber-300"
               }`}
             >
-              2. Customer Log In
-            </button>
+              <span
+                className="w-1.5 h-1.5 rounded-full shrink-0"
+                style={{ backgroundColor: customerAuthMode === "login" ? "#000080" : "#FF9933" }}
+              />
+              <span className="font-semibold">
+                {customerAuthMode === "login" ? "Sign-In Mode:" : "Registration Mode:"}
+              </span>
+              <span className="text-slate-600 dark:text-slate-400">
+                {customerAuthMode === "login"
+                  ? "Enter registered email or mobile to access services & personal vault."
+                  : "Complete details & face recognition below to create your secure account."}
+              </span>
+            </div>
           </div>
         )}
 
         {/* STEP 1: CUSTOMER SIGN UP / REGISTRATION FORM (DEFAULT VIEW) */}
         {selectedRole === "customer" && customerAuthMode === "signup" ? (
           <form onSubmit={handleSignUp} autoComplete="off" className="space-y-4">
-            {googleVerifiedUser && (
-              <div className="p-3.5 rounded-2xl bg-indigo-50/90 dark:bg-indigo-950/40 border-2 border-indigo-300 dark:border-indigo-800 text-xs space-y-2 animate-in fade-in">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center shadow-xs">
-                      <svg className="w-4 h-4" viewBox="0 0 24 24">
-                        <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
-                        <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.2v3.15C3.18 21.32 7.24 24 12 24z"/>
-                        <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.2C.44 8.1 0 9.8 0 12s.44 3.9 1.2 5.42l4.08-3.15z"/>
-                        <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.24 0 3.18 2.68 1.2 6.58l4.08 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="font-bold text-indigo-950 dark:text-indigo-200">{googleVerifiedUser.name}</p>
-                      <p className="text-[11px] text-indigo-600 dark:text-indigo-400 font-mono">{googleVerifiedUser.email}</p>
-                    </div>
-                  </div>
-                  <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/80 px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-300 dark:border-emerald-800">
-                    <CheckCircle2 className="w-3 h-3" /> Email Verified
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
-                  Your Google identity has been verified. Complete your phone number and security details below to finish creating your independent account.
-                </p>
-              </div>
-            )}
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
@@ -1358,7 +1311,7 @@ export const AuthView: React.FC = () => {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-3.5 px-4 text-white rounded-xl font-bold text-sm transition-all shadow-md shadow-[#FF9933]/25 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 bg-[#FF9933] hover:bg-[#FF6F00]"
+              className="w-full py-2.5 px-4 text-white rounded-xl font-bold text-xs sm:text-sm transition-all shadow-md shadow-[#FF9933]/25 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 bg-[#FF9933] hover:bg-[#FF6F00]"
             >
               {isLoading ? (
                 <span>Authenticating...</span>
@@ -1377,20 +1330,20 @@ export const AuthView: React.FC = () => {
               <button
                 type="button"
                 onClick={handleStartFaceSignIn}
-                className="w-full py-3 px-4 rounded-xl border-2 border-indigo-200 dark:border-indigo-800/80 bg-gradient-to-r from-indigo-50/80 to-blue-50/80 hover:from-indigo-100 hover:to-blue-100 dark:from-indigo-950/40 dark:to-blue-950/40 text-indigo-900 dark:text-indigo-200 font-bold text-xs flex items-center justify-center gap-2.5 transition-all shadow-xs cursor-pointer"
+                className="w-full py-2 px-3 rounded-xl border border-indigo-200 dark:border-indigo-800/80 bg-gradient-to-r from-indigo-50/80 to-blue-50/80 hover:from-indigo-100 hover:to-blue-100 dark:from-indigo-950/40 dark:to-blue-950/40 text-indigo-900 dark:text-indigo-200 font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-2xs cursor-pointer"
               >
-                <div className="p-1 rounded-lg bg-indigo-600 text-white shadow-xs">
+                <div className="p-1 rounded-lg bg-indigo-600 text-white shadow-2xs">
                   <Scan className="w-3.5 h-3.5" />
                 </div>
-                <span>Sign in with Face Biometrics (Face Recognition)</span>
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-300 dark:border-emerald-800">
+                <span>Sign in with Face Biometrics</span>
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-300 dark:border-emerald-800">
                   Liveness Verified
                 </span>
               </button>
             )}
 
             {selectedRole === "customer" && (
-              <div className="text-center pt-2 border-t border-slate-100 dark:border-slate-800">
+              <div className="text-center pt-1.5 border-t border-slate-100 dark:border-slate-800">
                 <p className="text-xs text-slate-500 dark:text-slate-400">
                   Don&apos;t have an account?{" "}
                   <button
@@ -1408,46 +1361,6 @@ export const AuthView: React.FC = () => {
               </div>
             )}
           </form>
-        )}
-
-        {/* Google Sign In Button (Customer only) */}
-        {selectedRole === "customer" && (
-          <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800">
-            <button
-              type="button"
-              onClick={() => {
-                setErrorMessage(null);
-                setSuccessMessage(null);
-                setIsGoogleModalOpen(true);
-              }}
-              className="w-full py-3 px-4 bg-slate-50 dark:bg-slate-950/70 hover:bg-slate-100 dark:hover:bg-slate-800/80 border border-slate-300 dark:border-slate-800 rounded-xl font-medium text-slate-800 dark:text-white text-xs transition-colors flex items-center justify-center gap-3 shadow-sm cursor-pointer group"
-            >
-              <svg className="w-4 h-4 shrink-0 group-hover:scale-105 transition-transform" viewBox="0 0 24 24">
-                <path
-                  fill="#4285F4"
-                  d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.2v3.15C3.18 21.32 7.24 24 12 24z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.2C.44 8.1 0 9.8 0 12s.44 3.9 1.2 5.42l4.08-3.15z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.24 0 3.18 2.68 1.2 6.58l4.08 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
-                />
-              </svg>
-              <span>{customerAuthMode === "signup" ? "Sign up with Google" : "Continue with Google"}</span>
-            </button>
-            <p className="text-[10px] text-center text-slate-400 dark:text-slate-500 mt-1.5 flex items-center justify-center gap-1">
-              <span>🔒 Standard OAuth Consent</span>
-              <span>•</span>
-              <span>prompt: select_account</span>
-            </p>
-          </div>
         )}
       </div>
 
@@ -2128,185 +2041,6 @@ export const AuthView: React.FC = () => {
                 )}
               </div>
             )}
-          </div>
-        </div>
-      )}
-
-      {/* Google Account Chooser Modal Popup */}
-      {isGoogleModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-white dark:bg-[#18181f] border border-slate-200 dark:border-slate-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl space-y-4 text-center">
-            <div className="inline-flex items-center justify-center w-11 h-11 rounded-full bg-slate-100 dark:bg-white mb-1 shadow-sm">
-              <svg className="w-5 h-5" viewBox="0 0 24 24">
-                <path
-                  fill="#4285F4"
-                  d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.2v3.15C3.18 21.32 7.24 24 12 24z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.2C.44 8.1 0 9.8 0 12s.44 3.9 1.2 5.42l4.08-3.15z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.24 0 3.18 2.68 1.2 6.58l4.08 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
-                />
-              </svg>
-            </div>
-            <div>
-              <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                {customerAuthMode === "signup" ? "Sign up with Google" : "Sign in with Google"}
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                {customerAuthMode === "signup"
-                  ? "Choose an account to register with MSN Portal"
-                  : "Choose an account to access MSN Portal"}
-              </p>
-            </div>
-
-            {/* Mode Guidance Notice */}
-            <div className={`p-2.5 rounded-xl border text-[11px] text-left leading-relaxed ${
-              customerAuthMode === "signup"
-                ? "bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200"
-                : "bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-800 text-indigo-800 dark:text-indigo-200"
-            }`}>
-              {customerAuthMode === "signup" ? (
-                <span>
-                  <strong>Sign-Up Verification:</strong> If this email exists, you will be directed to Log In. If new, you will complete registration below.
-                </span>
-              ) : (
-                <span>
-                  <strong>Sign-In Verification:</strong> Unregistered Google accounts will be prompted to Sign Up first. Automatic account merging is disabled.
-                </span>
-              )}
-            </div>
-
-            {/* Preset Accounts List */}
-            <div className="space-y-2 text-left pt-1">
-              <button
-                type="button"
-                onClick={() => handleGoogleAccountSelect("Rohith Kumar", "rohith.kumar@gmail.com")}
-                className="w-full flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-2xl cursor-pointer transition-colors text-left group"
-              >
-                <div className="flex items-center gap-3 overflow-hidden">
-                  <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-sm shrink-0">
-                    RK
-                  </div>
-                  <div className="overflow-hidden">
-                    <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">
-                      Rohith Kumar
-                    </p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate font-mono">
-                      rohith.kumar@gmail.com
-                    </p>
-                  </div>
-                </div>
-                <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full shrink-0 border border-emerald-300 dark:border-emerald-800">
-                  Existing User
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleGoogleAccountSelect("MSN Developer", "msn.developer@gmail.com")}
-                className="w-full flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-2xl cursor-pointer transition-colors text-left group"
-              >
-                <div className="flex items-center gap-3 overflow-hidden">
-                  <div className="w-10 h-10 rounded-full bg-emerald-600 flex items-center justify-center text-white font-bold text-sm shrink-0">
-                    MD
-                  </div>
-                  <div className="overflow-hidden">
-                    <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">
-                      MSN Developer
-                    </p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate font-mono">
-                      msn.developer@gmail.com
-                    </p>
-                  </div>
-                </div>
-                <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/60 px-2 py-0.5 rounded-full shrink-0 border border-amber-300 dark:border-amber-800">
-                  New Email
-                </span>
-              </button>
-            </div>
-
-            {/* Use Another Google Account Toggle */}
-            <div className="text-left pt-1">
-              {!isCustomGoogleInput ? (
-                <button
-                  type="button"
-                  onClick={() => setIsCustomGoogleInput(true)}
-                  className="w-full py-2 px-3 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 rounded-xl transition-colors border border-dashed border-indigo-300 dark:border-indigo-800 flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <User className="w-3.5 h-3.5" />
-                  <span>Use another Google account</span>
-                </button>
-              ) : (
-                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-2.5 animate-in fade-in">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                      Enter Google Email
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setIsCustomGoogleInput(false)}
-                      className="text-[10px] text-slate-400 hover:text-slate-600"
-                    >
-                      Back
-                    </button>
-                  </div>
-                  <input
-                    type="text"
-                    value={customGoogleName}
-                    onChange={(e) => setCustomGoogleName(e.target.value)}
-                    placeholder="Full Name (e.g. Kaveri Mallepakula)"
-                    className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white"
-                  />
-                  <input
-                    type="email"
-                    value={customGoogleEmail}
-                    onChange={(e) => setCustomGoogleEmail(e.target.value)}
-                    placeholder="Google Email (e.g. user@gmail.com)"
-                    className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white"
-                  />
-                  <button
-                    type="button"
-                    disabled={!customGoogleEmail.includes("@")}
-                    onClick={() => {
-                      if (customGoogleEmail.includes("@")) {
-                        handleGoogleAccountSelect(
-                          customGoogleName.trim() || customGoogleEmail.split("@")[0],
-                          customGoogleEmail.trim()
-                        );
-                      }
-                    }}
-                    className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-colors disabled:opacity-50 cursor-pointer"
-                  >
-                    Select this Account
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* OAuth Security Policy Footer */}
-            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-[10px] text-slate-400 dark:text-slate-500 space-y-0.5">
-              <p>🔒 Standard OAuth Consent flow (prompt: select_account)</p>
-              <p>Aggressive One Tap disabled • No cross-account merging</p>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                setIsGoogleModalOpen(false);
-                setIsCustomGoogleInput(false);
-              }}
-              className="w-full py-2 text-xs font-semibold text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors cursor-pointer"
-            >
-              Cancel
-            </button>
           </div>
         </div>
       )}

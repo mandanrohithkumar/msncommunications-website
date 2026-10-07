@@ -1,0 +1,39 @@
+{
+  "fileId": "vault_1790279028000_rahul_kumar_aadhaar",
+  "userId": "usr-cust-1",
+  "holderName": "Rahul Kumar",
+  "fileName": "rahul_kumar_aadhaar_card_masked.xml",
+  "docName": "Aadhaar Card",
+  "categoryName": "Identity & Personal Documents",
+  "fileSizeBytes": 970,
+  "mimeType": "application/xml",
+  "encryptedFilePath": "C:\\Users\\MALLEPAKULA KAVERI\\OneDrive\\Desktop(1)\\kumar\\kumar\\storage\\secure_vault\\vault_1790279028000_rahul_kumar_aadhaar.enc",
+  "sha256Hash": "61fdf48fb08441133f27462598bc61664a876c9aa279394c64e2c0c35b584965",
+  "uploadedAt": "2026-10-06T11:15:00.000Z",
+  "verificationStatus": "verified",
+  "structuredFields": {
+    "holderName": "Rahul Kumar",
+    "dateOfBirth": "01/01/1990",
+    "gender": "Male",
+    "address": "123, Demo Street, Block A, Near Demo Park, New Delhi, Delhi - 110001",
+    "identificationNumber": "XXXX XXXX 9821",
+    "statutoryCategory": "Identity & Personal Documents",
+    "documentType": "Aadhaar Card / Identity Proof",
+    "privacyGuidelinesCompliance": "UIDAI Masked Aadhaar (First 8 Digits Redacted, DPDP Act 2023)"
+  },
+  "digilockerMeta": {
+    "uri": "in.gov.uidai-ADHAR-0098213456",
+    "issuer": "Unique Identification Authority of India (UIDAI)",
+    "issuerId": "in.gov.uidai",
+    "issueDate": "1990-01-01",
+    "verificationStatus": "verified",
+    "verifiedAt": "2026-10-06T11:15:00.000Z",
+    "digilockerDocType": "ADHAR",
+    "certThumbprint": "4A8D93C29E081B4377A19FE5568190BCA31E63C2",
+    "signatureAlgorithm": "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256",
+    "isXmlDSigValid": true,
+    "tamperProofHash": "61fdf48fb08441133f27462598bc61664a876c9aa279394c64e2c0c35b584965",
+    "isEncryptedAtRest": true,
+    "maskedId": "XXXX XXXX 9821"
+  }
+}

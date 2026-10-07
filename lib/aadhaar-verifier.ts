@@ -68,7 +68,7 @@ const IDENTITY_STATEMENT_PATTERNS = [
   { name: "English: Aadhaar - My Identity", regex: /(aadhaar\s*[-–—:]\s*my\s*identity|mera\s*aadhaar[,\s]*meri\s*pehchan)/i }
 ];
 
-const AADHAAR_12_DIGIT_REGEX = /\b(\d{4}\s\d{4}\s\d{4}|\d{12})\b/;
+const AADHAAR_12_DIGIT_REGEX = /\b(\d{4}\s\d{4}\s\d{4}|\d{12}|[X•*x]{4}\s[X•*x]{4}\s\d{4}|[X•*x]{8}\d{4})\b/i;
 
 /**
  * Verifies an SVG string or DOM element against Aadhaar layout rules
