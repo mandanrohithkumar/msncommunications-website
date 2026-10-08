@@ -13,8 +13,6 @@ import {
   CheckCircle2,
   Lock,
   ExternalLink,
-  Sparkles,
-  User,
   Phone,
   Mail,
   MapPin,
@@ -34,8 +32,7 @@ import {
   calculateAge,
   validateColonyStreet,
   validatePincode,
-  buildSmartAddress,
-  formatJurisdictionLabel
+  buildSmartAddress
 } from "@/lib/field-validation";
 import { FileUploadBox } from "@/components/FileUploadBox";
 import { CascadingLocationSelector } from "@/components/portal/cascading-location-selector";
@@ -57,9 +54,10 @@ export const DynamicForm: React.FC = () => {
     "State": "Telangana",
     "District": "Nagarkurnool",
     "Mandal": "Nagarkurnool",
+    "Village / Locality": "Nagarkurnool Town",
     "Colony / Locality / Street Name": "",
     "Pincode": "509209",
-    "Address": buildSmartAddress("", "Nagarkurnool", "Nagarkurnool", "Telangana", "509209")
+    "Address": buildSmartAddress("", "Nagarkurnool", "Nagarkurnool", "Telangana", "509209", "Nagarkurnool Town")
   });
 
   useEffect(() => {
@@ -333,12 +331,6 @@ export const DynamicForm: React.FC = () => {
     }, 400);
   };
 
-  // Form completeness metrics
-  const requiredFieldsCount = selectedService.fields.filter((f) => f.required).length + 1; // +1 for Colony/Street
-  const filledRequiredFieldsCount =
-    selectedService.fields.filter((f) => f.required && (formData[f.label] || "").trim()).length +
-    (formData["Colony / Locality / Street Name"]?.trim() ? 1 : 0);
-
   return (
     <div className="w-full max-w-5xl mx-auto px-3 sm:px-4 py-4 sm:py-8 animate-in fade-in duration-300">
       {/* Header - Fits perfectly on mobile without overflowing */}
@@ -359,88 +351,6 @@ export const DynamicForm: React.FC = () => {
         <p className="text-[11px] sm:text-xs md:text-sm text-slate-600 dark:text-slate-400 mt-1 max-w-lg">
           Complete the required verified documents and citizen information below
         </p>
-      </div>
-
-      {/* REQUIREMENT 1: AUTO-FILLING PREVIEW / UPPER STRUCTURED BOXES (Compact 2x2 on mobile, 4 on desktop) */}
-      <div className="mb-5 sm:mb-6 p-3 sm:p-4 rounded-2xl sm:rounded-3xl bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-indigo-500/10 border border-amber-500/20 dark:border-amber-500/30 backdrop-blur-md shadow-xs">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-2.5 sm:pb-3 mb-2.5 sm:mb-3 border-b border-amber-500/20 gap-2">
-          <div className="flex items-center gap-2">
-            <div className="p-1 sm:p-1.5 rounded-lg bg-[#FF9933] text-white">
-              <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            </div>
-            <div>
-              <h3 className="text-xs font-bold text-slate-900 dark:text-white">
-                Application Live Profile & Address Summary
-              </h3>
-              <p className="text-[9px] sm:text-[10px] text-slate-500 dark:text-slate-400">
-                All fields dynamically synchronize and reflect in real time
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 self-start sm:self-center">
-            <span className="text-[9px] sm:text-[10px] font-bold px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
-              Form Progress: {filledRequiredFieldsCount}/{requiredFieldsCount} Required
-            </span>
-          </div>
-        </div>
-
-        {/* Structured Upper Grid Boxes: 2 cols on mobile, 4 on desktop */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-2.5 text-xs">
-          {/* Box 1: Citizen Name */}
-          <div className="p-2 sm:p-2.5 rounded-xl bg-white/90 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 flex items-start gap-1.5 sm:gap-2 shadow-xs min-w-0">
-            <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-600 shrink-0 mt-0.5" />
-            <div className="min-w-0">
-              <span className="block text-[8px] sm:text-[9px] uppercase tracking-wider text-slate-400 font-bold truncate">
-                Citizen Name
-              </span>
-              <span className="block text-[10px] sm:text-[11px] font-bold text-slate-900 dark:text-white truncate">
-                {formData["Full Name"] || "Awaiting entry..."}
-              </span>
-            </div>
-          </div>
-
-          {/* Box 2: Contact Info */}
-          <div className="p-2 sm:p-2.5 rounded-xl bg-white/90 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 flex items-start gap-1.5 sm:gap-2 shadow-xs min-w-0">
-            <Phone className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600 shrink-0 mt-0.5" />
-            <div className="min-w-0">
-              <span className="block text-[8px] sm:text-[9px] uppercase tracking-wider text-slate-400 font-bold truncate">
-                Contact
-              </span>
-              <span className="block text-[10px] sm:text-[11px] font-bold text-slate-900 dark:text-white truncate">
-                {formData["Phone Number"] || "No Phone"}
-              </span>
-            </div>
-          </div>
-
-          {/* Box 3: Jurisdiction */}
-          <div className="p-2 sm:p-2.5 rounded-xl bg-white/90 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 flex items-start gap-1.5 sm:gap-2 shadow-xs min-w-0">
-            <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#FF9933] shrink-0 mt-0.5" />
-            <div className="min-w-0">
-              <span className="block text-[8px] sm:text-[9px] uppercase tracking-wider text-slate-400 font-bold truncate">
-                Jurisdiction
-              </span>
-              <span className="block text-[10px] sm:text-[11px] font-bold text-slate-900 dark:text-white truncate">
-                {formatJurisdictionLabel(formData["Mandal"], formData["District"])}
-              </span>
-            </div>
-          </div>
-
-          {/* Box 4: Live Formatted Address */}
-          <div className="p-2 sm:p-2.5 rounded-xl bg-white/90 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 flex items-start gap-1.5 sm:gap-2 shadow-xs min-w-0">
-            <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 shrink-0 mt-0.5" />
-            <div className="min-w-0">
-              <span className="block text-[8px] sm:text-[9px] uppercase tracking-wider text-slate-400 font-bold truncate">
-                Address
-              </span>
-              <span
-                className="block text-[10px] sm:text-[11px] font-bold text-slate-900 dark:text-white truncate"
-                title={formData["Address"]}
-              >
-                {formData["Address"] || "Awaiting entry..."}
-              </span>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* REQUIREMENT 3: SMART ERROR HANDLING BANNER WITH JUMP-TO-FIELD BUTTON */}
@@ -663,14 +573,17 @@ export const DynamicForm: React.FC = () => {
                     ![
                       "district",
                       "mandal",
+                      "village",
+                      "village / locality",
+                      "village / mandal",
+                      "village name",
                       "pincode",
                       "pin code",
                       "colony / locality / street name",
                       "colony",
                       "locality",
                       "street name",
-                      "street",
-                      "village / mandal"
+                      "street"
                     ].includes(f.label.toLowerCase().trim())
                 )
                 .map((field, idx) => {
@@ -821,14 +734,16 @@ export const DynamicForm: React.FC = () => {
                 <CascadingLocationSelector
                   initialDistrict={formData["District"] || "Nagarkurnool"}
                   initialMandal={formData["Mandal"] || "Nagarkurnool"}
+                  initialVillage={formData["Village / Locality"] || "Nagarkurnool Town"}
                   initialColonyStreet={formData["Colony / Locality / Street Name"] || ""}
                   initialPincode={formData["Pincode"] || "509209"}
                   errorField={errorFieldId === "location-colony-street" ? "Colony / Street" : null}
-                  onLocationChange={({ district, mandal, colonyStreet, pincode, formattedAddress }) => {
+                  onLocationChange={({ district, mandal, village, colonyStreet, pincode, formattedAddress }) => {
                     setFormData((prev) => ({
                       ...prev,
                       "District": district,
                       "Mandal": mandal,
+                      "Village / Locality": village || "",
                       "Colony / Locality / Street Name": colonyStreet,
                       "Pincode": pincode,
                       "Address": formattedAddress

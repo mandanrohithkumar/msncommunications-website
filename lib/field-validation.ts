@@ -269,9 +269,13 @@ export function buildSmartAddress(
   mandal?: string | null,
   district?: string | null,
   state: string = "Telangana",
-  pincode?: string | null
+  pincode?: string | null,
+  village?: string | null
 ): string {
   const cleanStreet = (street || "").trim();
+  const cleanVillage = (village || "")
+    .replace(/\s+village$/i, "")
+    .trim();
 
   // Strip redundant "Mandal" or "Dist" text tags if passed in the raw values
   const cleanMandal = (mandal || "")
@@ -290,13 +294,20 @@ export function buildSmartAddress(
 
   const cleanPin = (pincode || "").trim();
 
-  // Standard clean format: [Colony/Street], [Mandal], [District], Telangana - [PINCODE]
+  // Standard clean format: [Colony/Street], [Village], [Mandal], [District], Telangana - [PINCODE]
   const parts: string[] = [];
 
   if (cleanStreet) {
     parts.push(cleanStreet);
   }
-  if (cleanMandal) {
+  if (cleanVillage && cleanVillage.toLowerCase() !== cleanStreet.toLowerCase()) {
+    parts.push(cleanVillage);
+  }
+  if (
+    cleanMandal &&
+    cleanMandal.toLowerCase() !== cleanVillage.toLowerCase() &&
+    cleanMandal.toLowerCase() !== cleanStreet.toLowerCase()
+  ) {
     parts.push(cleanMandal);
   }
   if (cleanDistrict) {

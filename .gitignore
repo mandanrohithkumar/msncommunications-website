@@ -9,3 +9,4 @@ fix-and-push.js
 check-github.js
 check-perms.js
 clean-push.js
+tsconfig.tsbuildinfo
