@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { ServiceItem, DocumentRequirement, FormField } from "@/types/portal";
 import {
   ArrowLeft,
+  ArrowRight,
   Menu,
   Plus,
   Trash2,
@@ -433,7 +434,27 @@ export const ServiceDetails: React.FC<ServiceDetailsProps> = ({ service, onBack,
   const [showDocsModal, setShowDocsModal] = useState(false);
   const [showFieldsModal, setShowFieldsModal] = useState(false);
   const [savedSuccessToast, setSavedSuccessToast] = useState(false);
+  const [activeMobileSection, setActiveMobileSection] = useState<"docs" | "applicant">("docs");
   const menuRef = useRef<HTMLDivElement>(null);
+  const touchStartXRef = useRef<number>(0);
+  const touchStartYRef = useRef<number>(0);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartXRef.current = e.touches[0].clientX;
+    touchStartYRef.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    const diffX = e.changedTouches[0].clientX - touchStartXRef.current;
+    const diffY = e.changedTouches[0].clientY - touchStartYRef.current;
+    if (Math.abs(diffX) > 40 && Math.abs(diffX) > Math.abs(diffY)) {
+      if (diffX < 0 && activeMobileSection === "docs") {
+        setActiveMobileSection("applicant");
+      } else if (diffX > 0 && activeMobileSection === "applicant") {
+        setActiveMobileSection("docs");
+      }
+    }
+  };
 
   useEffect(() => {
     setCurrentService(service);
@@ -521,38 +542,39 @@ export const ServiceDetails: React.FC<ServiceDetailsProps> = ({ service, onBack,
         </div>
       )}
 
-      {/* Top Bar */}
-      <header className="sticky top-0 z-40 bg-white border-b border-slate-200 px-4 sm:px-6 py-3 flex items-center justify-between shadow-xs">
+      {/* Top Bar - Responsive layout fitting mobile without overflowing */}
+      <header className="sticky top-0 z-40 bg-white border-b border-slate-200 px-3 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between shadow-xs gap-2">
         {/* Left: Back button calling onBack (setEditorService(null)) */}
         <button
           type="button"
           onClick={onBack}
-          className="flex items-center gap-2 text-xs font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-200 px-3.5 py-2 rounded-xl transition-colors cursor-pointer"
+          className="flex items-center gap-1.5 sm:gap-2 text-xs font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-200 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl transition-colors cursor-pointer shrink-0"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>Back to Catalog</span>
+          <span className="hidden sm:inline">Back to Catalog</span>
+          <span className="sm:hidden">Back</span>
         </button>
 
         {/* Center: Service Identity */}
-        <div className="flex items-center gap-2.5 text-center">
-          <span className="text-xl p-1.5 rounded-xl bg-slate-100 border border-slate-200">
+        <div className="flex items-center gap-2 sm:gap-2.5 text-center min-w-0 flex-1 justify-center max-w-sm sm:max-w-md">
+          <span className="text-lg sm:text-xl p-1 sm:p-1.5 rounded-xl bg-slate-100 border border-slate-200 shrink-0">
             {currentService.icon || "📄"}
           </span>
-          <div className="text-left">
-            <h1 className="text-sm font-extrabold text-slate-900 leading-tight flex items-center gap-2">
-              {currentService.name}
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#FFF3E0] text-[#E65100] border border-[#FFE082] font-mono">
+          <div className="text-left min-w-0">
+            <h1 className="text-xs sm:text-sm font-extrabold text-slate-900 leading-tight flex items-center gap-1.5 truncate">
+              <span className="truncate">{currentService.name}</span>
+              <span className="text-[9px] sm:text-[10px] px-1.5 sm:px-2 py-0.5 rounded-full bg-[#FFF3E0] text-[#E65100] border border-[#FFE082] font-mono shrink-0">
                 #{currentService.id}
               </span>
             </h1>
-            <p className="text-[11px] text-slate-500 font-medium">
+            <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium truncate">
               {currentService.category} • Statutory Portal Configuration
             </p>
           </div>
         </div>
 
         {/* Right: Circular button containing 3-line hamburger menu icon (Menu from lucide-react) */}
-        <div className="relative" ref={menuRef}>
+        <div className="relative shrink-0" ref={menuRef}>
           <button
             type="button"
             onClick={() => setMenuOpen((v) => !v)}
@@ -627,10 +649,97 @@ export const ServiceDetails: React.FC<ServiceDetailsProps> = ({ service, onBack,
         </div>
       </header>
 
-      {/* Two-Column Layout */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* ================= LEFT CARD: Required Documents ================= */}
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+      {/* Two-Column Layout with Mobile Swipe Controller & Touch Gestures */}
+      <main
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        className="max-w-6xl mx-auto px-3 sm:px-6 py-4 sm:py-8"
+      >
+        {/* Mobile Swipe Navigation Bar with Directional Indicator Arrows (Requirement 2) */}
+        <div className="lg:hidden mb-4">
+          <div className="flex items-center justify-between p-1.5 rounded-2xl bg-white border border-slate-200 shadow-md gap-1.5">
+            <button
+              type="button"
+              onClick={() => setActiveMobileSection("docs")}
+              disabled={activeMobileSection === "docs"}
+              aria-label="Previous Section: Required Documents"
+              className={`p-2 rounded-xl transition-all flex items-center justify-center cursor-pointer ${
+                activeMobileSection === "docs"
+                  ? "opacity-30 text-slate-400 cursor-not-allowed"
+                  : "bg-slate-100 text-slate-700 hover:bg-[#FF9933] hover:text-white"
+              }`}
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+
+            <div className="flex-1 grid grid-cols-2 gap-1.5">
+              <button
+                type="button"
+                onClick={() => setActiveMobileSection("docs")}
+                className={`py-2 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer truncate ${
+                  activeMobileSection === "docs"
+                    ? "bg-gradient-to-r from-[#FF9933] to-[#FF6F00] text-white shadow-sm shadow-[#FF9933]/30"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <span>📄</span>
+                <span className="truncate">Documents ({docs.length})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveMobileSection("applicant")}
+                className={`py-2 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer truncate ${
+                  activeMobileSection === "applicant"
+                    ? "bg-gradient-to-r from-[#000080] to-[#1E3A8A] text-white shadow-sm shadow-blue-900/30"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <span>📝</span>
+                <span className="truncate">Applicant Info</span>
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setActiveMobileSection("applicant")}
+              disabled={activeMobileSection === "applicant"}
+              aria-label="Next Section: Applicant Information"
+              className={`p-2 rounded-xl transition-all flex items-center justify-center cursor-pointer ${
+                activeMobileSection === "applicant"
+                  ? "opacity-30 text-slate-400 cursor-not-allowed"
+                  : "bg-slate-100 text-slate-700 hover:bg-[#000080] hover:text-white"
+              }`}
+            >
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="mt-1.5 px-2 flex items-center justify-between text-[11px] text-slate-500">
+            {activeMobileSection === "docs" ? (
+              <span className="flex items-center gap-1 text-[#E65100] font-medium">
+                <span>👈 Swipe left or tap arrow for Applicant Info</span>
+                <ArrowRight className="w-3 h-3 animate-pulse inline" />
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 text-[#000080] font-medium">
+                <ArrowLeft className="w-3 h-3 animate-pulse inline" />
+                <span>Swipe right or tap arrow for Documents 👉</span>
+              </span>
+            )}
+            <span className="font-mono text-[10px] text-slate-400">
+              {activeMobileSection === "docs" ? "Step 1 of 2" : "Step 2 of 2"}
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
+          {/* ================= LEFT CARD: Required Documents ================= */}
+          <div
+            className={`bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col ${
+              activeMobileSection === "docs" ? "block" : "hidden lg:flex"
+            }`}
+          >
           <div className="bg-slate-50 border-b border-slate-200 px-5 py-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <FileText className="w-4 h-4 text-slate-700" />
@@ -707,11 +816,27 @@ export const ServiceDetails: React.FC<ServiceDetailsProps> = ({ service, onBack,
                 These instructions will be displayed directly to the assigned operator when handling citizen submissions.
               </p>
             </div>
+
+            {/* Quick Mobile Navigation to Applicant Info */}
+            <div className="lg:hidden pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setActiveMobileSection("applicant")}
+                className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#FF9933] to-[#FF6F00] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+              >
+                <span>Continue to Applicant Information</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
 
         {/* ================= RIGHT CARD: Applicant Information ================= */}
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+        <div
+          className={`bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col ${
+            activeMobileSection === "applicant" ? "block" : "hidden lg:flex"
+          }`}
+        >
           <div className="bg-slate-50 border-b border-slate-200 px-5 py-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <ListPlus className="w-4 h-4 text-slate-700" />
@@ -799,9 +924,21 @@ export const ServiceDetails: React.FC<ServiceDetailsProps> = ({ service, onBack,
                 })}
               </div>
             )}
+            {/* Quick Mobile Navigation back to Docs */}
+            <div className="lg:hidden pt-4 mt-4 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setActiveMobileSection("docs")}
+                className="w-full py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-2 border border-slate-200 cursor-pointer"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Back to Required Documents</span>
+              </button>
+            </div>
           </div>
         </div>
-      </main>
+      </div>
+    </main>
 
       {/* Modals for Document, Basic Details & Field Customization */}
       {showBasicModal && (

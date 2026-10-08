@@ -79,6 +79,35 @@ export const DynamicForm: React.FC = () => {
   const [errorFieldId, setErrorFieldId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Mobile swipe navigation between 'Required Documents' and 'Applicant Information'
+  const [activeMobileSection, setActiveMobileSection] = useState<"docs" | "applicant">("docs");
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX.current === null || touchStartY.current === null) return;
+    const diffX = e.changedTouches[0].clientX - touchStartX.current;
+    const diffY = e.changedTouches[0].clientY - touchStartY.current;
+
+    // Detect horizontal swipe intent (horizontal swipe distance > vertical and threshold > 40px)
+    if (Math.abs(diffX) > Math.abs(diffY) * 1.3 && Math.abs(diffX) > 40) {
+      if (diffX < 0 && activeMobileSection === "docs") {
+        // Swiped Left -> navigate to Applicant Information
+        setActiveMobileSection("applicant");
+      } else if (diffX > 0 && activeMobileSection === "applicant") {
+        // Swiped Right -> navigate to Required Documents
+        setActiveMobileSection("docs");
+      }
+    }
+    touchStartX.current = null;
+    touchStartY.current = null;
+  };
+
   const errorBannerRef = useRef<HTMLDivElement>(null);
 
   // Maximum allowed date for Date of Birth (strictly prevents future dates)
@@ -100,6 +129,13 @@ export const DynamicForm: React.FC = () => {
 
   // Smooth scroll and auto-focus helper (Requirement 3)
   const focusAndScrollToField = (elementId: string) => {
+    // Automatically switch active mobile section to the section containing the erroneous field
+    if (elementId.startsWith("doc-box-")) {
+      setActiveMobileSection("docs");
+    } else {
+      setActiveMobileSection("applicant");
+    }
+
     // Scroll error banner into view first
     if (errorBannerRef.current) {
       errorBannerRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -304,103 +340,103 @@ export const DynamicForm: React.FC = () => {
     (formData["Colony / Locality / Street Name"]?.trim() ? 1 : 0);
 
   return (
-    <div className="w-full max-w-5xl mx-auto px-4 py-8 animate-in fade-in duration-300">
-      {/* Header */}
-      <div className="relative flex flex-col items-center text-center mb-6">
+    <div className="w-full max-w-5xl mx-auto px-3 sm:px-4 py-4 sm:py-8 animate-in fade-in duration-300">
+      {/* Header - Fits perfectly on mobile without overflowing */}
+      <div className="relative flex flex-col items-center text-center mb-5 sm:mb-6">
         <button
           onClick={goBack}
-          className="md:absolute left-0 top-1/2 md:-translate-y-1/2 mb-4 md:mb-0 px-4 py-2 rounded-full bg-white dark:bg-white/5 border border-slate-300 dark:border-slate-700/60 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-colors flex items-center gap-1.5 cursor-pointer backdrop-blur-md shadow-sm"
+          className="md:absolute left-0 top-1/2 md:-translate-y-1/2 mb-3 md:mb-0 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full bg-white dark:bg-white/5 border border-slate-300 dark:border-slate-700/60 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-colors flex items-center gap-1.5 cursor-pointer backdrop-blur-md shadow-sm self-start md:self-auto"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Back</span>
         </button>
-        <div className="flex items-center gap-2.5">
-          <span className="text-3xl">{selectedService.icon}</span>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+        <div className="flex items-center gap-2 sm:gap-2.5">
+          <span className="text-2xl sm:text-3xl">{selectedService.icon}</span>
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
             {selectedService.name} Application
           </h1>
         </div>
-        <p className="text-xs md:text-sm text-slate-600 dark:text-slate-400 mt-1 max-w-lg">
+        <p className="text-[11px] sm:text-xs md:text-sm text-slate-600 dark:text-slate-400 mt-1 max-w-lg">
           Complete the required verified documents and citizen information below
         </p>
       </div>
 
-      {/* REQUIREMENT 1: AUTO-FILLING PREVIEW / UPPER STRUCTURED BOXES */}
-      <div className="mb-6 p-4 rounded-3xl bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-indigo-500/10 border border-amber-500/20 dark:border-amber-500/30 backdrop-blur-md shadow-xs">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-3 mb-3 border-b border-amber-500/20 gap-2">
+      {/* REQUIREMENT 1: AUTO-FILLING PREVIEW / UPPER STRUCTURED BOXES (Compact 2x2 on mobile, 4 on desktop) */}
+      <div className="mb-5 sm:mb-6 p-3 sm:p-4 rounded-2xl sm:rounded-3xl bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-indigo-500/10 border border-amber-500/20 dark:border-amber-500/30 backdrop-blur-md shadow-xs">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-2.5 sm:pb-3 mb-2.5 sm:mb-3 border-b border-amber-500/20 gap-2">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-[#FF9933] text-white">
-              <Sparkles className="w-4 h-4" />
+            <div className="p-1 sm:p-1.5 rounded-lg bg-[#FF9933] text-white">
+              <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </div>
             <div>
               <h3 className="text-xs font-bold text-slate-900 dark:text-white">
                 Application Live Profile & Address Summary
               </h3>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400">
+              <p className="text-[9px] sm:text-[10px] text-slate-500 dark:text-slate-400">
                 All fields dynamically synchronize and reflect in real time
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2 self-end sm:self-center">
-            <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
+          <div className="flex items-center gap-2 self-start sm:self-center">
+            <span className="text-[9px] sm:text-[10px] font-bold px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
               Form Progress: {filledRequiredFieldsCount}/{requiredFieldsCount} Required
             </span>
           </div>
         </div>
 
-        {/* Structured Upper Grid Boxes */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5 text-xs">
+        {/* Structured Upper Grid Boxes: 2 cols on mobile, 4 on desktop */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-2.5 text-xs">
           {/* Box 1: Citizen Name */}
-          <div className="p-2.5 rounded-xl bg-white/90 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 flex items-start gap-2 shadow-xs">
-            <User className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+          <div className="p-2 sm:p-2.5 rounded-xl bg-white/90 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 flex items-start gap-1.5 sm:gap-2 shadow-xs min-w-0">
+            <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-600 shrink-0 mt-0.5" />
             <div className="min-w-0">
-              <span className="block text-[9px] uppercase tracking-wider text-slate-400 font-bold">
+              <span className="block text-[8px] sm:text-[9px] uppercase tracking-wider text-slate-400 font-bold truncate">
                 Citizen Name
               </span>
-              <span className="block text-[11px] font-bold text-slate-900 dark:text-white truncate">
+              <span className="block text-[10px] sm:text-[11px] font-bold text-slate-900 dark:text-white truncate">
                 {formData["Full Name"] || "Awaiting entry..."}
               </span>
             </div>
           </div>
 
           {/* Box 2: Contact Info */}
-          <div className="p-2.5 rounded-xl bg-white/90 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 flex items-start gap-2 shadow-xs">
-            <Phone className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+          <div className="p-2 sm:p-2.5 rounded-xl bg-white/90 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 flex items-start gap-1.5 sm:gap-2 shadow-xs min-w-0">
+            <Phone className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600 shrink-0 mt-0.5" />
             <div className="min-w-0">
-              <span className="block text-[9px] uppercase tracking-wider text-slate-400 font-bold">
-                Phone & Email
+              <span className="block text-[8px] sm:text-[9px] uppercase tracking-wider text-slate-400 font-bold truncate">
+                Contact
               </span>
-              <span className="block text-[11px] font-bold text-slate-900 dark:text-white truncate">
-                {formData["Phone Number"] || "No Phone"} • {formData["Email ID"]?.split("@")[0] || "No Email"}
+              <span className="block text-[10px] sm:text-[11px] font-bold text-slate-900 dark:text-white truncate">
+                {formData["Phone Number"] || "No Phone"}
               </span>
             </div>
           </div>
 
-          {/* Box 3: Jurisdiction (Deduplicated: shows unique name once if Mandal === District) */}
-          <div className="p-2.5 rounded-xl bg-white/90 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 flex items-start gap-2 shadow-xs">
-            <MapPin className="w-4 h-4 text-[#FF9933] shrink-0 mt-0.5" />
+          {/* Box 3: Jurisdiction */}
+          <div className="p-2 sm:p-2.5 rounded-xl bg-white/90 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 flex items-start gap-1.5 sm:gap-2 shadow-xs min-w-0">
+            <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#FF9933] shrink-0 mt-0.5" />
             <div className="min-w-0">
-              <span className="block text-[9px] uppercase tracking-wider text-slate-400 font-bold">
+              <span className="block text-[8px] sm:text-[9px] uppercase tracking-wider text-slate-400 font-bold truncate">
                 Jurisdiction
               </span>
-              <span className="block text-[11px] font-bold text-slate-900 dark:text-white truncate">
+              <span className="block text-[10px] sm:text-[11px] font-bold text-slate-900 dark:text-white truncate">
                 {formatJurisdictionLabel(formData["Mandal"], formData["District"])}
               </span>
             </div>
           </div>
 
-          {/* Box 4: Live Formatted Address (Smart concatenated, non-repeating) */}
-          <div className="p-2.5 rounded-xl bg-white/90 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 flex items-start gap-2 shadow-xs">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+          {/* Box 4: Live Formatted Address */}
+          <div className="p-2 sm:p-2.5 rounded-xl bg-white/90 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 flex items-start gap-1.5 sm:gap-2 shadow-xs min-w-0">
+            <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 shrink-0 mt-0.5" />
             <div className="min-w-0">
-              <span className="block text-[9px] uppercase tracking-wider text-slate-400 font-bold">
-                Live Address
+              <span className="block text-[8px] sm:text-[9px] uppercase tracking-wider text-slate-400 font-bold truncate">
+                Address
               </span>
               <span
-                className="block text-[11px] font-bold text-slate-900 dark:text-white truncate"
+                className="block text-[10px] sm:text-[11px] font-bold text-slate-900 dark:text-white truncate"
                 title={formData["Address"]}
               >
-                {formData["Address"] || "Awaiting address entry..."}
+                {formData["Address"] || "Awaiting entry..."}
               </span>
             </div>
           </div>
@@ -430,11 +466,101 @@ export const DynamicForm: React.FC = () => {
         </div>
       )}
 
-      {/* Main 2-Column Form Layout */}
+      {/* Main 2-Column Form Layout with Mobile Swipe & Touch Gestures */}
       <form onSubmit={handleSubmit}>
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 text-left">
+        {/* Mobile Swipe Navigation Bar with Directional Indicator Arrows (Requirement 2) */}
+        <div className="lg:hidden mb-4">
+          <div className="flex items-center justify-between p-1.5 rounded-2xl bg-white/95 dark:bg-slate-900/95 border border-slate-200/90 dark:border-slate-800 shadow-md backdrop-blur-md gap-1.5">
+            {/* Left Directional Indicator Arrow Button */}
+            <button
+              type="button"
+              onClick={() => setActiveMobileSection("docs")}
+              disabled={activeMobileSection === "docs"}
+              aria-label="Previous Section: Required Documents"
+              className={`p-2 rounded-xl transition-all flex items-center justify-center cursor-pointer ${
+                activeMobileSection === "docs"
+                  ? "opacity-30 text-slate-400 cursor-not-allowed"
+                  : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-[#FF9933] hover:text-white"
+              }`}
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+
+            {/* Segmented Section Tabs */}
+            <div className="flex-1 grid grid-cols-2 gap-1.5">
+              <button
+                type="button"
+                onClick={() => setActiveMobileSection("docs")}
+                className={`py-2 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer truncate ${
+                  activeMobileSection === "docs"
+                    ? "bg-gradient-to-r from-[#FF9933] to-[#FF6F00] text-white shadow-sm shadow-[#FF9933]/30"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                }`}
+              >
+                <span>📄</span>
+                <span className="truncate">Documents ({selectedService.docs.length})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveMobileSection("applicant")}
+                className={`py-2 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer truncate ${
+                  activeMobileSection === "applicant"
+                    ? "bg-gradient-to-r from-[#000080] to-[#1E3A8A] text-white shadow-sm shadow-blue-900/30"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                }`}
+              >
+                <span>📝</span>
+                <span className="truncate">Applicant Info</span>
+              </button>
+            </div>
+
+            {/* Right Directional Indicator Arrow Button */}
+            <button
+              type="button"
+              onClick={() => setActiveMobileSection("applicant")}
+              disabled={activeMobileSection === "applicant"}
+              aria-label="Next Section: Applicant Information"
+              className={`p-2 rounded-xl transition-all flex items-center justify-center cursor-pointer ${
+                activeMobileSection === "applicant"
+                  ? "opacity-30 text-slate-400 cursor-not-allowed"
+                  : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-[#000080] hover:text-white"
+              }`}
+            >
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Directional Guide Hint */}
+          <div className="mt-1.5 px-2 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+            {activeMobileSection === "docs" ? (
+              <span className="flex items-center gap-1 text-[#E65100] dark:text-amber-400 font-medium">
+                <span>👈 Swipe left or tap arrow for Applicant Info</span>
+                <ArrowRight className="w-3 h-3 animate-pulse inline" />
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 text-[#000080] dark:text-blue-400 font-medium">
+                <ArrowLeft className="w-3 h-3 animate-pulse inline" />
+                <span>Swipe right or tap arrow for Documents 👉</span>
+              </span>
+            )}
+            <span className="font-mono text-[10px] text-slate-400">
+              {activeMobileSection === "docs" ? "Step 1 of 2" : "Step 2 of 2"}
+            </span>
+          </div>
+        </div>
+
+        <div
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+          className="grid grid-cols-1 lg:grid-cols-12 gap-6 text-left"
+        >
           {/* Left Column: Documents & Special Instructions (5 cols) */}
-          <div className="lg:col-span-5 rounded-3xl bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 p-6 md:p-7 backdrop-blur-md space-y-5 shadow-sm">
+          <div
+            className={`lg:col-span-5 rounded-2xl sm:rounded-3xl bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 p-4 sm:p-6 md:p-7 backdrop-blur-md space-y-4 sm:space-y-5 shadow-sm transition-all duration-300 ${
+              activeMobileSection === "docs" ? "block" : "hidden lg:block"
+            }`}
+          >
             <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
               <h3 className="text-sm font-bold text-slate-900 dark:text-white tracking-wide">
                 Required Documents
@@ -498,10 +624,26 @@ export const DynamicForm: React.FC = () => {
                 className="w-full text-xs p-3 rounded-xl bg-slate-50 dark:bg-slate-950/70 border border-slate-300 dark:border-slate-800 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-indigo-500 resize-none transition-colors"
               />
             </div>
+
+            {/* Quick Mobile Navigation to Applicant Info */}
+            <div className="lg:hidden pt-3 border-t border-slate-200 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setActiveMobileSection("applicant")}
+                className="w-full py-2.5 px-4 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 font-bold text-xs flex items-center justify-center gap-2 border border-indigo-200 dark:border-indigo-800/50 cursor-pointer transition-colors"
+              >
+                <span>Continue to Applicant Information</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
           {/* Right Column: Basic Details Dynamic Inputs (7 cols) */}
-          <div className="lg:col-span-7 rounded-3xl bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 p-6 md:p-7 backdrop-blur-md space-y-5 shadow-sm">
+          <div
+            className={`lg:col-span-7 rounded-2xl sm:rounded-3xl bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 p-4 sm:p-6 md:p-7 backdrop-blur-md space-y-4 sm:space-y-5 shadow-sm transition-all duration-300 ${
+              activeMobileSection === "applicant" ? "block" : "hidden lg:block"
+            }`}
+          >
             <div className="pb-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
               <h3 className="text-sm font-bold text-slate-900 dark:text-white tracking-wide">
                 {t("form.applicant_info")}
@@ -702,31 +844,43 @@ export const DynamicForm: React.FC = () => {
                 />
               </div>
             </div>
+
+            {/* Quick Mobile Navigation back to Docs */}
+            <div className="lg:hidden pt-3 border-t border-slate-200 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setActiveMobileSection("docs")}
+                className="w-full py-2.5 px-4 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs flex items-center justify-center gap-2 border border-slate-200 dark:border-slate-700 cursor-pointer transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Back to Review Required Documents</span>
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Submit Bar */}
-        <div className="mt-8 flex items-center justify-between pt-4 border-t border-slate-200 dark:border-slate-800">
+        {/* Submit Bar - Perfectly responsive, fits on all mobile screens without overflow */}
+        <div className="mt-6 sm:mt-8 flex items-center justify-between gap-3 pt-4 border-t border-slate-200 dark:border-slate-800 w-full">
           <button
             type="button"
             onClick={goBack}
-            className="px-6 py-3 rounded-full border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/60 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer flex items-center gap-2 shadow-sm"
+            className="px-4 py-2.5 sm:px-6 sm:py-3 rounded-full border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/60 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer flex items-center gap-1.5 sm:gap-2 shadow-sm shrink-0"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             <span>Cancel</span>
           </button>
 
           <button
             type="submit"
             disabled={isSubmitting}
-            className="px-8 py-3.5 rounded-full bg-[#FF9933] hover:bg-[#FF6F00] text-white text-xs font-bold transition-all shadow-lg shadow-[#FF9933]/25 flex items-center gap-2.5 cursor-pointer disabled:opacity-60"
+            className="flex-1 sm:flex-initial px-4 py-2.5 sm:px-8 sm:py-3.5 rounded-full bg-[#FF9933] hover:bg-[#FF6F00] text-white text-xs font-bold transition-all shadow-lg shadow-[#FF9933]/25 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 truncate"
           >
             {isSubmitting ? (
               <span>{t("form.submitting")}</span>
             ) : (
               <>
-                <span>{t("form.submit")}</span>
-                <ArrowRight className="w-4 h-4" />
+                <span className="truncate">{t("form.submit")}</span>
+                <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
               </>
             )}
           </button>

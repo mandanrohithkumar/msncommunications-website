@@ -361,13 +361,99 @@
         }
         #notificationToast.show { transform: translateY(0); opacity: 1; }
 
-        /* Mobile Adjustments */
+        /* Mobile Adjustments - Compact Service Cards & Sticky Nav */
         @media (max-width: 768px) {
-            nav { border-radius: 12px; padding: 8px 12px; }
+            header {
+                position: sticky;
+                top: 0;
+                z-index: 1000;
+            }
+            nav {
+                position: sticky;
+                top: 0;
+                margin: 0 auto;
+                width: 100%;
+                border-radius: 0 0 16px 16px;
+                padding: 8px 12px;
+                box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+            }
             .nav-item-btn span.label-text { display: none; }
-            .service-row { flex-direction: column; align-items: flex-start; }
-            .service-actions { width: 100%; display: flex; justify-content: space-between; margin-top: 8px; }
+            
+            /* Compact service cards & boxes on mobile (Aadhaar, RTA, etc.) */
+            .service-row {
+                flex-direction: row !important;
+                align-items: center !important;
+                justify-content: space-between !important;
+                padding: 8px 10px !important;
+                border-radius: 10px !important;
+                gap: 8px !important;
+            }
+            .service-row .w-10 {
+                width: 32px !important;
+                height: 32px !important;
+                font-size: 15px !important;
+                border-radius: 8px !important;
+            }
+            .service-row h3, .service-row h4 {
+                font-size: 12px !important;
+                line-height: 1.25 !important;
+            }
+            .service-row p {
+                font-size: 10px !important;
+                line-height: 1.2 !important;
+            }
+            .service-actions {
+                width: auto !important;
+                margin-top: 0 !important;
+                display: flex !important;
+                align-items: center !important;
+                gap: 6px !important;
+            }
+            .service-actions .btn-primary {
+                font-size: 11px !important;
+                padding: 4px 8px !important;
+                border-radius: 8px !important;
+            }
+            .service-actions span {
+                font-size: 11px !important;
+            }
+            
+            /* Compact category accordion on mobile */
+            .category-accordion {
+                border-radius: 10px !important;
+                margin-bottom: 8px !important;
+            }
+            .category-header {
+                padding: 10px 12px !important;
+            }
+            .category-header h3 {
+                font-size: 12px !important;
+            }
+            .category-header .text-xl {
+                font-size: 16px !important;
+            }
+            .category-content {
+                padding: 8px !important;
+                gap: 6px !important;
+            }
+            
             .gov-table th, .gov-table td { padding: 8px 10px; font-size: 12px; }
+            
+            /* Mobile Swipe controller for Sub-service application modal */
+            .modal-swipe-nav {
+                display: flex !important;
+            }
+            .modal-section-docs, .modal-section-applicant {
+                transition: opacity 0.2s ease, transform 0.2s ease;
+            }
+            .modal-section-docs.hidden-mobile, .modal-section-applicant.hidden-mobile {
+                display: none !important;
+            }
+        }
+        @media (min-width: 769px) {
+            .modal-swipe-nav {
+                display: none !important;
+            }
         }
     </style>
 </head>
@@ -1230,56 +1316,101 @@
                 </div>
             </div>
 
+            <!-- Mobile Swipe Navigation Bar with Directional Indicator Arrows (Requirement 2) -->
+            <div class="modal-swipe-nav hidden flex-col mb-4">
+                <div class="flex items-center justify-between p-1.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] gap-1.5">
+                    <button type="button" id="btnModalNavPrev" onclick="MSN.setModalMobileSection('docs')" aria-label="Previous Section: Required Documents" class="p-2 rounded-lg bg-[var(--bg-surface)] text-[var(--text-main)] hover:bg-amber-500 hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed">
+                        &larr;
+                    </button>
+                    <div class="flex-1 grid grid-cols-2 gap-1 text-xs font-bold">
+                        <button type="button" id="tabModalDocs" onclick="MSN.setModalMobileSection('docs')" class="py-1.5 px-2 rounded-lg bg-indigo-600 text-white truncate transition-all">
+                            📄 Required Docs
+                        </button>
+                        <button type="button" id="tabModalApplicant" onclick="MSN.setModalMobileSection('applicant')" class="py-1.5 px-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-main)] truncate transition-all">
+                            📝 Applicant Info
+                        </button>
+                    </div>
+                    <button type="button" id="btnModalNavNext" onclick="MSN.setModalMobileSection('applicant')" aria-label="Next Section: Applicant Information" class="p-2 rounded-lg bg-[var(--bg-surface)] text-[var(--text-main)] hover:bg-indigo-600 hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed">
+                        &rarr;
+                    </button>
+                </div>
+                <div class="mt-1 px-1 flex items-center justify-between text-[10px] text-[var(--text-dim)]">
+                    <span id="modalSwipeHint" class="text-amber-400 font-medium">👈 Swipe left or tap arrow for Applicant Info &rarr;</span>
+                    <span id="modalStepIndicator" class="font-mono">Step 1 of 2</span>
+                </div>
+            </div>
+
             <form id="dynamicApplicationForm" onsubmit="submitApplicationForm(event)" class="space-y-4">
-                <!-- Section 1: Customer Information -->
-                <div>
-                    <h4 class="text-xs font-bold text-[var(--text-main)] uppercase tracking-wider mb-2">1. Applicant Details</h4>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-[11px] text-[var(--text-muted)] mb-1">Full Legal Name *</label>
-                            <input type="text" id="appFullName" required class="gov-input" placeholder="e.g. Rohith Kumar">
+                <!-- Group A: Required Documents & Special Notes -->
+                <div class="modal-section-docs space-y-4">
+                    <!-- Section 3: Document Uploads -->
+                    <div>
+                        <h4 class="text-xs font-bold text-[var(--text-main)] uppercase tracking-wider mb-2">1. Required Documents</h4>
+                        <div id="requiredDocsContainer" class="space-y-2">
+                            <!-- Required docs items injected via JS -->
                         </div>
-                        <div>
-                            <label class="block text-[11px] text-[var(--text-muted)] mb-1">Mobile Phone Number *</label>
-                            <input type="tel" id="appPhone" required class="gov-input" placeholder="10-digit mobile number" maxlength="10" inputmode="numeric" oninput="this.value = this.value.replace(/\D/g, '').slice(0, 10)">
-                        </div>
-                        <div>
-                            <label class="block text-[11px] text-[var(--text-muted)] mb-1">Email Address *</label>
-                            <input type="email" id="appEmail" required class="gov-input" placeholder="name@example.com">
-                        </div>
-                        <div>
-                            <label class="block text-[11px] text-[var(--text-muted)] mb-1">Full Postal Address *</label>
-                            <input type="text" id="appAddress" required class="gov-input" placeholder="Door No, Street, Village/City">
-                        </div>
+                    </div>
+
+                    <!-- Section 4: Optional Documents & Special Instructions -->
+                    <div>
+                        <label class="block text-[11px] text-[var(--text-muted)] mb-1">Additional Notes / Instructions for Center Owner</label>
+                        <textarea id="appNotes" class="gov-input min-h-[60px]" placeholder="Optional notes for the operator..."></textarea>
+                    </div>
+
+                    <div class="md:hidden pt-2">
+                        <button type="button" onclick="MSN.setModalMobileSection('applicant')" class="w-full py-2 px-3 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-xs font-bold text-indigo-400 flex items-center justify-center gap-1.5">
+                            <span>Continue to Applicant Information</span>
+                            <span>&rarr;</span>
+                        </button>
                     </div>
                 </div>
 
-                <!-- Section 2: Service-Specific Dynamic Fields -->
-                <div id="serviceSpecificFieldsContainer">
-                    <h4 class="text-xs font-bold text-[var(--text-main)] uppercase tracking-wider mb-2">2. Service Specific Information</h4>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3" id="serviceFieldsGrid">
-                        <!-- Dynamic fields injected via JS -->
+                <!-- Group B: Applicant Details & Service Specific Information -->
+                <div class="modal-section-applicant hidden-mobile space-y-4">
+                    <!-- Section 1: Customer Information -->
+                    <div>
+                        <h4 class="text-xs font-bold text-[var(--text-main)] uppercase tracking-wider mb-2">2. Applicant Details</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-[11px] text-[var(--text-muted)] mb-1">Full Legal Name *</label>
+                                <input type="text" id="appFullName" required class="gov-input" placeholder="e.g. Rohith Kumar">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-[var(--text-muted)] mb-1">Mobile Phone Number *</label>
+                                <input type="tel" id="appPhone" required class="gov-input" placeholder="10-digit mobile number" maxlength="10" inputmode="numeric" oninput="this.value = this.value.replace(/\D/g, '').slice(0, 10)">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-[var(--text-muted)] mb-1">Email Address *</label>
+                                <input type="email" id="appEmail" required class="gov-input" placeholder="name@example.com">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-[var(--text-muted)] mb-1">Full Postal Address *</label>
+                                <input type="text" id="appAddress" required class="gov-input" placeholder="Door No, Street, Village/City">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 2: Service-Specific Dynamic Fields -->
+                    <div id="serviceSpecificFieldsContainer">
+                        <h4 class="text-xs font-bold text-[var(--text-main)] uppercase tracking-wider mb-2">Service Specific Information</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3" id="serviceFieldsGrid">
+                            <!-- Dynamic fields injected via JS -->
+                        </div>
+                    </div>
+
+                    <div class="md:hidden pt-2">
+                        <button type="button" onclick="MSN.setModalMobileSection('docs')" class="w-full py-2 px-3 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-xs font-bold text-[var(--text-muted)] flex items-center justify-center gap-1.5">
+                            <span>&larr;</span>
+                            <span>Back to Required Documents</span>
+                        </button>
                     </div>
                 </div>
 
-                <!-- Section 3: Document Uploads -->
-                <div>
-                    <h4 class="text-xs font-bold text-[var(--text-main)] uppercase tracking-wider mb-2">3. Required Documents</h4>
-                    <div id="requiredDocsContainer" class="space-y-2">
-                        <!-- Required docs items injected via JS -->
-                    </div>
-                </div>
-
-                <!-- Section 4: Optional Documents & Special Instructions -->
-                <div>
-                    <label class="block text-[11px] text-[var(--text-muted)] mb-1">Additional Notes / Instructions for Center Owner</label>
-                    <textarea id="appNotes" class="gov-input min-h-[60px]" placeholder="Optional notes for the operator..."></textarea>
-                </div>
-
-                <div class="flex items-center justify-between pt-3 border-t border-[var(--border-subtle)]">
-                    <button type="button" onclick="closeApplyModal()" class="btn-secondary">Cancel</button>
-                    <button type="submit" class="btn-primary">
-                        <span>Submit Application & Proceed</span>
+                <!-- Submit Bar - Fits perfectly on mobile without overflow -->
+                <div class="flex items-center justify-between pt-3 border-t border-[var(--border-subtle)] gap-2">
+                    <button type="button" onclick="closeApplyModal()" class="btn-secondary text-xs px-3 py-2 shrink-0">Cancel</button>
+                    <button type="submit" class="btn-primary text-xs px-4 py-2 flex-1 justify-center truncate">
+                        <span>Submit Application</span>
                         <span>&rarr;</span>
                     </button>
                 </div>
@@ -2717,6 +2848,71 @@
                 });
 
                 document.getElementById('applyModal').classList.add('active');
+                this.setModalMobileSection('docs');
+                this.setupModalSwipeGesture();
+            },
+
+            setModalMobileSection(section) {
+                this.activeModalSection = section;
+                const docsSection = document.querySelector('.modal-section-docs');
+                const applicantSection = document.querySelector('.modal-section-applicant');
+                const prevBtn = document.getElementById('btnModalNavPrev');
+                const nextBtn = document.getElementById('btnModalNavNext');
+                const tabDocs = document.getElementById('tabModalDocs');
+                const tabApplicant = document.getElementById('tabModalApplicant');
+                const hint = document.getElementById('modalSwipeHint');
+                const step = document.getElementById('modalStepIndicator');
+
+                if (section === 'docs') {
+                    if (docsSection) docsSection.classList.remove('hidden-mobile');
+                    if (applicantSection) applicantSection.classList.add('hidden-mobile');
+                    if (prevBtn) prevBtn.disabled = true;
+                    if (nextBtn) nextBtn.disabled = false;
+                    if (tabDocs) {
+                        tabDocs.className = "py-1.5 px-2 rounded-lg bg-indigo-600 text-white truncate transition-all";
+                    }
+                    if (tabApplicant) {
+                        tabApplicant.className = "py-1.5 px-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-main)] truncate transition-all";
+                    }
+                    if (hint) hint.innerHTML = '👈 Swipe left or tap arrow for Applicant Info &rarr;';
+                    if (step) step.textContent = 'Step 1 of 2';
+                } else {
+                    if (docsSection) docsSection.classList.add('hidden-mobile');
+                    if (applicantSection) applicantSection.classList.remove('hidden-mobile');
+                    if (prevBtn) prevBtn.disabled = false;
+                    if (nextBtn) nextBtn.disabled = true;
+                    if (tabDocs) {
+                        tabDocs.className = "py-1.5 px-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-main)] truncate transition-all";
+                    }
+                    if (tabApplicant) {
+                        tabApplicant.className = "py-1.5 px-2 rounded-lg bg-indigo-600 text-white truncate transition-all";
+                    }
+                    if (hint) hint.innerHTML = '&larr; Swipe right or tap arrow for Documents 👉';
+                    if (step) step.textContent = 'Step 2 of 2';
+                }
+            },
+
+            setupModalSwipeGesture() {
+                const form = document.getElementById('dynamicApplicationForm');
+                if (!form || form._hasSwipeListener) return;
+                form._hasSwipeListener = true;
+                let touchStartX = 0;
+                let touchStartY = 0;
+                form.addEventListener('touchstart', (e) => {
+                    touchStartX = e.changedTouches[0].clientX;
+                    touchStartY = e.changedTouches[0].clientY;
+                }, { passive: true });
+                form.addEventListener('touchend', (e) => {
+                    const diffX = e.changedTouches[0].clientX - touchStartX;
+                    const diffY = e.changedTouches[0].clientY - touchStartY;
+                    if (Math.abs(diffX) > 40 && Math.abs(diffX) > Math.abs(diffY)) {
+                        if (diffX < 0 && this.activeModalSection === 'docs') {
+                            this.setModalMobileSection('applicant');
+                        } else if (diffX > 0 && this.activeModalSection === 'applicant') {
+                            this.setModalMobileSection('docs');
+                        }
+                    }
+                }, { passive: true });
             },
 
             closeApplyModal() {
