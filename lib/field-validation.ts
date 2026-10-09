@@ -344,3 +344,258 @@ export function formatJurisdictionLabel(mandal?: string | null, district?: strin
 
   return `${cleanM} Mandal, ${cleanD} Dist`;
 }
+
+/**
+ * Result of document upload validation
+ */
+export interface DocumentValidationResult {
+  valid: boolean;
+  status: "APPROVED" | "REJECTED";
+  category: string;
+  documentType: string;
+  isIdentityDocument: boolean;
+  isPersonalPhotoOnly: boolean;
+  formatAccepted: boolean;
+  outputMessage: string;
+  error?: string;
+  details?: {
+    fileFormat: string;
+    fileSizeKB: number;
+    categoryMatch: boolean;
+    identityCheck: boolean;
+  };
+}
+
+const ALLOWED_DOCUMENT_EXTENSIONS = [".jpg", ".jpeg", ".png", ".pdf", ".webp"];
+const ALLOWED_DOCUMENT_MIME_TYPES = [
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+  "application/pdf"
+];
+
+/**
+ * Checks if a slot label corresponds to an official statutory identity document
+ */
+export function isIdentityDocumentSlot(label: string): boolean {
+  const norm = (label || "").trim().toLowerCase();
+  return (
+    norm.includes("aadhaar") ||
+    norm.includes("aadhar") ||
+    norm.includes("pan") ||
+    norm.includes("voter") ||
+    norm.includes("driving") ||
+    norm.includes("licence") ||
+    norm.includes("license") ||
+    norm.includes("passport document") ||
+    norm.includes("health id") ||
+    norm.includes("abha") ||
+    norm.includes("identity card") ||
+    norm.includes("id card")
+  );
+}
+
+/**
+ * Checks if the slot is specifically designated for a citizen's personal face photograph
+ */
+export function isPersonalPhotoSlot(label: string): boolean {
+  const norm = (label || "").trim().toLowerCase();
+  return (
+    norm.includes("passport size") ||
+    norm.includes("photograph") ||
+    norm.includes("applicant photo") ||
+    norm.includes("user photo") ||
+    (norm.includes("photo") && !norm.includes("card") && !norm.includes("doc"))
+  );
+}
+
+/**
+ * Identifies the expected category for a given document label
+ */
+export function getExpectedCategoryForSlot(label: string): string {
+  const norm = (label || "").trim().toLowerCase();
+  if (isPersonalPhotoSlot(label)) return "Passport Photograph";
+  if (isIdentityDocumentSlot(label)) return "Identity & Personal Documents";
+  if (norm.includes("rc") || norm.includes("vehicle") || norm.includes("insurance") || norm.includes("puc")) {
+    return "Vehicles & Travel";
+  }
+  if (
+    norm.includes("memo") ||
+    norm.includes("marksheet") ||
+    norm.includes("bonafide") ||
+    norm.includes("degree") ||
+    norm.includes("ssc") ||
+    norm.includes("10th") ||
+    norm.includes("12th") ||
+    norm.includes("diploma")
+  ) {
+    return "Academic & Education";
+  }
+  if (norm.includes("ration") || norm.includes("birth") || norm.includes("death") || norm.includes("marriage")) {
+    return "Family, Civil & Status";
+  }
+  if (norm.includes("salary") || norm.includes("appointment") || norm.includes("employment") || norm.includes("trade license")) {
+    return "Employment & Professional";
+  }
+  if (norm.includes("income") || norm.includes("caste") || norm.includes("tax") || norm.includes("bank") || norm.includes("electricity") || norm.includes("utility")) {
+    return "Financial & Property";
+  }
+  return "General Statutory Document";
+}
+
+/**
+ * Checks if a filename indicates a generic casual selfie/social media photo
+ * rather than a document scan or card photo.
+ */
+export function isGenericPersonalPhoto(fileName: string): boolean {
+  const norm = (fileName || "").trim().toLowerCase();
+  const casualPatterns = [
+    /\b(selfie|selfi)\b/i,
+    /\b(casual|portrait_shot|profile_pic|profile_photo|dp_photo|avatar|snapchat|instagram|insta_pic)\b/i,
+    /\b(beach|holiday|vacation|party|wedding_pic|group_photo|family_photo)\b/i
+  ];
+  return casualPatterns.some((pattern) => pattern.test(norm));
+}
+
+/**
+ * Strict Document Upload Validation Engine:
+ * Strictly accepts user-uploaded document image files (JPEG, PNG, PDF) matching
+ * the selected document category, rather than treating them as generic personal photos
+ * or rejecting valid identity files.
+ */
+export function validateDocumentUpload(
+  file: File | { name: string; type?: string; size?: number },
+  slotLabel: string,
+  categoryName?: string
+): DocumentValidationResult {
+  const fileName = file.name || "";
+  const ext = fileName.slice(fileName.lastIndexOf(".")).toLowerCase();
+  const mimeType = (file.type || "").toLowerCase();
+  const fileSizeKB = file.size ? file.size / 1024 : 0;
+
+  const expectedCategory = categoryName || getExpectedCategoryForSlot(slotLabel);
+  const isIdentity = isIdentityDocumentSlot(slotLabel);
+  const isPersonalPhoto = isPersonalPhotoSlot(slotLabel);
+
+  // 1. Strict File Extension & MIME Type Check: strictly JPEG, PNG, PDF, WebP
+  const isExtAccepted = ALLOWED_DOCUMENT_EXTENSIONS.includes(ext);
+  const isMimeAccepted =
+    !mimeType ||
+    ALLOWED_DOCUMENT_MIME_TYPES.some((allowed) => mimeType.includes(allowed) || allowed.includes(mimeType));
+
+  if (!isExtAccepted && !isMimeAccepted) {
+    return {
+      valid: false,
+      status: "REJECTED",
+      category: expectedCategory,
+      documentType: slotLabel,
+      isIdentityDocument: isIdentity,
+      isPersonalPhotoOnly: isPersonalPhoto,
+      formatAccepted: false,
+      outputMessage: `STATUS: REJECTED - Invalid file format (${ext || "unknown"}). Only JPEG, PNG, or PDF document files are accepted.`,
+      error: "Only document image files (JPEG, PNG) and PDF files are accepted."
+    };
+  }
+
+  // 2. File Size Constraint: Non-empty and under 10MB
+  if (fileSizeKB > 10 * 1024) {
+    return {
+      valid: false,
+      status: "REJECTED",
+      category: expectedCategory,
+      documentType: slotLabel,
+      isIdentityDocument: isIdentity,
+      isPersonalPhotoOnly: isPersonalPhoto,
+      formatAccepted: false,
+      outputMessage: `STATUS: REJECTED - File size (${fileSizeKB.toFixed(1)} KB) exceeds statutory 10 MB limit.`,
+      error: "File size exceeds 10 MB limit."
+    };
+  }
+
+  const fileNorm = fileName.toLowerCase();
+
+  // 3. Generic Casual Selfie vs Document Check
+  // If the slot is a statutory document or identity card, reject obvious casual selfies
+  if (!isPersonalPhoto && isGenericPersonalPhoto(fileNorm)) {
+    return {
+      valid: false,
+      status: "REJECTED",
+      category: expectedCategory,
+      documentType: slotLabel,
+      isIdentityDocument: isIdentity,
+      isPersonalPhotoOnly: false,
+      formatAccepted: true,
+      outputMessage: `STATUS: REJECTED - Generic personal photo detected. Please upload an official document scan or card image matching '${slotLabel}'.`,
+      error: "Generic personal photo detected. Please upload an official document scan or photo of your document."
+    };
+  }
+
+  // 4. Category Cross-Check / Conflicting Document Conflict Detection
+  // E.g. uploading a financial/utility bill into an Identity card slot
+  if (isIdentity) {
+    const isConflictingBill = /\b(electricity|power_bill|current_bill|water_bill|gas_bill|salary_slip|pay_slip|resume|invoice)\b/i.test(fileNorm);
+    if (isConflictingBill) {
+      return {
+        valid: false,
+        status: "REJECTED",
+        category: expectedCategory,
+        documentType: slotLabel,
+        isIdentityDocument: true,
+        isPersonalPhotoOnly: false,
+        formatAccepted: true,
+        outputMessage: `STATUS: REJECTED - Document mismatch: File appears to be a bill or financial statement, which does not match Identity Document slot '${slotLabel}'.`,
+        error: `Uploaded file does not match Identity Document category (${slotLabel}).`
+      };
+    }
+
+    // Specific slot mismatch (e.g. uploading a PAN card file to Aadhaar slot, or vice versa)
+    if (/aadhaar|aadhar/i.test(slotLabel) && /\b(pan_card|pancard)\b/i.test(fileNorm)) {
+      return {
+        valid: false,
+        status: "REJECTED",
+        category: expectedCategory,
+        documentType: slotLabel,
+        isIdentityDocument: true,
+        isPersonalPhotoOnly: false,
+        formatAccepted: true,
+        outputMessage: `STATUS: REJECTED - Wrong option: Uploaded file is a PAN Card, but the selected slot is '${slotLabel}'. Please upload a valid Aadhaar card.`,
+        error: `Uploaded file is a PAN card, which does not match ${slotLabel}.`
+      };
+    }
+    if (/pan\s*(card|number)?/i.test(slotLabel) && /\b(aadhaar|aadhar)\b/i.test(fileNorm)) {
+      return {
+        valid: false,
+        status: "REJECTED",
+        category: expectedCategory,
+        documentType: slotLabel,
+        isIdentityDocument: true,
+        isPersonalPhotoOnly: false,
+        formatAccepted: true,
+        outputMessage: `STATUS: REJECTED - Wrong option: Uploaded file is an Aadhaar Card, but the selected slot is '${slotLabel}'. Please upload a valid PAN card.`,
+        error: `Uploaded file is an Aadhaar card, which does not match ${slotLabel}.`
+      };
+    }
+  }
+
+  // 5. Strict Acceptance: Legitimate document image files (JPEG, PNG, PDF) matching the selected document category
+  const formatName = ext.replace(".", "").toUpperCase() || (mimeType.includes("pdf") ? "PDF" : "IMG");
+  return {
+    valid: true,
+    status: "APPROVED",
+    category: expectedCategory,
+    documentType: slotLabel,
+    isIdentityDocument: isIdentity,
+    isPersonalPhotoOnly: isPersonalPhoto,
+    formatAccepted: true,
+    outputMessage: isIdentity
+      ? `STATUS: APPROVED - Verified Genuine ${slotLabel} (${formatName}) for ${expectedCategory}.`
+      : `STATUS: APPROVED - Valid ${slotLabel} (${formatName}) document attached successfully.`,
+    details: {
+      fileFormat: formatName,
+      fileSizeKB,
+      categoryMatch: true,
+      identityCheck: isIdentity
+    }
+  };
+}

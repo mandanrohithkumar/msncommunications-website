@@ -33,10 +33,14 @@ import {
   ZoomOut,
   FileCheck2,
   ImageIcon,
-  MapPin
+  MapPin,
+  Globe,
+  Building2,
+  Search
 } from "lucide-react";
 import { resolveDocumentDataUrl, isImageDocument, isPdfDocument } from "@/lib/doc-preview-utils";
 import { downloadDocument, shareDocumentAsPdf } from "@/lib/document-download-share";
+import { GovPortalsSection } from "./gov-portals-section";
 
 // Helper component for smooth visual count-up animation of total file count
 const AnimatedFileCounter: React.FC<{ targetCount: number; onTrigger?: () => void }> = ({
@@ -624,8 +628,10 @@ export const OwnerDashboard: React.FC = () => {
   } = usePortal();
 
   const isAuthorized = user?.role === "owner" || user?.role === "superadmin" || true;
-  const [activeTab, setActiveTab] = useState<"available" | "mine" | "completed">("available");
+  const [activeTab, setActiveTab] = useState<"available" | "mine" | "completed" | "services" | "portals">("available");
   const [categoryFilter, setCategoryFilter] = useState<"all" | "online" | "meeseva">("all");
+  const [catalogSearch, setCatalogSearch] = useState("");
+  const [catalogCategoryFilter, setCatalogCategoryFilter] = useState<"all" | "meeseva" | "online">("all");
   const [selectedAppForMsg, setSelectedAppForMsg] = useState<Application | null>(null);
   const [msgInput, setMsgInput] = useState("");
   const [msgSuccess, setMsgSuccess] = useState(false);
@@ -642,6 +648,23 @@ export const OwnerDashboard: React.FC = () => {
     });
     return list;
   }, [meesevaServices, onlineCategories]);
+
+  // Filtered Services Catalog for Owner workbench inspection
+  const filteredCatalogServices = useMemo(() => {
+    return allCatalogServices.filter((service) => {
+      const isMeeSeva = meesevaServices.some((ms) => ms.id === service.id);
+      if (catalogCategoryFilter === "meeseva" && !isMeeSeva) return false;
+      if (catalogCategoryFilter === "online" && isMeeSeva) return false;
+
+      if (!catalogSearch.trim()) return true;
+      const q = catalogSearch.toLowerCase().trim();
+      const matchName = service.name.toLowerCase().includes(q);
+      const matchCat = (service.category || "").toLowerCase().includes(q);
+      const matchNote = (service.note || "").toLowerCase().includes(q);
+      const matchDocs = (service.docs || []).some((d) => d.label.toLowerCase().includes(q));
+      return matchName || matchCat || matchNote || matchDocs;
+    });
+  }, [allCatalogServices, meesevaServices, catalogCategoryFilter, catalogSearch]);
 
   // Robust Unified Category Classifier: Determines whether submission is "Online Works" or "MeeSeva Works"
   const getUnifiedCategory = useCallback((app: Application) => {
@@ -830,6 +853,92 @@ export const OwnerDashboard: React.FC = () => {
             }`}
           >
             Completed ({completedTasks.length})
+          </button>
+          <button
+            onClick={() => setActiveTab("services")}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeTab === "services"
+                ? "bg-gradient-to-r from-[#FF9933] to-[#E65100] text-white shadow-md shadow-[#FF9933]/25"
+                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+            }`}
+          >
+            <Building2 className="w-3.5 h-3.5" />
+            <span>Services Catalog ({meesevaServices.length} MeeSeva)</span>
+          </button>
+          <button
+            onClick={() => setActiveTab("portals")}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeTab === "portals"
+                ? "bg-gradient-to-r from-[#000080] to-blue-700 text-white shadow-md shadow-blue-900/25"
+                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+            }`}
+          >
+            <Globe className="w-3.5 h-3.5" />
+            <span>Official Portals (9)</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Quick Official Dept Portals Shortcut Strip */}
+      <div className="flex flex-wrap items-center justify-between gap-2.5 p-3 rounded-2xl bg-gradient-to-r from-blue-50/70 via-white to-emerald-50/70 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 border border-slate-200/80 dark:border-slate-800 text-xs shadow-xs">
+        <div className="flex items-center gap-2">
+          <span className="p-1.5 rounded-lg bg-[#000080] text-white">
+            <Globe className="w-3.5 h-3.5" />
+          </span>
+          <span className="font-bold text-slate-800 dark:text-slate-200">Official Dept Shortcuts:</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <a
+            href="https://meeseva.telangana.gov.in"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-blue-500 text-[11px] font-semibold text-blue-700 dark:text-blue-300 flex items-center gap-1 shadow-2xs hover:shadow-xs transition-all"
+          >
+            <span>MeeSeva 2.0</span>
+            <ExternalLink className="w-2.5 h-2.5 opacity-60" />
+          </a>
+          <a
+            href="https://epds.telangana.gov.in"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-emerald-500 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 flex items-center gap-1 shadow-2xs hover:shadow-xs transition-all"
+          >
+            <span>EPDS Ration</span>
+            <ExternalLink className="w-2.5 h-2.5 opacity-60" />
+          </a>
+          <a
+            href="https://cdma.cgg.gov.in"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-amber-500 text-[11px] font-semibold text-amber-700 dark:text-amber-300 flex items-center gap-1 shadow-2xs hover:shadow-xs transition-all"
+          >
+            <span>CDMA Birth/Death</span>
+            <ExternalLink className="w-2.5 h-2.5 opacity-60" />
+          </a>
+          <a
+            href="https://www.ghmc.gov.in"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-purple-500 text-[11px] font-semibold text-purple-700 dark:text-purple-300 flex items-center gap-1 shadow-2xs hover:shadow-xs transition-all"
+          >
+            <span>GHMC / UBC</span>
+            <ExternalLink className="w-2.5 h-2.5 opacity-60" />
+          </a>
+          <a
+            href="https://dharani.telangana.gov.in"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-emerald-600 text-[11px] font-semibold text-emerald-800 dark:text-emerald-200 flex items-center gap-1 shadow-2xs hover:shadow-xs transition-all"
+          >
+            <span>Dharani</span>
+            <ExternalLink className="w-2.5 h-2.5 opacity-60" />
+          </a>
+          <button
+            type="button"
+            onClick={() => setActiveTab("portals")}
+            className="px-2.5 py-1 rounded-lg bg-[#000080] text-white text-[11px] font-bold hover:bg-blue-900 transition-colors cursor-pointer"
+          >
+            All 9 Portals &rarr;
           </button>
         </div>
       </div>
@@ -1730,6 +1839,270 @@ export const OwnerDashboard: React.FC = () => {
               );
             })
           )}
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB: SERVICES CATALOG (ALL 17 MEESEVA SERVICES & ONLINE SERVICES)        */}
+      {/* ========================================================================= */}
+      {activeTab === "services" && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          {/* Header Card */}
+          <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <span className="p-2.5 rounded-2xl bg-[#FFF3E0] dark:bg-amber-950/80 text-[#E65100] border border-[#FFE082] shadow-sm">
+                  <Building2 className="w-6 h-6" />
+                </span>
+                <div>
+                  <h2 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+                    <span>Services Catalog &amp; Master Tariff Registry</span>
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-[#FF9933] text-white">
+                      {meesevaServices.length} MeeSeva Services
+                    </span>
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Real-time operational view of all statutory governmental certificates and online digital works with live tariffs, document requirements, and portal integration.
+                  </p>
+                </div>
+              </div>
+
+              {/* Stat Counters Strip */}
+              <div className="flex items-center gap-2 self-start md:self-auto">
+                <div className="px-3 py-1.5 rounded-xl bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-900/40 text-center">
+                  <span className="text-[10px] text-orange-600 dark:text-orange-400 font-bold block uppercase">MeeSeva</span>
+                  <span className="text-base font-black text-[#E65100]">{meesevaServices.length}</span>
+                </div>
+                <div className="px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/40 text-center">
+                  <span className="text-[10px] text-blue-600 dark:text-blue-400 font-bold block uppercase">Online Works</span>
+                  <span className="text-base font-black text-[#000080] dark:text-blue-300">{allCatalogServices.length - meesevaServices.length}</span>
+                </div>
+                <div className="px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/40 text-center">
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold block uppercase">Total Catalog</span>
+                  <span className="text-base font-black text-[#138808]">{allCatalogServices.length}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Informational Banner */}
+            <div className="p-3.5 rounded-2xl bg-[#FFF8E1]/90 dark:bg-amber-950/30 border border-[#FFE082] dark:border-amber-900/40 text-xs text-[#B78103] dark:text-amber-300 flex items-start gap-2.5">
+              <Sparkles className="w-4 h-4 shrink-0 text-[#FF9933] mt-0.5" />
+              <div>
+                <strong>Active Coverage &amp; Recent Upgrades:</strong> All {meesevaServices.length} MeeSeva services are fully activated and displayed in this catalog without caps or exclusions. Newly integrated services include <strong>Non-Availability Birth Certificate (₹130)</strong>, <strong>Non-Availability Death Certificate (₹130)</strong>, <strong>UBC GHMC Certificate (₹130)</strong>, <strong>Gap Certificate (₹100)</strong>, <strong>Nativity Certificate (₹100)</strong>, with <strong>Ration Card &amp; Ration Card Correction</strong> tariffs set to <strong>₹100</strong>.
+              </div>
+            </div>
+
+            {/* Search and Category Filters */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
+              <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80">
+                <button
+                  onClick={() => setCatalogCategoryFilter("all")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    catalogCategoryFilter === "all"
+                      ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs"
+                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
+                  }`}
+                >
+                  All Services ({allCatalogServices.length})
+                </button>
+                <button
+                  onClick={() => setCatalogCategoryFilter("meeseva")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    catalogCategoryFilter === "meeseva"
+                      ? "bg-[#FF9933] text-white shadow-xs"
+                      : "text-slate-600 dark:text-slate-400 hover:text-orange-600"
+                  }`}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                  <span>MeeSeva ({meesevaServices.length})</span>
+                </button>
+                <button
+                  onClick={() => setCatalogCategoryFilter("online")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    catalogCategoryFilter === "online"
+                      ? "bg-[#000080] text-white shadow-xs"
+                      : "text-slate-600 dark:text-slate-400 hover:text-blue-600"
+                  }`}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                  <span>Online Works ({allCatalogServices.length - meesevaServices.length})</span>
+                </button>
+              </div>
+
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search by name, document, or fee..."
+                  value={catalogSearch}
+                  onChange={(e) => setCatalogSearch(e.target.value)}
+                  className="pl-9 pr-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-[#FF9933] transition-colors w-full sm:w-72"
+                />
+                {catalogSearch && (
+                  <button
+                    onClick={() => setCatalogSearch("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Interactive Catalog Table */}
+          <div className="overflow-hidden rounded-3xl border border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/80 backdrop-blur-md shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300">
+                <thead className="bg-[#FFF8E1]/60 dark:bg-slate-800/80 text-[11px] uppercase tracking-wider text-[#B78103] dark:text-amber-300 border-b border-[#FFE082] dark:border-slate-700">
+                  <tr>
+                    <th className="py-3 px-4 font-semibold w-12 text-center">#</th>
+                    <th className="py-3 px-4 font-semibold min-w-[220px]">Service &amp; Category</th>
+                    <th className="py-3 px-4 font-semibold min-w-[200px]">Application Details Required</th>
+                    <th className="py-3 px-4 font-semibold min-w-[250px]">Required Documents Checklist</th>
+                    <th className="py-3 px-4 font-semibold w-28">Tariff Fee</th>
+                    <th className="py-3 px-4 font-semibold min-w-[150px]">Official Dept Portal</th>
+                    <th className="py-3 px-4 font-semibold w-24 text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                  {filteredCatalogServices.map((service, idx) => {
+                    const isMeeSeva = meesevaServices.some((ms) => ms.id === service.id);
+                    return (
+                      <tr
+                        key={service.id}
+                        className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
+                      >
+                        <td className="py-3 px-4 font-mono font-bold text-slate-400 text-center">
+                          {idx + 1}
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex items-start gap-2.5">
+                            <span className={`p-2 rounded-xl text-base shrink-0 ${
+                              isMeeSeva
+                                ? "bg-[#FFF3E0] dark:bg-amber-950/70 border border-[#FFE082]"
+                                : "bg-[#E8EEF5] dark:bg-blue-950/70 border border-[#BBDEFB]"
+                            }`}>
+                              {service.icon || "📄"}
+                            </span>
+                            <div>
+                              <p className="font-bold text-slate-900 dark:text-white leading-tight">
+                                {service.name}
+                              </p>
+                              <div className="flex items-center gap-1.5 mt-1">
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  isMeeSeva
+                                    ? "bg-[#FFF3E0] text-[#E65100] border border-[#FFE082]"
+                                    : "bg-[#E8EEF5] text-[#000080] dark:text-blue-300 border border-[#BBDEFB]"
+                                }`}>
+                                  {isMeeSeva ? "MeeSeva Statutory" : service.category || "Online Utility"}
+                                </span>
+                                {service.waitingTime && (
+                                  <span className="text-[10px] text-slate-400 flex items-center gap-0.5">
+                                    <Clock className="w-2.5 h-2.5" />
+                                    <span>{service.waitingTime}</span>
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="space-y-1">
+                            {service.fields && service.fields.length > 0 ? (
+                              <div className="flex flex-wrap gap-1 max-w-sm">
+                                {service.fields.slice(0, 4).map((f, fIdx) => (
+                                  <span
+                                    key={fIdx}
+                                    className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[10px] text-slate-600 dark:text-slate-300"
+                                  >
+                                    {f.label}
+                                  </span>
+                                ))}
+                                {service.fields.length > 4 && (
+                                  <span className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[10px] text-slate-500 font-semibold">
+                                    +{service.fields.length - 4} more
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-slate-400 text-[11px]">Standard citizen form fields</span>
+                            )}
+                            {service.note && (
+                              <p className="text-[10px] text-slate-400 italic line-clamp-1">{service.note}</p>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          {service.docs && service.docs.length > 0 ? (
+                            <div className="flex flex-wrap gap-1 max-w-md">
+                              {service.docs.map((d, dIdx) => (
+                                <span
+                                  key={dIdx}
+                                  className="px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-[#138808] dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40 text-[10px] font-medium flex items-center gap-1"
+                                >
+                                  <FileCheck2 className="w-2.5 h-2.5" />
+                                  <span>{d.label}</span>
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 text-[11px]">No documents required</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="px-2.5 py-1 rounded-xl bg-[#E8F5E9] dark:bg-emerald-950/70 border border-[#C8E6C9] dark:border-emerald-900/60 text-[#138808] dark:text-emerald-300 font-extrabold text-xs">
+                            ₹{service.price}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4">
+                          {service.officialUrl ? (
+                            <a
+                              href={service.officialUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#000080] dark:text-blue-400 hover:underline max-w-[170px] truncate"
+                              title={service.officialUrl}
+                            >
+                              <span className="truncate">{service.officialUrl.replace("https://", "")}</span>
+                              <ExternalLink className="w-3 h-3 shrink-0" />
+                            </a>
+                          ) : (
+                            <span className="text-slate-400 text-[11px]">Integrated API</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#E8F5E9] text-[#138808] border border-[#C8E6C9]">
+                            <Check className="w-2.5 h-2.5" />
+                            <span>Active</span>
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {filteredCatalogServices.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="py-12 text-center text-slate-400 text-xs">
+                        No services match &quot;{catalogSearch}&quot; in the selected filter.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 4: OFFICIAL GOVERNMENT & MEESEVA PORTALS DIRECT SHORTCUTS            */}
+      {/* ========================================================================= */}
+      {activeTab === "portals" && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          <GovPortalsSection
+            title="Official MeeSeva & Government Websites"
+            subtitle="Central directory of Telangana and Central government portals for rapid application processing, status verifications, and statutory lookup."
+          />
         </div>
       )}
 

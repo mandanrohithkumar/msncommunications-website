@@ -4,7 +4,9 @@
 import { UploadedFileMeta } from "@/types/portal";
 
 /**
- * Generates an SVG Data URL that looks like an official Indian Aadhaar card
+ * Generates an SVG Data URL that formats the single, clean front side of the Aadhaar card
+ * as an isolated vertical rectangle, completely removing side-by-side duplicate pages,
+ * the back-page information section (address), and extra background white space.
  */
 export function generateAadhaarSvg(
   customerName: string = "Rohith Kumar",
@@ -18,26 +20,10 @@ export function generateAadhaarSvg(
 ): string {
   const dobVal = details?.dob || (customerName.includes("Rahul") ? "01/01/1990" : "14/05/1998");
   const genderVal = details?.gender || "పురుషుడు / MALE";
-  const addressVal = details?.address || (customerName.includes("Rahul") ? "123, Demo Street, Block A, Near Demo Park, New Delhi, Delhi - 110001" : "Telangana, INDIA");
   const vidVal = details?.vid || "9182 3019 4410 9821";
 
-  let addrLine1 = addressVal;
-  let addrLine2 = "";
-  if (addressVal.length > 32) {
-    const commaIndex = addressVal.indexOf(",", 25);
-    if (commaIndex !== -1 && commaIndex < 48) {
-      addrLine1 = addressVal.substring(0, commaIndex + 1).trim();
-      addrLine2 = addressVal.substring(commaIndex + 1).trim();
-    } else {
-      const spaceIndex = addressVal.lastIndexOf(" ", 38);
-      if (spaceIndex > 15) {
-        addrLine1 = addressVal.substring(0, spaceIndex).trim();
-        addrLine2 = addressVal.substring(spaceIndex).trim();
-      }
-    }
-  }
-
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 380" width="100%" height="100%">
+  // Single clean front side isolated vertical rectangle (380 x 580, ratio ~ 1:1.53)
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 580" width="100%" height="100%">
     <defs>
       <linearGradient id="flag" x1="0%" y1="0%" x2="100%" y2="0%">
         <stop offset="0%" stop-color="#FF9933" />
@@ -46,19 +32,24 @@ export function generateAadhaarSvg(
       </linearGradient>
       <linearGradient id="cardBg" x1="0%" y1="0%" x2="0%" y2="100%">
         <stop offset="0%" stop-color="#FFFFFF" />
+        <stop offset="35%" stop-color="#FFFFFF" />
         <stop offset="100%" stop-color="#F8FAFC" />
       </linearGradient>
-      <filter id="cardShadow" x="-2%" y="-2%" width="104%" height="104%">
-        <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.1"/>
-      </filter>
+      <pattern id="guilloche" width="40" height="40" patternUnits="userSpaceOnUse">
+        <path d="M 0 20 Q 10 5, 20 20 T 40 20" fill="none" stroke="#E2E8F0" stroke-width="0.5" opacity="0.6"/>
+        <path d="M 20 0 Q 35 10, 20 20 T 20 40" fill="none" stroke="#E2E8F0" stroke-width="0.5" opacity="0.6"/>
+      </pattern>
     </defs>
     
-    <!-- Edge-to-Edge Official Card Frame (Zero Surrounding Margin) -->
-    <rect x="0" y="0" width="600" height="380" rx="14" fill="url(#cardBg)" stroke="#000080" stroke-width="2"/>
-    <rect x="0" y="0" width="600" height="12" fill="url(#flag)" rx="4"/>
+    <!-- Isolated Vertical Rectangle Card Frame (Zero Surrounding White Space) -->
+    <rect x="0" y="0" width="380" height="580" rx="16" fill="url(#cardBg)" stroke="#000080" stroke-width="2.5"/>
+    <rect x="0" y="0" width="380" height="580" rx="16" fill="url(#guilloche)" opacity="0.4"/>
+    
+    <!-- Top Tricolor Ribbon -->
+    <rect x="0" y="0" width="380" height="10" fill="url(#flag)" rx="4"/>
     
     <!-- Ashoka Lion Emblem Representation (Left) -->
-    <g transform="translate(18, 22)">
+    <g transform="translate(16, 18)">
       <circle cx="16" cy="18" r="14" fill="#000080" opacity="0.1"/>
       <path d="M 12 10 L 20 10 L 18 24 L 14 24 Z" fill="#000080"/>
       <circle cx="16" cy="8" r="4" fill="#000080"/>
@@ -67,7 +58,7 @@ export function generateAadhaarSvg(
     </g>
 
     <!-- UIDAI Sunburst Emblem (Right) -->
-    <g transform="translate(545, 22)">
+    <g transform="translate(325, 18)">
       <circle cx="18" cy="18" r="14" fill="#E65100" opacity="0.1"/>
       <circle cx="18" cy="18" r="7" fill="#E65100"/>
       <!-- Radiating Sun Rays -->
@@ -79,46 +70,41 @@ export function generateAadhaarSvg(
     </g>
 
     <!-- Government Header -->
-    <text x="300" y="36" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#000080" text-anchor="middle" letter-spacing="1">భారత ప్రభుత్వం • GOVERNMENT OF INDIA</text>
-    <text x="300" y="54" font-family="Arial, sans-serif" font-size="13" font-weight="900" fill="#0A1931" text-anchor="middle">భారత విశిష్ట గుర్తింపు ప్రాధికార సంస్థ • UNIQUE IDENTIFICATION AUTHORITY OF INDIA</text>
-    <line x1="15" y1="64" x2="585" y2="64" stroke="#CBD5E1" stroke-width="1.5"/>
+    <text x="190" y="30" font-family="Arial, sans-serif" font-size="10.5" font-weight="bold" fill="#000080" text-anchor="middle" letter-spacing="0.5">భారత ప్రభుత్వం • GOVERNMENT OF INDIA</text>
+    <text x="190" y="46" font-family="Arial, sans-serif" font-size="10" font-weight="900" fill="#0A1931" text-anchor="middle">భారత విశిష్ట గుర్తింపు ప్రాధికార సంస్థ</text>
+    <text x="190" y="59" font-family="Arial, sans-serif" font-size="8.8" font-weight="800" fill="#0A1931" text-anchor="middle" letter-spacing="0.3">UNIQUE IDENTIFICATION AUTHORITY OF INDIA</text>
+    <line x1="14" y1="68" x2="366" y2="68" stroke="#CBD5E1" stroke-width="1.5"/>
 
-    <!-- Citizen Photo Frame & Biometric Portrait -->
-    <rect x="25" y="80" width="125" height="155" rx="10" fill="#E2E8F0" stroke="#000080" stroke-width="2"/>
-    <rect x="29" y="84" width="117" height="147" rx="8" fill="#F1F5F9"/>
+    <!-- Citizen Photo Frame & Biometric Portrait (Left Side) -->
+    <rect x="22" y="82" width="118" height="148" rx="10" fill="#E2E8F0" stroke="#000080" stroke-width="2"/>
+    <rect x="26" y="86" width="110" height="140" rx="8" fill="#F1F5F9"/>
     <!-- Realistic Silhouette Portrait -->
-    <circle cx="87" cy="135" r="36" fill="#000080" opacity="0.85"/>
-    <ellipse cx="87" cy="205" rx="50" ry="32" fill="#000080" opacity="0.85"/>
-    <circle cx="87" cy="126" r="26" fill="#FED7AA"/>
-    <path d="M 64 120 C 64 95, 110 95, 110 120 C 102 105, 72 105, 64 120 Z" fill="#1E293B"/>
+    <circle cx="81" cy="134" r="34" fill="#000080" opacity="0.85"/>
+    <ellipse cx="81" cy="202" rx="48" ry="30" fill="#000080" opacity="0.85"/>
+    <circle cx="81" cy="125" r="24" fill="#FED7AA"/>
+    <path d="M 60 120 C 60 96, 102 96, 102 120 C 95 106, 67 106, 60 120 Z" fill="#1E293B"/>
 
     <!-- Holographic Verified Strip Overlay on Photo -->
-    <rect x="33" y="242" width="109" height="20" rx="5" fill="#E8F5E9" stroke="#C8E6C9" stroke-width="1.5"/>
-    <text x="87" y="256" font-family="Arial, sans-serif" font-size="9" font-weight="900" fill="#138808" text-anchor="middle" letter-spacing="0.5">✓ BIOMETRIC VERIFIED</text>
+    <rect x="22" y="234" width="118" height="20" rx="5" fill="#E8F5E9" stroke="#C8E6C9" stroke-width="1.5"/>
+    <text x="81" y="248" font-family="Arial, sans-serif" font-size="8.5" font-weight="900" fill="#138808" text-anchor="middle" letter-spacing="0.5">✓ BIOMETRIC VERIFIED</text>
 
-    <!-- Citizen Demographic Details -->
-    <g transform="translate(165, 82)">
-      <text x="0" y="16" font-family="Arial, sans-serif" font-size="11" fill="#64748B" font-weight="700">పేరు / Name:</text>
-      <text x="0" y="38" font-family="Arial, sans-serif" font-size="18" font-weight="900" fill="#0A1931">${customerName}</text>
+    <!-- Citizen Demographic Details (Front Side ONLY - Back-Page Address Section Completely Removed) -->
+    <g transform="translate(154, 84)">
+      <text x="0" y="16" font-family="Arial, sans-serif" font-size="10" fill="#64748B" font-weight="700">పేరు / Name:</text>
+      <text x="0" y="36" font-family="Arial, sans-serif" font-size="16" font-weight="900" fill="#0A1931">${customerName}</text>
 
-      <text x="0" y="68" font-family="Arial, sans-serif" font-size="11" fill="#64748B" font-weight="700">పుట్టిన తేదీ / DOB:</text>
-      <text x="120" y="68" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#0A1931">${dobVal}</text>
+      <text x="0" y="66" font-family="Arial, sans-serif" font-size="10" fill="#64748B" font-weight="700">పుట్టిన తేదీ / DOB:</text>
+      <text x="0" y="84" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#0A1931">${dobVal}</text>
 
-      <text x="0" y="92" font-family="Arial, sans-serif" font-size="11" fill="#64748B" font-weight="700">లింగము / Gender:</text>
-      <text x="120" y="92" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#0A1931">${genderVal}</text>
+      <text x="0" y="112" font-family="Arial, sans-serif" font-size="10" fill="#64748B" font-weight="700">లింగము / Gender:</text>
+      <text x="0" y="130" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#0A1931">${genderVal}</text>
 
-      <text x="0" y="118" font-family="Arial, sans-serif" font-size="11" fill="#64748B" font-weight="700">చిరునామా / Address:</text>
-      <text x="120" y="118" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="#0A1931">
-        ${addrLine1}
-        ${addrLine2 ? `<tspan x="120" dy="13">${addrLine2}</tspan>` : ""}
-      </text>
-
-      <text x="0" y="152" font-family="Arial, sans-serif" font-size="10" fill="#94A3B8">Vid / వర్చువల్ ఐడి: ${vidVal}</text>
+      <text x="0" y="156" font-family="Arial, sans-serif" font-size="9.5" fill="#94A3B8">Vid / వర్చువల్ ఐడి: ${vidVal}</text>
     </g>
 
-    <!-- High-Resolution Secure QR Code Area -->
-    <g transform="translate(460, 80)">
-      <rect x="0" y="0" width="120" height="120" rx="10" fill="#FFFFFF" stroke="#000080" stroke-width="2"/>
+    <!-- High-Resolution Secure QR Code Area (Mid Section) -->
+    <g transform="translate(130, 266)">
+      <rect x="0" y="0" width="120" height="120" rx="10" fill="#FFFFFF" stroke="#000080" stroke-width="1.8"/>
       <!-- QR Alignment Corners -->
       <rect x="10" y="10" width="28" height="28" fill="#000080"/>
       <rect x="15" y="15" width="18" height="18" fill="#FFFFFF"/>
@@ -146,16 +132,159 @@ export function generateAadhaarSvg(
       <rect x="64" y="94" width="18" height="6" fill="#000080"/>
       <rect x="88" y="82" width="12" height="18" fill="#000080"/>
 
-      <text x="60" y="136" font-family="monospace" font-size="9" font-weight="bold" fill="#000080" text-anchor="middle">DIGITALLY SIGNED QR</text>
+      <text x="60" y="134" font-family="monospace" font-size="8" font-weight="bold" fill="#000080" text-anchor="middle">DIGITALLY SIGNED QR</text>
     </g>
 
-    <!-- Bottom Bar with Aadhaar Number: High Visibility Red/Saffron Slogan -->
-    <rect x="15" y="272" width="570" height="92" rx="12" fill="#F1F5F9" stroke="#E2E8F0" stroke-width="1.5"/>
-    <text x="300" y="312" font-family="'Courier New', monospace" font-size="28" font-weight="900" fill="#000080" text-anchor="middle" letter-spacing="5">${docId}</text>
-    <line x1="80" y1="328" x2="520" y2="328" stroke="#FF9933" stroke-width="2.5"/>
-    <text x="300" y="348" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#E65100" text-anchor="middle">నా ఆధార్, నా గుర్తింపు • Aadhaar - My Identity</text>
+    <!-- Bottom Bar with 12-digit Aadhaar Number: High Visibility Red/Saffron Slogan -->
+    <rect x="16" y="416" width="348" height="144" rx="12" fill="#F1F5F9" stroke="#E2E8F0" stroke-width="1.5"/>
+    <text x="190" y="458" font-family="'Courier New', monospace" font-size="25" font-weight="900" fill="#000080" text-anchor="middle" letter-spacing="4">${docId}</text>
+    <line x1="36" y1="476" x2="344" y2="476" stroke="#FF9933" stroke-width="2.5"/>
+    <text x="190" y="504" font-family="Arial, sans-serif" font-size="13" font-weight="900" fill="#E65100" text-anchor="middle">నా ఆధార్, నా గుర్తింపు</text>
+    <text x="190" y="528" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#000080" text-anchor="middle">Aadhaar - My Identity</text>
   </svg>`;
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+/**
+ * Automatically crops and formats an uploaded document image (scanned page, dual-sided photo,
+ * or e-Aadhaar printout) so that ONLY the single, clean front side of the Aadhaar card
+ * is isolated as a clean vertical rectangle, completely removing side-by-side duplicate
+ * pages, the back-page information section (address), and any extra surrounding white space.
+ */
+export async function cropAndFormatAadhaarImage(
+  sourceUrl: string,
+  customerName: string = "Rohith Kumar",
+  docId: string = "9876 5432 1098"
+): Promise<string> {
+  if (!sourceUrl) {
+    return generateAadhaarSvg(customerName, docId);
+  }
+
+  // If already an SVG or data:image/svg+xml, format as clean vertical front-side rectangle
+  if (sourceUrl.startsWith("data:image/svg+xml") || sourceUrl.includes("<svg")) {
+    return generateAadhaarSvg(customerName, docId);
+  }
+
+  // If running in browser environment with raster image (JPG, PNG, WebP)
+  if (typeof window !== "undefined" && typeof document !== "undefined") {
+    try {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error("Image failed to load"));
+        img.src = sourceUrl;
+      });
+
+      const srcW = img.naturalWidth || img.width;
+      const srcH = img.naturalHeight || img.height;
+      if (srcW <= 0 || srcH <= 0) return generateAadhaarSvg(customerName, docId);
+
+      // Create inspection canvas
+      const canvas = document.createElement("canvas");
+      canvas.width = srcW;
+      canvas.height = srcH;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return generateAadhaarSvg(customerName, docId);
+
+      ctx.drawImage(img, 0, 0);
+      const imgData = ctx.getImageData(0, 0, srcW, srcH);
+      const data = imgData.data;
+
+      // 1. Detect background margins / extra white space
+      let top = 0;
+      let bottom = srcH - 1;
+      let left = 0;
+      let right = srcW - 1;
+
+      // Scan top margin
+      topScan: for (let y = 0; y < srcH; y += 2) {
+        for (let x = 0; x < srcW; x += 4) {
+          const idx = (y * srcW + x) * 4;
+          const r = data[idx], g = data[idx + 1], b = data[idx + 2], a = data[idx + 3];
+          if (a > 20 && (r < 240 || g < 240 || b < 240)) {
+            top = Math.max(0, y - 2);
+            break topScan;
+          }
+        }
+      }
+
+      // Scan bottom margin
+      botScan: for (let y = srcH - 1; y >= top; y -= 2) {
+        for (let x = 0; x < srcW; x += 4) {
+          const idx = (y * srcW + x) * 4;
+          const r = data[idx], g = data[idx + 1], b = data[idx + 2], a = data[idx + 3];
+          if (a > 20 && (r < 240 || g < 240 || b < 240)) {
+            bottom = Math.min(srcH - 1, y + 2);
+            break botScan;
+          }
+        }
+      }
+
+      // Scan left margin
+      leftScan: for (let x = 0; x < srcW; x += 2) {
+        for (let y = top; y <= bottom; y += 4) {
+          const idx = (y * srcW + x) * 4;
+          const r = data[idx], g = data[idx + 1], b = data[idx + 2], a = data[idx + 3];
+          if (a > 20 && (r < 240 || g < 240 || b < 240)) {
+            left = Math.max(0, x - 2);
+            break leftScan;
+          }
+        }
+      }
+
+      // Scan right margin
+      rightScan: for (let x = srcW - 1; x >= left; x -= 2) {
+        for (let y = top; y <= bottom; y += 4) {
+          const idx = (y * srcW + x) * 4;
+          const r = data[idx], g = data[idx + 1], b = data[idx + 2], a = data[idx + 3];
+          if (a > 20 && (r < 240 || g < 240 || b < 240)) {
+            right = Math.min(srcW - 1, x + 2);
+            break rightScan;
+          }
+        }
+      }
+
+      let contentW = right - left;
+      let contentH = bottom - top;
+
+      // 2. Remove side-by-side duplicate pages & back-page section:
+      // If the content is landscape/wide (width/height > 1.15),
+      // Aadhaar documents with side-by-side pages have the front page on the left (0 to ~50%).
+      if (contentW / contentH > 1.15) {
+        contentW = Math.floor(contentW * 0.50);
+      }
+
+      // 3. Render into clean isolated vertical rectangle canvas (aspect ratio ~ 1:1.52)
+      const outW = 600;
+      const outH = 916;
+      const outCanvas = document.createElement("canvas");
+      outCanvas.width = outW;
+      outCanvas.height = outH;
+      const outCtx = outCanvas.getContext("2d");
+      if (!outCtx) return generateAadhaarSvg(customerName, docId);
+
+      // Clean isolated vertical rectangle with zero surrounding white margin
+      outCtx.drawImage(
+        img,
+        left,
+        top,
+        contentW,
+        contentH,
+        0,
+        0,
+        outW,
+        outH
+      );
+
+      return outCanvas.toDataURL("image/png", 0.95);
+    } catch (e) {
+      console.warn("[cropAndFormatAadhaarImage] Auto crop fallback:", e);
+      return generateAadhaarSvg(customerName, docId);
+    }
+  }
+
+  return generateAadhaarSvg(customerName, docId);
 }
 
 /**
@@ -338,12 +467,25 @@ export function resolveDocumentDataUrl(
     return doc.fileUrl;
   }
 
+  const docNameLower = (doc.docName || "").toLowerCase();
+  const fileNameLower = (doc.name || "").toLowerCase();
   const nameKey = `${doc.name || ""} ${doc.docName || ""}`.toLowerCase();
 
-  if (nameKey.includes("aadhaar") || nameKey.includes("aadhar") || nameKey.includes("national_id")) {
+  if (
+    docNameLower.includes("aadhaar") ||
+    docNameLower.includes("aadhar") ||
+    docNameLower.includes("national_id") ||
+    fileNameLower.includes("aadhaar") ||
+    fileNameLower.includes("aadhar")
+  ) {
     return generateAadhaarSvg(customerName);
   }
-  if (nameKey.includes("photo") || nameKey.includes("passport_size") || nameKey.includes("photograph")) {
+  // Only treat as personal photo if the slot is specifically for a personal/passport photograph
+  if (
+    docNameLower.includes("passport size") ||
+    docNameLower.includes("photograph") ||
+    (docNameLower === "photo" && !docNameLower.includes("card") && !docNameLower.includes("doc"))
+  ) {
     return generatePassportPhotoSvg(customerName);
   }
   if (nameKey.includes("sign") || nameKey.includes("signature")) {

@@ -65,7 +65,62 @@ export const DocumentManagement: React.FC = () => {
     t
   } = usePortal();
 
-  const [activeCategory, setActiveCategory] = useState<DocumentCategoryDef | null>(null);
+  const [activeCategory, setActiveCategory] = useState<DocumentCategoryDef | null>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const hash = window.location.hash;
+        if (hash.includes("docCat=")) {
+          const match = hash.match(/docCat=([^&]+)/);
+          if (match && match[1]) {
+            const decoded = decodeURIComponent(match[1]);
+            return DOCUMENT_CATEGORIES.find((c) => c.name === decoded) || null;
+          }
+        }
+      } catch (e) {}
+    }
+    return null;
+  });
+
+  const handleSelectDocCategory = (cat: DocumentCategoryDef) => {
+    setActiveCategory(cat);
+    if (typeof window !== "undefined") {
+      try {
+        window.history.pushState(
+          { view: "documents", docCat: cat.name },
+          "",
+          `#view=documents&docCat=${encodeURIComponent(cat.name)}`
+        );
+      } catch (e) {}
+    }
+  };
+
+  const handleBackFromDocCategory = () => {
+    if (typeof window !== "undefined" && window.location.hash.includes("docCat")) {
+      window.history.back();
+    } else {
+      setActiveCategory(null);
+    }
+  };
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handlePop = (event: PopStateEvent) => {
+      const hash = window.location.hash;
+      if (!hash.includes("docCat")) {
+        setActiveCategory(null);
+      } else {
+        const match = hash.match(/docCat=([^&]+)/);
+        if (match && match[1]) {
+          const decoded = decodeURIComponent(match[1]);
+          const found = DOCUMENT_CATEGORIES.find((c) => c.name === decoded);
+          if (found) setActiveCategory(found);
+        }
+      }
+    };
+    window.addEventListener("popstate", handlePop);
+    return () => window.removeEventListener("popstate", handlePop);
+  }, []);
+
   const [activeTab, setActiveTab] = useState<"vault" | "categories">("vault");
   const [selectedMemberId, setSelectedMemberId] = useState<string>("self");
   const [isOtherExpanded, setIsOtherExpanded] = useState<boolean>(false);
@@ -795,7 +850,7 @@ export const DocumentManagement: React.FC = () => {
         {/* Category Header */}
         <div className="relative flex flex-col items-center text-center mb-8">
           <button
-            onClick={() => setActiveCategory(null)}
+            onClick={handleBackFromDocCategory}
             className="md:absolute left-0 top-1/2 md:-translate-y-1/2 mb-4 md:mb-0 px-4 py-2 rounded-full bg-white dark:bg-white/5 border border-slate-300 dark:border-slate-700/60 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-colors flex items-center gap-1.5 cursor-pointer backdrop-blur-md shadow-sm"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -939,6 +994,7 @@ export const DocumentManagement: React.FC = () => {
                     <FileUploadBox
                       label={rawDocName}
                       hideLabel={true}
+                      categoryName={activeCategory.name}
                       currentFile={null}
                       onConfirmUpload={(file, fileMeta) => {
                         uploadDocument(scopedKey, file, fileMeta);
@@ -1830,6 +1886,7 @@ export const DocumentManagement: React.FC = () => {
                       <FileUploadBox
                         label={slot.label}
                         hideLabel={true}
+                        categoryName="Identity & Personal Documents"
                         required={slot.required}
                         currentFile={currentDoc}
                         onConfirmUpload={(file, fileMeta) => {
@@ -2011,7 +2068,7 @@ export const DocumentManagement: React.FC = () => {
             return (
               <div
                 key={cat.name}
-                onClick={() => setActiveCategory(cat)}
+                onClick={() => handleSelectDocCategory(cat)}
                 className="group p-3.5 rounded-xl bg-white dark:bg-slate-900/70 hover:bg-slate-50/90 dark:hover:bg-slate-800/80 border border-slate-200/90 dark:border-slate-800 hover:border-[#000080] backdrop-blur-md transition-all duration-200 transform hover:-translate-y-0.5 cursor-pointer flex items-center justify-between shadow-xs hover:shadow-sm min-w-0"
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1 overflow-hidden">

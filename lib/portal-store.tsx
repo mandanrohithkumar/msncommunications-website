@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   User,
   UserRole,
@@ -39,6 +39,40 @@ export type ViewType =
   | "inbox"
   | "owner-dashboard"
   | "admin-dashboard";
+
+export interface NavigationHistorySnapshot {
+  view: ViewType;
+  categoryId?: string | null;
+  serviceId?: string | null;
+  modal?: "previewDoc" | "payment" | "profile" | "auth" | "messages" | null;
+  index: number;
+}
+
+export function buildHashFromSnapshot(snapshot: Partial<NavigationHistorySnapshot>): string {
+  const params = new URLSearchParams();
+  if (snapshot.view) params.set("view", snapshot.view);
+  if (snapshot.categoryId) params.set("cat", snapshot.categoryId);
+  if (snapshot.serviceId) params.set("svc", snapshot.serviceId);
+  if (snapshot.modal) params.set("modal", snapshot.modal);
+  const q = params.toString();
+  return q ? `#${q}` : "";
+}
+
+export function parseSnapshotFromHash(hash: string): Partial<NavigationHistorySnapshot> {
+  const clean = hash.startsWith("#") ? hash.slice(1) : hash;
+  if (!clean) return {};
+  const params = new URLSearchParams(clean);
+  const viewParam = params.get("view") as ViewType | null;
+  const catParam = params.get("cat") || params.get("category");
+  const svcParam = params.get("svc") || params.get("service");
+  const modalParam = params.get("modal") as NavigationHistorySnapshot["modal"];
+  return {
+    view: viewParam || undefined,
+    categoryId: catParam || null,
+    serviceId: svcParam || null,
+    modal: modalParam || null
+  };
+}
 
 interface PortalContextType {
   // Auth & User
@@ -1153,15 +1187,107 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setAccounts((prev) => prev.filter((a) => a.id !== id));
   };
 
-  // View state
-  const [currentView, setCurrentView] = useState<ViewType>("online-works");
+  // View state with initial URL hash parsing for direct linking and bookmarking
+  const [currentView, setCurrentView] = useState<ViewType>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const parsed = parseSnapshotFromHash(window.location.hash);
+        if (parsed.view) return parsed.view;
+      } catch (e) {}
+    }
+    return "online-works";
+  });
   const [previousView, setPreviousView] = useState<ViewType | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<ServiceCategory | null>(null);
-  const [selectedService, setSelectedService] = useState<ServiceItem | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<ServiceCategory | null>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const parsed = parseSnapshotFromHash(window.location.hash);
+        if (parsed.categoryId) {
+          return ONLINE_CATEGORIES.find((c) => c.id === parsed.categoryId) || null;
+        }
+      } catch (e) {}
+    }
+    return null;
+  });
+  const [selectedService, setSelectedService] = useState<ServiceItem | null>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const parsed = parseSnapshotFromHash(window.location.hash);
+        if (parsed.serviceId) {
+          const fromMee = MEESEVA_SERVICES.find((s) => s.id === parsed.serviceId);
+          if (fromMee) return fromMee;
+          for (const cat of ONLINE_CATEGORIES) {
+            const sub = cat.subServices?.find((s) => s.id === parsed.serviceId);
+            if (sub) return sub;
+          }
+        }
+      } catch (e) {}
+    }
+    return null;
+  });
 
-  // Services catalog
-  const [meesevaServices, setMeesevaServices] = useState<ServiceItem[]>(MEESEVA_SERVICES);
-  const [onlineCategories, setOnlineCategories] = useState<ServiceCategory[]>(ONLINE_CATEGORIES);
+  // History & routing control refs
+  const isPopStateActionRef = useRef<boolean>(false);
+  const historyIndexRef = useRef<number>(0);
+  const isInitialMountRef = useRef<boolean>(true);
+  const currentSnapshotRef = useRef<NavigationHistorySnapshot>({
+    view: "online-works",
+    categoryId: null,
+    serviceId: null,
+    modal: null,
+    index: 0
+  });
+
+  // Services catalog (guarantees all 17 MeeSeva services are active and loaded with localStorage sync)
+  const [meesevaServices, setMeesevaServices] = useState<ServiceItem[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("msn_portal_meeseva_services");
+        if (stored) {
+          const parsed = JSON.parse(stored) as ServiceItem[];
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const merged = MEESEVA_SERVICES.map((base) => {
+              const found = parsed.find((p) => p.id === base.id);
+              return found ? { ...base, ...found } : base;
+            });
+            return merged;
+          }
+        }
+      } catch (e) {}
+    }
+    return MEESEVA_SERVICES;
+  });
+
+  const [onlineCategories, setOnlineCategories] = useState<ServiceCategory[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("msn_portal_online_categories");
+        if (stored) {
+          const parsed = JSON.parse(stored) as ServiceCategory[];
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed;
+          }
+        }
+      } catch (e) {}
+    }
+    return ONLINE_CATEGORIES;
+  });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("msn_portal_meeseva_services", JSON.stringify(meesevaServices));
+      } catch (e) {}
+    }
+  }, [meesevaServices]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("msn_portal_online_categories", JSON.stringify(onlineCategories));
+      } catch (e) {}
+    }
+  }, [onlineCategories]);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -2824,6 +2950,150 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return activeFromAccounts || (user ? 1 : 0);
   }, [accounts, user]);
 
+  // Active modal detection for routing snapshot
+  const activeModalName: NavigationHistorySnapshot["modal"] = useMemo(() => {
+    if (previewDoc) return "previewDoc";
+    if (activePaymentApp) return "payment";
+    if (isProfileOpen) return "profile";
+    if (isAuthOpen) return "auth";
+    if (isMessagesOpen) return "messages";
+    return null;
+  }, [previewDoc, activePaymentApp, isProfileOpen, isAuthOpen, isMessagesOpen]);
+
+  // Robust History Push/Replace State Synchronization
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    // Do NOT push state if this change was triggered by popstate (browser back/forward, mobile swipe gestures)
+    if (isPopStateActionRef.current) {
+      currentSnapshotRef.current = {
+        view: currentView,
+        categoryId: selectedCategory?.id || null,
+        serviceId: selectedService?.id || null,
+        modal: activeModalName,
+        index: historyIndexRef.current
+      };
+      return;
+    }
+
+    const prev = currentSnapshotRef.current;
+    const isViewDiff = prev.view !== currentView;
+    const isCatDiff = (prev.categoryId || null) !== (selectedCategory?.id || null);
+    const isSvcDiff = (prev.serviceId || null) !== (selectedService?.id || null);
+    const isModalDiff = (prev.modal || null) !== (activeModalName || null);
+
+    if (!isViewDiff && !isCatDiff && !isSvcDiff && !isModalDiff && !isInitialMountRef.current) {
+      return;
+    }
+
+    const newSnapshot: NavigationHistorySnapshot = {
+      view: currentView,
+      categoryId: selectedCategory?.id || null,
+      serviceId: selectedService?.id || null,
+      modal: activeModalName,
+      index: isInitialMountRef.current ? 0 : historyIndexRef.current + 1
+    };
+
+    const newHash = buildHashFromSnapshot(newSnapshot);
+
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false;
+      historyIndexRef.current = 0;
+      try {
+        window.history.replaceState(newSnapshot, "", newHash || window.location.pathname);
+      } catch (e) {}
+    } else {
+      historyIndexRef.current += 1;
+      newSnapshot.index = historyIndexRef.current;
+      try {
+        window.history.pushState(newSnapshot, "", newHash || window.location.pathname);
+      } catch (e) {}
+    }
+
+    currentSnapshotRef.current = newSnapshot;
+  }, [currentView, selectedCategory, selectedService, activeModalName]);
+
+  // PopState & Mobile / Hardware Gesture Event Listener
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handlePopState = (event: PopStateEvent) => {
+      isPopStateActionRef.current = true;
+
+      let target: Partial<NavigationHistorySnapshot> | null = event.state;
+      if (!target || !target.view) {
+        target = parseSnapshotFromHash(window.location.hash);
+      }
+
+      // 1. Modals Dismissal / Synchronization
+      const targetModal = target?.modal || null;
+      if (!targetModal) {
+        setPreviewDoc(null);
+        setActivePaymentApp(null);
+        setIsProfileOpen(false);
+        setIsAuthOpen(false);
+        setIsMessagesOpen(false);
+      }
+
+      // 2. View Navigation & Routing
+      const targetView: ViewType = target?.view || (
+        user?.role === "owner" ? "owner-dashboard" : user?.role === "superadmin" ? "admin-dashboard" : "online-works"
+      );
+      setCurrentView(targetView);
+
+      // 3. Category Sync
+      if (target?.categoryId) {
+        const found = onlineCategories.find((c) => c.id === target?.categoryId);
+        setSelectedCategory(found || null);
+      } else {
+        setSelectedCategory(null);
+      }
+
+      // 4. Service Sync
+      if (target?.serviceId) {
+        let foundSvc = meesevaServices.find((s) => s.id === target?.serviceId);
+        if (!foundSvc) {
+          for (const cat of onlineCategories) {
+            const sub = cat.subServices?.find((s) => s.id === target?.serviceId);
+            if (sub) {
+              foundSvc = sub;
+              break;
+            }
+          }
+        }
+        setSelectedService(foundSvc || null);
+      } else {
+        setSelectedService(null);
+      }
+
+      // 5. Update history index
+      if (typeof target?.index === "number") {
+        historyIndexRef.current = target.index;
+      } else if (historyIndexRef.current > 0) {
+        historyIndexRef.current -= 1;
+      }
+
+      currentSnapshotRef.current = {
+        view: targetView,
+        categoryId: target?.categoryId || null,
+        serviceId: target?.serviceId || null,
+        modal: targetModal,
+        index: historyIndexRef.current
+      };
+
+      window.scrollTo({ top: 0, behavior: "smooth" });
+
+      setTimeout(() => {
+        isPopStateActionRef.current = false;
+      }, 80);
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, [user, meesevaServices, onlineCategories]);
+
   // View Navigation
   const openServiceForm = (service: ServiceItem, fromView: ViewType) => {
     setPreviousView(fromView);
@@ -2832,16 +3102,121 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const goBack = () => {
-    if (currentView === "form" && previousView) {
-      setCurrentView(previousView);
+  // Robust, Device-Universal Back Navigation (Desktop, Tablet, Mobile)
+  const goBack = useCallback(() => {
+    // 1. If any modal is active, dismiss the modal first
+    if (activeModalName) {
+      if (typeof window !== "undefined" && historyIndexRef.current > 0) {
+        window.history.back();
+        return;
+      }
+      setPreviewDoc(null);
+      setActivePaymentApp(null);
+      setIsProfileOpen(false);
+      setIsAuthOpen(false);
+      setIsMessagesOpen(false);
+      return;
+    }
+
+    // 2. If history stack exists within current session
+    if (typeof window !== "undefined" && historyIndexRef.current > 0) {
+      window.history.back();
+      return;
+    }
+
+    // 3. Graceful Hierarchical Fallback (Prevents page freeze or unintended redirect)
+    if (currentView === "form") {
+      if (selectedCategory) {
+        setCurrentView("online-sub");
+      } else if (previousView) {
+        setCurrentView(previousView);
+      } else {
+        setCurrentView("online-works");
+      }
+      setSelectedService(null);
     } else if (currentView === "online-sub") {
+      setSelectedCategory(null);
       setCurrentView("online-works");
     } else {
-      setCurrentView(user?.role === "owner" ? "owner-dashboard" : user?.role === "superadmin" ? "admin-dashboard" : "online-works");
+      const defaultHome: ViewType =
+        user?.role === "owner" ? "owner-dashboard" : user?.role === "superadmin" ? "admin-dashboard" : "online-works";
+      setCurrentView(defaultHome);
+      setSelectedCategory(null);
+      setSelectedService(null);
     }
     window.scrollTo({ top: 0, behavior: "smooth" });
-  };
+  }, [activeModalName, currentView, selectedCategory, previousView, user]);
+
+  // History-aware Category Selection
+  const safeSetSelectedCategory = useCallback((cat: ServiceCategory | null) => {
+    setSelectedCategory(cat);
+    if (cat) {
+      setCurrentView("online-sub");
+    } else if (currentView === "online-sub") {
+      setCurrentView("online-works");
+    }
+  }, [currentView]);
+
+  // History-aware Modal Setters
+  const safeSetPreviewDoc = useCallback((doc: UploadedFileMeta | null) => {
+    if (doc) {
+      setPreviewDoc(doc);
+    } else {
+      if (typeof window !== "undefined" && currentSnapshotRef.current.modal === "previewDoc" && historyIndexRef.current > 0 && !isPopStateActionRef.current) {
+        window.history.back();
+      } else {
+        setPreviewDoc(null);
+      }
+    }
+  }, []);
+
+  const safeSetActivePaymentApp = useCallback((app: Application | null) => {
+    if (app) {
+      setActivePaymentApp(app);
+    } else {
+      if (typeof window !== "undefined" && currentSnapshotRef.current.modal === "payment" && historyIndexRef.current > 0 && !isPopStateActionRef.current) {
+        window.history.back();
+      } else {
+        setActivePaymentApp(null);
+      }
+    }
+  }, []);
+
+  const safeSetIsProfileOpen = useCallback((open: boolean) => {
+    if (open) {
+      setIsProfileOpen(true);
+    } else {
+      if (typeof window !== "undefined" && currentSnapshotRef.current.modal === "profile" && historyIndexRef.current > 0 && !isPopStateActionRef.current) {
+        window.history.back();
+      } else {
+        setIsProfileOpen(false);
+      }
+    }
+  }, []);
+
+  const safeSetIsAuthOpen = useCallback((open: boolean) => {
+    if (open) {
+      setIsAuthOpen(true);
+    } else {
+      if (typeof window !== "undefined" && currentSnapshotRef.current.modal === "auth" && historyIndexRef.current > 0 && !isPopStateActionRef.current) {
+        window.history.back();
+      } else {
+        setIsAuthOpen(false);
+      }
+    }
+  }, []);
+
+  const safeSetIsMessagesOpen = useCallback((open: boolean) => {
+    if (open) {
+      setIsMessagesOpen(true);
+    } else {
+      if (typeof window !== "undefined" && currentSnapshotRef.current.modal === "messages" && historyIndexRef.current > 0 && !isPopStateActionRef.current) {
+        window.history.back();
+      } else {
+        setIsMessagesOpen(false);
+      }
+    }
+  }, []);
 
   // Documents - Scoped strictly to authenticated user's email with persistent storage
   const uploadDocument = (docName: string, file: File, maybeMeta?: UploadedFileMeta) => {
@@ -3457,7 +3832,7 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         selectedRole,
         setSelectedRole,
         isAuthOpen,
-        setIsAuthOpen,
+        setIsAuthOpen: safeSetIsAuthOpen,
         openAuth,
         closeAuth,
         login,
@@ -3469,7 +3844,7 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setCurrentView,
         previousView,
         selectedCategory,
-        setSelectedCategory,
+        setSelectedCategory: safeSetSelectedCategory,
         selectedService,
         setSelectedService,
         openServiceForm,
@@ -3490,7 +3865,7 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         getUserUploadedDocs,
         getUserDocCount,
         previewDoc,
-        setPreviewDoc,
+        setPreviewDoc: safeSetPreviewDoc,
         submissionDocsMap,
         getApplicationDocuments,
         applications,
@@ -3499,7 +3874,7 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         updateApplicationStatus,
         payments,
         activePaymentApp,
-        setActivePaymentApp,
+        setActivePaymentApp: safeSetActivePaymentApp,
         processPayment,
         notifications,
         markNotificationRead,
@@ -3509,13 +3884,13 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         messages,
         sendMessage,
         isMessagesOpen,
-        setIsMessagesOpen,
+        setIsMessagesOpen: safeSetIsMessagesOpen,
         activeMessageAppId,
         setActiveMessageAppId,
         feedbackList,
         submitFeedback,
         isProfileOpen,
-        setIsProfileOpen,
+        setIsProfileOpen: safeSetIsProfileOpen,
         theme,
         toggleTheme,
         isContentHidden,

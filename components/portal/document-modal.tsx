@@ -348,10 +348,22 @@ export const DocumentModal: React.FC = () => {
                       ? "bg-[#138808] text-white shadow-sm"
                       : "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300"
                   }`}
-                  title="Toggle between Auto-Crop document bounds and Full View"
+                  title={
+                    /aadhaar|aadhar/i.test(previewDoc.docName || previewDoc.name)
+                      ? "Toggle between Isolated Front Side (Vertical Rectangle) and Full Document View"
+                      : "Toggle between Auto-Crop document bounds and Full View"
+                  }
                 >
                   <Crop className="w-3.5 h-3.5" />
-                  <span>{isSmartCrop ? "Auto-Cropped" : "Full View"}</span>
+                  <span>
+                    {/aadhaar|aadhar/i.test(previewDoc.docName || previewDoc.name)
+                      ? isSmartCrop
+                        ? "Front Side (Vertical)"
+                        : "Full Document"
+                      : isSmartCrop
+                      ? "Auto-Cropped"
+                      : "Full View"}
+                  </span>
                 </button>
 
                 <button
@@ -396,6 +408,13 @@ export const DocumentModal: React.FC = () => {
 
         {/* Document Inspection Canvas: Dedicated Cropped Viewport */}
         <div className="relative flex-1 overflow-auto p-4 md:p-8 bg-[#0B1120] flex items-center justify-center min-h-[420px] max-h-[62vh] select-none">
+          {viewMode === "file" && /aadhaar|aadhar/i.test(previewDoc.docName || previewDoc.name) && isSmartCrop && (
+            <div className="absolute top-3 left-4 z-10 px-3 py-1 rounded-full bg-slate-900/80 backdrop-blur-md border border-white/15 text-emerald-400 text-[11px] font-bold flex items-center gap-1.5 shadow-lg">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span>Isolated Front Side (Vertical Rectangle) • Clean Edge-to-Edge Bounds</span>
+            </div>
+          )}
+
           {viewMode === "file" ? (
             /* VIEW 1: Dedicated Cropped Customer Document Content (Photo or PDF) */
             <div
@@ -409,16 +428,20 @@ export const DocumentModal: React.FC = () => {
               <div
                 className={`relative transition-all duration-300 flex items-center justify-center ${
                   isSmartCrop
-                    ? "rounded-2xl overflow-hidden shadow-[0_25px_60px_-15px_rgba(0,0,0,0.85)] ring-1 ring-white/20"
+                    ? (/aadhaar|aadhar/i.test(previewDoc.docName || previewDoc.name)
+                        ? "rounded-2xl overflow-hidden shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] ring-2 ring-white/20 aspect-[380/580] max-h-[58vh] bg-white flex items-center justify-center"
+                        : "rounded-2xl overflow-hidden shadow-[0_25px_60px_-15px_rgba(0,0,0,0.85)] ring-1 ring-white/20")
                     : "rounded-xl overflow-hidden shadow-xl ring-1 ring-white/10"
                 }`}
               >
                 <img
                   src={resolvedDataUrl}
                   alt={previewDoc.name}
-                  className={`max-w-full object-contain transition-all duration-200 ${
+                  className={`object-contain transition-all duration-200 ${
                     isSmartCrop
-                      ? "max-h-[56vh] md:max-h-[60vh] w-auto"
+                      ? (/aadhaar|aadhar/i.test(previewDoc.docName || previewDoc.name)
+                          ? "h-full w-full object-fill"
+                          : "max-h-[56vh] md:max-h-[60vh] w-auto")
                       : "max-h-[50vh] w-auto"
                   }`}
                   style={{

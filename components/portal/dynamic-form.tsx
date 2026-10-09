@@ -494,6 +494,7 @@ export const DynamicForm: React.FC = () => {
                   <div key={doc.label} id={`doc-box-${doc.label.replace(/[^a-zA-Z0-9]/g, "-")}`}>
                     <FileUploadBox
                       label={doc.label}
+                      categoryName={selectedService.category}
                       required={doc.required}
                       acceptedTypes={doc.acceptedTypes || [".pdf", ".jpg", ".jpeg", ".png"]}
                       currentFile={isAttached}

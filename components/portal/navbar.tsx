@@ -130,6 +130,20 @@ export const PortalNavbar: React.FC = () => {
     searchInputRef.current?.focus();
   };
 
+  // Auto-dismiss local popovers and modals on mobile/gesture back navigation
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handlePopState = () => {
+      setMenuOpen(false);
+      setIsResetConfirmOpen(false);
+      setIsFamilyModalOpen(false);
+      setIsFacePreviewOpen(false);
+      setIsFaceChangeModalOpen(false);
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
   // Active account information lookup
   const currentAccount = accounts?.find(
     (a) =>

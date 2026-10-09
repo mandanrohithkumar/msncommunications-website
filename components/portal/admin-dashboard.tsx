@@ -69,6 +69,7 @@ import {
   DEFAULT_APPLICANT_FIELDS
 } from "./service-details";
 import { UserAccount } from "@/types/portal";
+import { GovPortalsSection } from "./gov-portals-section";
 
 // User figure with gear badge icon matching the reference image exactly
 export const UserGearIcon: React.FC<{ className?: string }> = ({ className = "w-5 h-5" }) => (
@@ -125,7 +126,7 @@ export const AdminDashboard: React.FC = () => {
 
   // Navigation tab state: includes standard tabs and the dedicated "user-settings" view
   const [activeTab, setActiveTab] = useState<
-    "services" | "applications" | "revenue" | "feedback" | "audit" | "user-settings" | "accounts"
+    "services" | "applications" | "revenue" | "feedback" | "audit" | "user-settings" | "accounts" | "portals"
   >("services");
 
   // Sidebar collapse state
@@ -538,9 +539,9 @@ export const AdminDashboard: React.FC = () => {
     ...onlineCategories.flatMap((c) => c.subServices)
   ], [meesevaServices, onlineCategories]);
 
-  // Distinct groups: First 12 are "Meeseva Services", remaining are "Online Services"
-  const meesevaServicesList = useMemo(() => allServices.slice(0, 12), [allServices]);
-  const onlineServicesList = useMemo(() => allServices.slice(12), [allServices]);
+  // Distinct groups: Dynamic MeeSeva services and Online categories subservices
+  const meesevaServicesList = useMemo(() => meesevaServices, [meesevaServices]);
+  const onlineServicesList = useMemo(() => onlineCategories.flatMap((c) => c.subServices), [onlineCategories]);
 
   // Filtered services for the "tabs" view
   const filteredServices = useMemo(() => {
@@ -1242,6 +1243,36 @@ export const AdminDashboard: React.FC = () => {
                     {!isSidebarCollapsed && <span>Accounts Mgmt</span>}
                   </div>
                 </button>
+
+                {/* Official Govt & MeeSeva Portals Button */}
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("portals")}
+                  title="Official Government & MeeSeva Website Shortcuts"
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-xs font-semibold transition-all cursor-pointer ${
+                    isSidebarCollapsed ? "justify-center" : "justify-between"
+                  } ${
+                    activeTab === "portals"
+                      ? "bg-gradient-to-r from-[#000080] to-blue-700 text-white shadow-lg shadow-blue-900/25 font-bold"
+                      : "text-slate-600 dark:text-slate-400 hover:bg-[#E8EEF5]/70 dark:hover:bg-slate-800 hover:text-[#000080] dark:hover:text-blue-300"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Globe className={`w-4 h-4 shrink-0 ${activeTab === "portals" ? "text-white" : "text-[#000080] dark:text-[#93C5FD]"}`} />
+                    {!isSidebarCollapsed && <span>Govt Portals</span>}
+                  </div>
+                  {!isSidebarCollapsed && (
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        activeTab === "portals"
+                          ? "bg-white/20 text-white"
+                          : "bg-blue-100 dark:bg-blue-900/50 text-[#000080] dark:text-blue-300"
+                      }`}
+                    >
+                      9
+                    </span>
+                  )}
+                </button>
               </nav>
             </div>
 
@@ -1444,10 +1475,71 @@ export const AdminDashboard: React.FC = () => {
           {/* ========================================================= */}
           {activeTab === "services" && (
             <div className="space-y-6">
+              {/* Quick Official Dept Portals Shortcut Strip */}
+              <div className="p-3.5 rounded-3xl bg-gradient-to-r from-blue-50/80 via-white to-emerald-50/80 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 border border-slate-200/90 dark:border-slate-800 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#000080] to-blue-600 text-white flex items-center justify-center shadow-xs">
+                    <Globe className="w-4 h-4" />
+                  </span>
+                  <div>
+                    <span className="font-extrabold text-[#000080] dark:text-blue-300">Official Dept Shortcuts:</span>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400 ml-1.5 hidden sm:inline">
+                      Quick direct access to Telangana & Central government portals
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <a
+                    href="https://meeseva.telangana.gov.in"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-2.5 py-1 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-blue-500 text-[11px] font-semibold text-blue-700 dark:text-blue-300 flex items-center gap-1 shadow-2xs hover:shadow-xs transition-all"
+                  >
+                    <span>MeeSeva 2.0</span>
+                    <ExternalLink className="w-2.5 h-2.5 opacity-60" />
+                  </a>
+                  <a
+                    href="https://epds.telangana.gov.in"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-2.5 py-1 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-emerald-500 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 flex items-center gap-1 shadow-2xs hover:shadow-xs transition-all"
+                  >
+                    <span>EPDS Ration</span>
+                    <ExternalLink className="w-2.5 h-2.5 opacity-60" />
+                  </a>
+                  <a
+                    href="https://cdma.cgg.gov.in"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-2.5 py-1 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-amber-500 text-[11px] font-semibold text-amber-700 dark:text-amber-300 flex items-center gap-1 shadow-2xs hover:shadow-xs transition-all"
+                  >
+                    <span>CDMA Birth/Death</span>
+                    <ExternalLink className="w-2.5 h-2.5 opacity-60" />
+                  </a>
+                  <a
+                    href="https://www.ghmc.gov.in"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-2.5 py-1 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-purple-500 text-[11px] font-semibold text-purple-700 dark:text-purple-300 flex items-center gap-1 shadow-2xs hover:shadow-xs transition-all"
+                  >
+                    <span>GHMC / UBC</span>
+                    <ExternalLink className="w-2.5 h-2.5 opacity-60" />
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("portals")}
+                    className="px-3 py-1 rounded-xl bg-[#000080] text-white text-[11px] font-bold hover:bg-blue-900 transition-colors cursor-pointer shadow-xs"
+                  >
+                    All 9 Portals &rarr;
+                  </button>
+                </div>
+              </div>
+
               {/* Category Filter Tabs & Toolbar */}
               <div className="p-4 rounded-3xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  {/* Requirement 3: Filterable Tabs for Meeseva (first 12) & Online (remaining) */}
+                  {/* Requirement 3: Filterable Tabs for Meeseva & Online */}
                   <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs overflow-x-auto">
                     <button
                       type="button"
@@ -1485,7 +1577,7 @@ export const AdminDashboard: React.FC = () => {
                             : "bg-[#FFF3E0] dark:bg-amber-950 text-[#E65100] dark:text-amber-300"
                         }`}
                       >
-                        12
+                        {meesevaServicesList.length}
                       </span>
                     </button>
 
@@ -1558,7 +1650,7 @@ export const AdminDashboard: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <Info className="w-4 h-4 shrink-0 text-[#FF9933]" />
                     <span>
-                      <strong>Catalog Partitioning:</strong> First 12 services automatically routed to{" "}
+                      <strong>Catalog Partitioning:</strong> All {meesevaServicesList.length} services automatically routed to{" "}
                       <strong>Meeseva Services</strong> (statutory verification, certificates & cards); remaining{" "}
                       <strong>{onlineServicesList.length} services</strong> routed to{" "}
                       <strong>Online Services</strong> (digital portals & utilities).
@@ -1577,7 +1669,7 @@ export const AdminDashboard: React.FC = () => {
                     <div>
                       <h2 className="text-sm font-bold text-slate-900 dark:text-white">
                         {serviceCategoryFilter === "all" && `All Catalog Services (${filteredServices.length})`}
-                        {serviceCategoryFilter === "meeseva" && `Meeseva Services (First 12 Services)`}
+                        {serviceCategoryFilter === "meeseva" && `Meeseva Services (${meesevaServicesList.length} Services)`}
                         {serviceCategoryFilter === "online" && `Online Services (Digital & Utility Apps)`}
                       </h2>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400">
@@ -1602,8 +1694,9 @@ export const AdminDashboard: React.FC = () => {
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
                         {filteredServices.map((service, idx) => {
-                          const serviceIndex = allServices.findIndex((s) => s.id === service.id);
-                          const isMeesevaGroup = serviceIndex < 12;
+                          const isMeesevaGroup =
+                            meesevaServices.some((ms) => ms.id === service.id) ||
+                            (service.category && service.category.toLowerCase().includes("meeseva"));
 
                           return (
                             <tr
@@ -1710,7 +1803,7 @@ export const AdminDashboard: React.FC = () => {
                           <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
                             <span>Meeseva Services</span>
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-[#FF9933] text-white">
-                              12 Services
+                              {meesevaServicesList.length} Services
                             </span>
                           </h2>
                           <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -1725,7 +1818,7 @@ export const AdminDashboard: React.FC = () => {
                         <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300">
                           <thead className="bg-[#FFF8E1]/60 dark:bg-amber-950/30 text-[11px] uppercase tracking-wider text-[#B78103] dark:text-amber-300 border-b border-[#FFE082] dark:border-amber-900/30">
                             <tr>
-                              <th className="py-3 px-4 font-semibold">Service (#1 to #12)</th>
+                              <th className="py-3 px-4 font-semibold">Service (#1 to #{meesevaServicesList.length})</th>
                               <th className="py-3 px-4 font-semibold">Details</th>
                               <th className="py-3 px-4 font-semibold">Statutory Tariff</th>
                               <th className="py-3 px-4 font-semibold">Official Dept Portal</th>
@@ -2076,7 +2169,7 @@ export const AdminDashboard: React.FC = () => {
                     Catalog Active Services
                   </span>
                   <p className="text-3xl font-black text-[#FF9933] dark:text-amber-400 mt-2">{allServices.length}</p>
-                  <p className="text-[11px] text-slate-400 mt-1">12 Meeseva + {onlineServicesList.length} Online utilities</p>
+                  <p className="text-[11px] text-slate-400 mt-1">{meesevaServicesList.length} Meeseva + {onlineServicesList.length} Online utilities</p>
                 </div>
               </div>
 
@@ -4641,7 +4734,7 @@ export const AdminDashboard: React.FC = () => {
                       </p>
                       <div className="flex items-center gap-2 pt-1">
                         <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-[#FFF3E0] dark:bg-amber-950 text-[#E65100] dark:text-amber-300">
-                          12 Meeseva Enforced
+                          {meesevaServicesList.length} Meeseva Enforced
                         </span>
                         <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-[#E8EEF5] dark:bg-blue-950 text-[#000080] dark:text-blue-300">
                           {onlineServicesList.length} Online Open
@@ -4724,6 +4817,19 @@ export const AdminDashboard: React.FC = () => {
               </form>
             </div>
           )}
+
+          {/* ========================================================= */}
+          {/* TAB 7: OFFICIAL GOVERNMENT & MEESEVA WEBSITE SHORTCUTS     */}
+          {/* ========================================================= */}
+          {activeTab === "portals" && (
+            <div className="space-y-6 animate-in fade-in duration-200">
+              <GovPortalsSection
+                title="Super Admin Official Government & MeeSeva Portals"
+                subtitle="Direct quick reference and departmental shortcut links for statutory lookups, verification portals, and kiosk compliance management."
+              />
+            </div>
+          )}
+
           {/* Dedicated Service Management Modals triggered from pencil menu */}
           {activeModalType === "basic" && selectedServiceForModal && (
             <ManageBasicDetailsModal
