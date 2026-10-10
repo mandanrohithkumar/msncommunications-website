@@ -143,3 +143,22 @@
 .border-tricolor {
   border-image: linear-gradient(to right, #FF9933, #000080, #138808) 1;
 }
+
+/* ==========================================================================
+   CUSTOMER PAGE: HIDE DASHBOARD TAB ON MOBILE (<= 768px)
+   Hides the dashboard navigation button/tab specifically on mobile screens
+   in the horizontal scroll menu while preserving visibility on desktop.
+   ========================================================================== */
+@media (max-width: 768px) {
+  #btnNavDashboard,
+  #btnMobileNavDashboard,
+  #btnMobileTabDashboard,
+  #btnTabDashboard,
+  .nav-tab-dashboard,
+  .dashboard-nav-tab,
+  .customer-dashboard-tab,
+  [data-nav="dashboard"],
+  [data-tab="dashboard"] {
+    display: none !important;
+  }
+}

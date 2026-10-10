@@ -288,9 +288,27 @@ export const PortalNavbar: React.FC = () => {
             }`}
           />
 
-          {/* Resting State Preview Tags for Desktop: "Meeseva  online works  documents" */}
+          {/* Resting State Preview Tags for Desktop: "Dashboard  Meeseva  online works  documents" */}
           {!isSearchFocused && !searchQuery && (
             <div className="hidden sm:flex items-center gap-1.5 sm:gap-2.5 text-xs font-medium animate-in fade-in duration-200 select-none overflow-hidden truncate">
+              {/* Dashboard Preview Tag for Desktop */}
+              <button
+                type="button"
+                id="btnDesktopNavDashboard"
+                data-nav="dashboard"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCurrentView("meeseva");
+                }}
+                className={`nav-tab-dashboard px-2.5 py-0.5 rounded-full transition-all cursor-pointer font-semibold ${
+                  (currentView as string) === "dashboard"
+                    ? "bg-[#000080] text-white shadow-xs"
+                    : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-white/10"
+                }`}
+                title="Go to Dashboard"
+              >
+                Dashboard
+              </button>
               {/* Meeseva Preview Tag (Saffron accent) */}
               <button
                 type="button"
@@ -982,6 +1000,22 @@ export const PortalNavbar: React.FC = () => {
 
       {/* Mobile Sticky Quick-View Navigator Chips */}
       <div className="flex sm:hidden items-center justify-center gap-1.5 mt-1.5 w-full max-w-xl px-1 overflow-x-auto no-scrollbar py-0.5">
+        {/* Customer Dashboard Navigation Tab (Hidden on mobile via CSS media query max-width: 768px) */}
+        <button
+          type="button"
+          id="btnNavDashboard"
+          data-nav="dashboard"
+          onClick={() => setCurrentView("meeseva")}
+          className={`nav-tab-dashboard px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 shrink-0 ${
+            (currentView as string) === "dashboard"
+              ? "bg-[#000080] text-white shadow-xs scale-105"
+              : "bg-white/80 dark:bg-slate-900/80 text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-800"
+          }`}
+          title="Dashboard"
+        >
+          <span>📊</span>
+          <span>Dashboard</span>
+        </button>
         <button
           type="button"
           onClick={() => setCurrentView("meeseva")}

@@ -369,6 +369,19 @@
 
         /* Mobile Adjustments - Compact Service Cards & Sticky Nav */
         @media (max-width: 768px) {
+            /* Customer Page: Hide Dashboard navigation tab/button specifically on mobile view */
+            #btnMobileNavDashboard,
+            #btnMobileTabDashboard,
+            #btnTabDashboard,
+            #btnNavDashboard,
+            .nav-tab-dashboard,
+            .dashboard-nav-tab,
+            .customer-dashboard-tab,
+            [data-nav="dashboard"],
+            [data-tab="dashboard"] {
+                display: none !important;
+            }
+
             header {
                 position: sticky;
                 top: 0;
@@ -493,6 +506,9 @@
             <div class="flex items-center gap-1 sm:gap-2">
                 <!-- Navigation Tabs (Only visible when signed in) -->
                 <div id="portalNavLinks" class="hidden md:flex items-center gap-1">
+                    <button class="nav-item-btn nav-tab-dashboard" id="btnTabDashboard" data-nav="dashboard" onclick="switchMainTab('meeseva')">
+                        <span>📊</span><span class="label-text" id="lblNavDashboard">Dashboard</span>
+                    </button>
                     <button class="nav-item-btn active" id="btnTabMeeSeva" onclick="switchMainTab('meeseva')">
                         <span>🏛️</span><span class="label-text" id="lblNavMeeSeva">MeeSeva Services</span>
                     </button>
@@ -620,6 +636,25 @@
                 </div>
             </div>
         </nav>
+
+        <!-- Mobile Horizontal Scroll Menu for Customer Portal -->
+        <div id="mobileQuickNav" class="flex md:hidden items-center gap-1.5 mt-1.5 w-full overflow-x-auto no-scrollbar py-1 px-1">
+            <button type="button" id="btnMobileNavDashboard" data-nav="dashboard" class="nav-tab-dashboard px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-indigo-600 text-white shrink-0" onclick="switchMainTab('meeseva')">
+                <span>📊</span> Dashboard
+            </button>
+            <button type="button" id="btnMobileTabMeeSeva" class="px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-main)] shrink-0" onclick="switchMainTab('meeseva')">
+                <span>🏛️</span> MeeSeva
+            </button>
+            <button type="button" id="btnMobileTabOnline" class="px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-main)] shrink-0" onclick="switchMainTab('online')">
+                <span>⚡</span> Online Works
+            </button>
+            <button type="button" id="btnMobileTabDocs" class="px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-main)] shrink-0" onclick="switchMainTab('documents')">
+                <span>📁</span> Documents
+            </button>
+            <button type="button" id="btnMobileTabHistory" class="px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-main)] shrink-0" onclick="switchMainTab('history')">
+                <span>📋</span> History
+            </button>
+        </div>
     </header>
 
     <!-- MAIN VIEW CONTAINER -->
