@@ -131,6 +131,15 @@ export const AdminDashboard: React.FC = () => {
 
   // Sidebar collapse state
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  // Mobile navigation drawer toggle state
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+
+  const handleSelectTab = (
+    tab: "services" | "applications" | "revenue" | "feedback" | "audit" | "user-settings" | "accounts" | "portals"
+  ) => {
+    setActiveTab(tab);
+    setIsMobileNavOpen(false);
+  };
 
   // Services catalog filtering & grouping state
   const [serviceCategoryFilter, setServiceCategoryFilter] = useState<"all" | "meeseva" | "online">("all");
@@ -1039,13 +1048,14 @@ export const AdminDashboard: React.FC = () => {
       <div className="flex flex-col lg:flex-row gap-5 items-start">
         {/* ==================== FIXED COLLAPSIBLE SIDEBAR ==================== */}
         <aside
-          className={`shrink-0 transition-all duration-300 ease-in-out z-30 sticky top-20 ${
+          id="adminSidebar"
+          className={`shrink-0 transition-all duration-300 ease-in-out z-30 relative lg:sticky lg:top-20 ${
             isSidebarCollapsed ? "w-full lg:w-20" : "w-full lg:w-64"
           }`}
         >
-          <div className="h-auto lg:h-[calc(100vh-6.5rem)] flex flex-col justify-between rounded-3xl bg-white/95 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-black/50 p-3.5 space-y-4">
-            {/* Top: Sidebar Brand & Collapse Toggle */}
-            <div className="space-y-4">
+          <div className="h-auto lg:h-[calc(100vh-6.5rem)] flex flex-col justify-between rounded-3xl bg-white/95 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-black/50 p-3.5 space-y-3">
+            {/* Top: Sidebar Brand, Collapse Toggle & Mobile Bar */}
+            <div className="space-y-3">
               <div className="flex items-center justify-between pb-3 border-b border-slate-200/80 dark:border-slate-800">
                 <div className={`flex items-center gap-2.5 overflow-hidden ${isSidebarCollapsed ? "lg:justify-center w-full" : ""}`}>
                   <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-[#FF9933] to-[#FF6F00] flex items-center justify-center text-white shadow-md shadow-[#FF9933]/30 shrink-0">
@@ -1070,7 +1080,7 @@ export const AdminDashboard: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                  className="hidden lg:flex p-1.5 rounded-xl text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-[#FFF3E0] dark:hover:bg-slate-800 transition-colors"
+                  className="hidden lg:flex p-1.5 rounded-xl text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-[#FFF3E0] dark:hover:bg-slate-800 transition-colors cursor-pointer"
                   title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
                 >
                   {isSidebarCollapsed ? (
@@ -1079,289 +1089,395 @@ export const AdminDashboard: React.FC = () => {
                     <PanelLeftClose className="w-4 h-4 text-[#000080]" />
                   )}
                 </button>
+
+                {/* Mobile Menu Hamburger / Close Toggle Button (visible on mobile < 1024px) */}
+                <button
+                  type="button"
+                  onClick={() => setIsMobileNavOpen(!isMobileNavOpen)}
+                  className="flex lg:hidden items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all border border-slate-200 dark:border-slate-700 cursor-pointer"
+                  title="Toggle Super Admin Navigation"
+                >
+                  {isMobileNavOpen ? <X className="w-4 h-4 text-rose-500" /> : <Menu className="w-4 h-4 text-[#FF9933]" />}
+                  <span>{isMobileNavOpen ? "Close" : "Menu"}</span>
+                </button>
               </div>
 
-              {/* Navigation Menu */}
-              <nav className="space-y-1.5">
-                {/* Services Catalog Button */}
+              {/* Mobile 1-Tap Horizontal Quick Nav Bar (Visible on mobile < 1024px) */}
+              <div className="flex lg:hidden items-center gap-1.5 overflow-x-auto no-scrollbar py-1 w-full">
                 <button
                   type="button"
-                  onClick={() => setActiveTab("services")}
-                  title="Services Catalog"
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-xs font-semibold transition-all cursor-pointer ${
-                    isSidebarCollapsed ? "justify-center" : "justify-between"
-                  } ${
+                  onClick={() => handleSelectTab("services")}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap shrink-0 transition-all ${
                     activeTab === "services"
-                      ? "bg-[#FF9933] text-white shadow-lg shadow-[#FF9933]/25 font-bold"
-                      : "text-slate-600 dark:text-slate-400 hover:bg-[#FFF3E0]/70 dark:hover:bg-slate-800 hover:text-[#E65100] dark:hover:text-[#FFB74D]"
+                      ? "bg-[#FF9933] text-white shadow-xs font-bold"
+                      : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <Layers className={`w-4 h-4 shrink-0 ${activeTab === "services" ? "text-white" : "text-[#000080] dark:text-[#93C5FD]"}`} />
-                    {!isSidebarCollapsed && <span>Services Catalog</span>}
-                  </div>
-                  {!isSidebarCollapsed && (
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                        activeTab === "services"
-                          ? "bg-white/20 text-white"
-                          : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
-                      }`}
-                    >
-                      {allServices.length}
-                    </span>
-                  )}
+                  📚 Services
                 </button>
-
-                {/* All Applications Button */}
                 <button
                   type="button"
-                  onClick={() => setActiveTab("applications")}
-                  title="All Applications"
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-xs font-semibold transition-all cursor-pointer ${
-                    isSidebarCollapsed ? "justify-center" : "justify-between"
-                  } ${
+                  onClick={() => handleSelectTab("applications")}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap shrink-0 transition-all ${
                     activeTab === "applications"
-                      ? "bg-[#FF9933] text-white shadow-lg shadow-[#FF9933]/25 font-bold"
-                      : "text-slate-600 dark:text-slate-400 hover:bg-[#FFF3E0]/70 dark:hover:bg-slate-800 hover:text-[#E65100] dark:hover:text-[#FFB74D]"
+                      ? "bg-[#FF9933] text-white shadow-xs font-bold"
+                      : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <FileCheck className={`w-4 h-4 shrink-0 ${activeTab === "applications" ? "text-white" : "text-[#000080] dark:text-[#93C5FD]"}`} />
-                    {!isSidebarCollapsed && <span>Applications</span>}
-                  </div>
-                  {!isSidebarCollapsed && (
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                        activeTab === "applications"
-                          ? "bg-white/20 text-white"
-                          : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
-                      }`}
-                    >
-                      {applications.length}
-                    </span>
-                  )}
+                  📋 Apps
                 </button>
-
-                {/* Revenue & Billing Button */}
                 <button
                   type="button"
-                  onClick={() => setActiveTab("revenue")}
-                  title="Revenue & Ledger"
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-xs font-semibold transition-all cursor-pointer ${
-                    isSidebarCollapsed ? "justify-center" : "justify-between"
-                  } ${
+                  onClick={() => handleSelectTab("revenue")}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap shrink-0 transition-all ${
                     activeTab === "revenue"
-                      ? "bg-[#FF9933] text-white shadow-lg shadow-[#FF9933]/25 font-bold"
-                      : "text-slate-600 dark:text-slate-400 hover:bg-[#FFF3E0]/70 dark:hover:bg-slate-800 hover:text-[#E65100] dark:hover:text-[#FFB74D]"
+                      ? "bg-[#FF9933] text-white shadow-xs font-bold"
+                      : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <TrendingUp className={`w-4 h-4 shrink-0 ${activeTab === "revenue" ? "text-white" : "text-[#138808]"}`} />
-                    {!isSidebarCollapsed && <span>Revenue & Ledger</span>}
-                  </div>
-                  {!isSidebarCollapsed && (
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                        activeTab === "revenue"
-                          ? "bg-white/20 text-white"
-                          : "bg-[#E8F5E9] dark:bg-emerald-950/80 text-[#138808] dark:text-[#A5D6A7]"
-                      }`}
-                    >
-                      ₹{totalRevenue}
-                    </span>
-                  )}
+                  💳 Ledger
                 </button>
-
-                {/* Feedback & Grievances Button */}
                 <button
                   type="button"
-                  onClick={() => setActiveTab("feedback")}
-                  title="Feedback & Grievances"
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-xs font-semibold transition-all cursor-pointer ${
-                    isSidebarCollapsed ? "justify-center" : "justify-between"
-                  } ${
+                  onClick={() => handleSelectTab("feedback")}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap shrink-0 transition-all ${
                     activeTab === "feedback"
-                      ? "bg-[#FF9933] text-white shadow-lg shadow-[#FF9933]/25 font-bold"
-                      : "text-slate-600 dark:text-slate-400 hover:bg-[#FFF3E0]/70 dark:hover:bg-slate-800 hover:text-[#E65100] dark:hover:text-[#FFB74D]"
+                      ? "bg-[#FF9933] text-white shadow-xs font-bold"
+                      : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <BellRing className={`w-4 h-4 shrink-0 ${activeTab === "feedback" ? "text-white" : "text-[#000080] dark:text-[#93C5FD]"}`} />
-                    {!isSidebarCollapsed && <span>Grievances</span>}
-                  </div>
-                  {!isSidebarCollapsed && (
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                        activeTab === "feedback"
-                          ? "bg-white/20 text-white"
-                          : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
-                      }`}
-                    >
-                      {feedbackList.length}
-                    </span>
-                  )}
+                  💬 Grievances
                 </button>
-
-                {/* Audit Logs Button */}
                 <button
                   type="button"
-                  onClick={() => setActiveTab("audit")}
-                  title="Security Audit Logs"
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-xs font-semibold transition-all cursor-pointer ${
-                    isSidebarCollapsed ? "justify-center" : "justify-between"
-                  } ${
+                  onClick={() => handleSelectTab("audit")}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap shrink-0 transition-all ${
                     activeTab === "audit"
-                      ? "bg-[#FF9933] text-white shadow-lg shadow-[#FF9933]/25 font-bold"
-                      : "text-slate-600 dark:text-slate-400 hover:bg-[#FFF3E0]/70 dark:hover:bg-slate-800 hover:text-[#E65100] dark:hover:text-[#FFB74D]"
+                      ? "bg-[#FF9933] text-white shadow-xs font-bold"
+                      : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <ShieldCheck className={`w-4 h-4 shrink-0 ${activeTab === "audit" ? "text-white" : "text-[#138808]"}`} />
-                    {!isSidebarCollapsed && <span>Audit Logs</span>}
-                  </div>
-                  {!isSidebarCollapsed && (
-                    <span className="w-2 h-2 rounded-full bg-[#138808] animate-pulse" />
-                  )}
+                  🛡️ Audit
                 </button>
-
-                {/* Accounts Button */}
                 <button
                   type="button"
-                  onClick={() => setActiveTab("accounts")}
-                  title="Accounts Management"
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-xs font-semibold transition-all cursor-pointer ${
-                    isSidebarCollapsed ? "justify-center" : "justify-between"
-                  } ${
+                  onClick={() => handleSelectTab("accounts")}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap shrink-0 transition-all ${
                     activeTab === "accounts"
-                      ? "bg-[#FF9933] text-white shadow-lg shadow-[#FF9933]/25 font-bold"
-                      : "text-slate-600 dark:text-slate-400 hover:bg-[#FFF3E0]/70 dark:hover:bg-slate-800 hover:text-[#E65100] dark:hover:text-[#FFB74D]"
+                      ? "bg-[#FF9933] text-white shadow-xs font-bold"
+                      : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <Users className={`w-4 h-4 shrink-0 ${activeTab === "accounts" ? "text-white" : "text-[#000080] dark:text-[#93C5FD]"}`} />
-                    {!isSidebarCollapsed && <span>Accounts Mgmt</span>}
-                  </div>
+                  👥 Accounts
                 </button>
-
-                {/* Official Govt & MeeSeva Portals Button */}
                 <button
                   type="button"
-                  onClick={() => setActiveTab("portals")}
-                  title="Official Government & MeeSeva Website Shortcuts"
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-xs font-semibold transition-all cursor-pointer ${
-                    isSidebarCollapsed ? "justify-center" : "justify-between"
-                  } ${
+                  onClick={() => handleSelectTab("portals")}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap shrink-0 transition-all ${
                     activeTab === "portals"
-                      ? "bg-gradient-to-r from-[#000080] to-blue-700 text-white shadow-lg shadow-blue-900/25 font-bold"
-                      : "text-slate-600 dark:text-slate-400 hover:bg-[#E8EEF5]/70 dark:hover:bg-slate-800 hover:text-[#000080] dark:hover:text-blue-300"
+                      ? "bg-[#000080] text-white shadow-xs font-bold"
+                      : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <Globe className={`w-4 h-4 shrink-0 ${activeTab === "portals" ? "text-white" : "text-[#000080] dark:text-[#93C5FD]"}`} />
-                    {!isSidebarCollapsed && <span>Govt Portals</span>}
-                  </div>
-                  {!isSidebarCollapsed && (
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                        activeTab === "portals"
-                          ? "bg-white/20 text-white"
-                          : "bg-blue-100 dark:bg-blue-900/50 text-[#000080] dark:text-blue-300"
-                      }`}
-                    >
-                      9
-                    </span>
-                  )}
+                  🌐 Portals
                 </button>
-              </nav>
-            </div>
+                <button
+                  type="button"
+                  onClick={() => handleSelectTab("user-settings")}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap shrink-0 transition-all ${
+                    activeTab === "user-settings"
+                      ? "bg-gradient-to-r from-[#FF9933] to-[#FF6F00] text-white shadow-xs font-bold"
+                      : "bg-slate-100 dark:bg-slate-800 text-amber-600 dark:text-amber-400 border border-amber-300/60 dark:border-amber-900/60"
+                  }`}
+                >
+                  ⚙️ Settings
+                </button>
+              </div>
 
-            {/* Bottom-Left: User-Settings Icon Button (User Figure with Gear Badge) */}
-            <div className="pt-3 border-t border-slate-200/80 dark:border-slate-800">
-              <button
-                type="button"
-                id="btnSidebarUserSettings"
-                onClick={() => setActiveTab("user-settings")}
-                title="Super Admin User Settings"
-                className={`group w-full flex items-center gap-3 p-2.5 rounded-2xl transition-all cursor-pointer ${
-                  isSidebarCollapsed ? "justify-center" : "justify-between"
-                } ${
-                  activeTab === "user-settings"
-                    ? "bg-gradient-to-r from-[#FF9933] to-[#FF6F00] text-white shadow-lg shadow-[#FF9933]/30 ring-2 ring-[#FF9933]/40"
-                    : "bg-[#FFF8F0] dark:bg-slate-800 hover:bg-[#FFF0DC] dark:hover:bg-slate-700/80 border border-[#FFE0B2] dark:border-slate-700 text-slate-700 dark:text-slate-300"
-                }`}
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  {/* User figure with gear badge icon */}
-                  <div
-                    className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 ${
-                      activeTab === "user-settings"
-                        ? "bg-white/20 text-white"
-                        : "bg-[#FF9933] text-white shadow-md shadow-[#FF9933]/25"
+              {/* Collapsible Navigation Container (Hidden when collapsed on mobile, block on desktop) */}
+              <div id="adminSidebarNavContainer" className={`${isMobileNavOpen ? "block" : "hidden"} lg:block space-y-4 transition-all duration-200`}>
+                {/* Navigation Menu */}
+                <nav className="space-y-1.5">
+                  {/* Services Catalog Button */}
+                  <button
+                    type="button"
+                    onClick={() => handleSelectTab("services")}
+                    title="Services Catalog"
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-xs font-semibold transition-all cursor-pointer ${
+                      isSidebarCollapsed ? "justify-center" : "justify-between"
+                    } ${
+                      activeTab === "services"
+                        ? "bg-[#FF9933] text-white shadow-lg shadow-[#FF9933]/25 font-bold"
+                        : "text-slate-600 dark:text-slate-400 hover:bg-[#FFF3E0]/70 dark:hover:bg-slate-800 hover:text-[#E65100] dark:hover:text-[#FFB74D]"
                     }`}
                   >
-                    <UserGearIcon className="w-5 h-5" />
-                  </div>
-
-                  {!isSidebarCollapsed && (
-                    <div className="text-left truncate">
-                      <p
-                        className={`text-xs font-bold leading-tight truncate ${
-                          activeTab === "user-settings" ? "text-white" : "text-slate-900 dark:text-white"
-                        }`}
-                      >
-                        User Settings
-                      </p>
-                      <p
-                        className={`text-[10px] leading-tight truncate ${
-                          activeTab === "user-settings" ? "text-amber-100" : "text-[#FF9933] dark:text-amber-400"
-                        }`}
-                      >
-                        Root Preferences & Keys
-                      </p>
+                    <div className="flex items-center gap-3">
+                      <Layers className={`w-4 h-4 shrink-0 ${activeTab === "services" ? "text-white" : "text-[#000080] dark:text-[#93C5FD]"}`} />
+                      {!isSidebarCollapsed && <span>Services Catalog</span>}
                     </div>
-                  )}
-                </div>
+                    {!isSidebarCollapsed && (
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          activeTab === "services"
+                            ? "bg-white/20 text-white"
+                            : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
+                        }`}
+                      >
+                        {allServices.length}
+                      </span>
+                    )}
+                  </button>
 
-                {!isSidebarCollapsed && (
-                  <span
-                    className={`text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded-md ${
-                      activeTab === "user-settings"
-                        ? "bg-white/20 text-white"
-                        : "bg-[#FFF3E0] dark:bg-amber-950/60 text-[#E65100] dark:text-amber-300"
+                  {/* All Applications Button */}
+                  <button
+                    type="button"
+                    onClick={() => handleSelectTab("applications")}
+                    title="All Applications"
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-xs font-semibold transition-all cursor-pointer ${
+                      isSidebarCollapsed ? "justify-center" : "justify-between"
+                    } ${
+                      activeTab === "applications"
+                        ? "bg-[#FF9933] text-white shadow-lg shadow-[#FF9933]/25 font-bold"
+                        : "text-slate-600 dark:text-slate-400 hover:bg-[#FFF3E0]/70 dark:hover:bg-slate-800 hover:text-[#E65100] dark:hover:text-[#FFB74D]"
                     }`}
                   >
-                    Admin
-                  </span>
-                )}
-              </button>
-
-              {/* Prominent Sidebar Logout Button */}
-              <button
-                type="button"
-                onClick={logout}
-                title="Terminate Super Admin Session"
-                className={`w-full mt-2 flex items-center gap-3 p-2.5 rounded-2xl transition-all cursor-pointer bg-rose-50/80 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-900/60 text-rose-600 dark:text-rose-400 text-xs font-bold ${
-                  isSidebarCollapsed ? "justify-center" : "justify-between"
-                }`}
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-9 h-9 rounded-xl bg-rose-500 text-white flex items-center justify-center shrink-0 shadow-md shadow-rose-500/25">
-                    <LogOut className="w-4 h-4" />
-                  </div>
-                  {!isSidebarCollapsed && (
-                    <div className="text-left truncate">
-                      <p className="text-xs font-bold leading-tight truncate">Logout</p>
-                      <p className="text-[10px] text-rose-500/80 leading-tight truncate">Exit Super Admin</p>
+                    <div className="flex items-center gap-3">
+                      <FileCheck className={`w-4 h-4 shrink-0 ${activeTab === "applications" ? "text-white" : "text-[#000080] dark:text-[#93C5FD]"}`} />
+                      {!isSidebarCollapsed && <span>Applications</span>}
                     </div>
-                  )}
+                    {!isSidebarCollapsed && (
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          activeTab === "applications"
+                            ? "bg-white/20 text-white"
+                            : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
+                        }`}
+                      >
+                        {applications.length}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Revenue & Billing Button */}
+                  <button
+                    type="button"
+                    onClick={() => handleSelectTab("revenue")}
+                    title="Revenue & Ledger"
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-xs font-semibold transition-all cursor-pointer ${
+                      isSidebarCollapsed ? "justify-center" : "justify-between"
+                    } ${
+                      activeTab === "revenue"
+                        ? "bg-[#FF9933] text-white shadow-lg shadow-[#FF9933]/25 font-bold"
+                        : "text-slate-600 dark:text-slate-400 hover:bg-[#FFF3E0]/70 dark:hover:bg-slate-800 hover:text-[#E65100] dark:hover:text-[#FFB74D]"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <TrendingUp className={`w-4 h-4 shrink-0 ${activeTab === "revenue" ? "text-white" : "text-[#138808]"}`} />
+                      {!isSidebarCollapsed && <span>Revenue & Ledger</span>}
+                    </div>
+                    {!isSidebarCollapsed && (
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          activeTab === "revenue"
+                            ? "bg-white/20 text-white"
+                            : "bg-[#E8F5E9] dark:bg-emerald-950/80 text-[#138808] dark:text-[#A5D6A7]"
+                        }`}
+                      >
+                        ₹{totalRevenue}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Feedback & Grievances Button */}
+                  <button
+                    type="button"
+                    onClick={() => handleSelectTab("feedback")}
+                    title="Feedback & Grievances"
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-xs font-semibold transition-all cursor-pointer ${
+                      isSidebarCollapsed ? "justify-center" : "justify-between"
+                    } ${
+                      activeTab === "feedback"
+                        ? "bg-[#FF9933] text-white shadow-lg shadow-[#FF9933]/25 font-bold"
+                        : "text-slate-600 dark:text-slate-400 hover:bg-[#FFF3E0]/70 dark:hover:bg-slate-800 hover:text-[#E65100] dark:hover:text-[#FFB74D]"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <BellRing className={`w-4 h-4 shrink-0 ${activeTab === "feedback" ? "text-white" : "text-[#000080] dark:text-[#93C5FD]"}`} />
+                      {!isSidebarCollapsed && <span>Grievances</span>}
+                    </div>
+                    {!isSidebarCollapsed && (
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          activeTab === "feedback"
+                            ? "bg-white/20 text-white"
+                            : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
+                        }`}
+                      >
+                        {feedbackList.length}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Audit Logs Button */}
+                  <button
+                    type="button"
+                    onClick={() => handleSelectTab("audit")}
+                    title="Security Audit Logs"
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-xs font-semibold transition-all cursor-pointer ${
+                      isSidebarCollapsed ? "justify-center" : "justify-between"
+                    } ${
+                      activeTab === "audit"
+                        ? "bg-[#FF9933] text-white shadow-lg shadow-[#FF9933]/25 font-bold"
+                        : "text-slate-600 dark:text-slate-400 hover:bg-[#FFF3E0]/70 dark:hover:bg-slate-800 hover:text-[#E65100] dark:hover:text-[#FFB74D]"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <ShieldCheck className={`w-4 h-4 shrink-0 ${activeTab === "audit" ? "text-white" : "text-[#138808]"}`} />
+                      {!isSidebarCollapsed && <span>Audit Logs</span>}
+                    </div>
+                    {!isSidebarCollapsed && (
+                      <span className="w-2 h-2 rounded-full bg-[#138808] animate-pulse" />
+                    )}
+                  </button>
+
+                  {/* Accounts Button */}
+                  <button
+                    type="button"
+                    onClick={() => handleSelectTab("accounts")}
+                    title="Accounts Management"
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-xs font-semibold transition-all cursor-pointer ${
+                      isSidebarCollapsed ? "justify-center" : "justify-between"
+                    } ${
+                      activeTab === "accounts"
+                        ? "bg-[#FF9933] text-white shadow-lg shadow-[#FF9933]/25 font-bold"
+                        : "text-slate-600 dark:text-slate-400 hover:bg-[#FFF3E0]/70 dark:hover:bg-slate-800 hover:text-[#E65100] dark:hover:text-[#FFB74D]"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Users className={`w-4 h-4 shrink-0 ${activeTab === "accounts" ? "text-white" : "text-[#000080] dark:text-[#93C5FD]"}`} />
+                      {!isSidebarCollapsed && <span>Accounts Mgmt</span>}
+                    </div>
+                  </button>
+
+                  {/* Official Govt & MeeSeva Portals Button */}
+                  <button
+                    type="button"
+                    onClick={() => handleSelectTab("portals")}
+                    title="Official Government & MeeSeva Website Shortcuts"
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-xs font-semibold transition-all cursor-pointer ${
+                      isSidebarCollapsed ? "justify-center" : "justify-between"
+                    } ${
+                      activeTab === "portals"
+                        ? "bg-gradient-to-r from-[#000080] to-blue-700 text-white shadow-lg shadow-blue-900/25 font-bold"
+                        : "text-slate-600 dark:text-slate-400 hover:bg-[#E8EEF5]/70 dark:hover:bg-slate-800 hover:text-[#000080] dark:hover:text-blue-300"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Globe className={`w-4 h-4 shrink-0 ${activeTab === "portals" ? "text-white" : "text-[#000080] dark:text-[#93C5FD]"}`} />
+                      {!isSidebarCollapsed && <span>Govt Portals</span>}
+                    </div>
+                    {!isSidebarCollapsed && (
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          activeTab === "portals"
+                            ? "bg-white/20 text-white"
+                            : "bg-blue-100 dark:bg-blue-900/50 text-[#000080] dark:text-blue-300"
+                        }`}
+                      >
+                        9
+                      </span>
+                    )}
+                  </button>
+                </nav>
+
+                {/* Bottom-Left: User-Settings Icon Button (User Figure with Gear Badge) */}
+                <div className="pt-3 border-t border-slate-200/80 dark:border-slate-800">
+                  <button
+                    type="button"
+                    id="btnSidebarUserSettings"
+                    onClick={() => handleSelectTab("user-settings")}
+                    title="Super Admin User Settings"
+                    className={`group w-full flex items-center gap-3 p-2.5 rounded-2xl transition-all cursor-pointer ${
+                      isSidebarCollapsed ? "justify-center" : "justify-between"
+                    } ${
+                      activeTab === "user-settings"
+                        ? "bg-gradient-to-r from-[#FF9933] to-[#FF6F00] text-white shadow-lg shadow-[#FF9933]/30 ring-2 ring-[#FF9933]/40"
+                        : "bg-[#FFF8F0] dark:bg-slate-800 hover:bg-[#FFF0DC] dark:hover:bg-slate-700/80 border border-[#FFE0B2] dark:border-slate-700 text-slate-700 dark:text-slate-300"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      {/* User figure with gear badge icon */}
+                      <div
+                        className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 ${
+                          activeTab === "user-settings"
+                            ? "bg-white/20 text-white"
+                            : "bg-[#FF9933] text-white shadow-md shadow-[#FF9933]/25"
+                        }`}
+                      >
+                        <UserGearIcon className="w-5 h-5" />
+                      </div>
+
+                      {!isSidebarCollapsed && (
+                        <div className="text-left truncate">
+                          <p
+                            className={`text-xs font-bold leading-tight truncate ${
+                              activeTab === "user-settings" ? "text-white" : "text-slate-900 dark:text-white"
+                            }`}
+                          >
+                            User Settings
+                          </p>
+                          <p
+                            className={`text-[10px] leading-tight truncate ${
+                              activeTab === "user-settings" ? "text-amber-100" : "text-[#FF9933] dark:text-amber-400"
+                            }`}
+                          >
+                            Root Preferences & Keys
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {!isSidebarCollapsed && (
+                      <span
+                        className={`text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded-md ${
+                          activeTab === "user-settings"
+                            ? "bg-white/20 text-white"
+                            : "bg-[#FFF3E0] dark:bg-amber-950/60 text-[#E65100] dark:text-amber-300"
+                        }`}
+                      >
+                        Admin
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Prominent Sidebar Logout Button */}
+                  <button
+                    type="button"
+                    onClick={logout}
+                    title="Terminate Super Admin Session"
+                    className={`w-full mt-2 flex items-center gap-3 p-2.5 rounded-2xl transition-all cursor-pointer bg-rose-50/80 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-900/60 text-rose-600 dark:text-rose-400 text-xs font-bold ${
+                      isSidebarCollapsed ? "justify-center" : "justify-between"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-9 h-9 rounded-xl bg-rose-500 text-white flex items-center justify-center shrink-0 shadow-md shadow-rose-500/25">
+                        <LogOut className="w-4 h-4" />
+                      </div>
+                      {!isSidebarCollapsed && (
+                        <div className="text-left truncate">
+                          <p className="text-xs font-bold leading-tight truncate">Logout</p>
+                          <p className="text-[10px] text-rose-500/80 leading-tight truncate">Exit Super Admin</p>
+                        </div>
+                      )}
+                    </div>
+                    {!isSidebarCollapsed && (
+                      <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-rose-200/60 dark:bg-rose-900/60 text-rose-800 dark:text-rose-300">
+                        Exit
+                      </span>
+                    )}
+                  </button>
                 </div>
-                {!isSidebarCollapsed && (
-                  <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-rose-200/60 dark:bg-rose-900/60 text-rose-800 dark:text-rose-300">
-                    Exit
-                  </span>
-                )}
-              </button>
+              </div>
             </div>
           </div>
         </aside>

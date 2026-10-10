@@ -161,4 +161,21 @@
   [data-tab="dashboard"] {
     display: none !important;
   }
+
+  /* Super Admin Control Section Mobile Optimization (<= 768px) */
+  #adminSidebar {
+    position: relative !important;
+    top: 0 !important;
+    width: 100% !important;
+    margin-bottom: 14px !important;
+  }
+  #adminSidebarNavContainer.hidden {
+    display: none !important;
+  }
+  #threeDotMenu {
+    max-width: calc(100vw - 20px) !important;
+    right: 0 !important;
+    left: auto !important;
+  }
 }
+
