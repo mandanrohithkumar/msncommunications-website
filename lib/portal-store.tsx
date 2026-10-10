@@ -641,7 +641,7 @@ const INITIAL_APPLICATIONS: Application[] = [
     serviceName: "Order Aadhaar PVC Card Print",
     serviceCategory: "Online Works",
     subCategory: "Aadhaar Services",
-    price: "150",
+    price: "50",
     customerId: "cust-1",
     customerName: "Rohith Kumar",
     customerEmail: "rohith.kumar@gmail.com",
@@ -699,7 +699,7 @@ const INITIAL_PAYMENTS: PaymentRecord[] = [
     id: "PAY-2026-814",
     applicationId: "MSN-2026-003892",
     serviceName: "Order Aadhaar PVC Card Print",
-    amount: "₹150",
+    amount: "₹50",
     method: "QR Code",
     status: "Successful",
     timestamp: "2026-09-15 02:16 PM",
@@ -1265,7 +1265,18 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (stored) {
           const parsed = JSON.parse(stored) as ServiceCategory[];
           if (Array.isArray(parsed) && parsed.length > 0) {
-            return parsed;
+            // Guarantee updated catalog prices (e.g. Order Aadhaar PVC Card Print = ₹50) propagate to client cache
+            return parsed.map((cat) => ({
+              ...cat,
+              subServices: cat.subServices
+                ? cat.subServices.map((sub) => {
+                    if (sub.id === "aadhaar-pvc" && sub.price === "150") {
+                      return { ...sub, price: "50" };
+                    }
+                    return sub;
+                  })
+                : cat.subServices
+            }));
           }
         }
       } catch (e) {}

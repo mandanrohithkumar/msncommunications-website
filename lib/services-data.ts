@@ -622,7 +622,7 @@ export const ONLINE_CATEGORIES: ServiceCategory[] = [
         id: "aadhaar-pvc",
         name: "Order Aadhaar PVC Card Print",
         icon: "📇",
-        price: "150",
+        price: "50",
         category: "Aadhaar Services",
         note: "Order official PVC Aadhaar card print delivered by Speed Post.",
         officialUrl: "https://myaadhaar.uidai.gov.in/gen-pvc",

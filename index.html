@@ -1988,7 +1988,7 @@
                         { name: "Aadhaar Verify (Mobile No.)", desc: "Verify registered mobile number & email ID with UIDAI", price: 20, time: "10 Mins", docs: ["Aadhaar Card"], url: "https://myaadhaar.uidai.gov.in/verify-email-mobile", fields: [{ label: "Aadhaar Number", type: "text" }, { label: "Mobile Number", type: "tel" }] },
                         { name: "Check Aadhaar Status", desc: "Check Enrolment and Update request status via EID", price: 10, time: "5 Mins", docs: ["Enrolment Slip"], url: "https://myaadhaar.uidai.gov.in/check-aadhaar-status", fields: [{ label: "Enrolment ID (28 Digits)", type: "text" }] },
                         { name: "Aadhaar Download", desc: "Download password-protected official electronic e-Aadhaar PDF", price: 20, time: "10 Mins", docs: ["Aadhaar Card"], url: "https://myaadhaar.uidai.gov.in/genricDownloadAadhaar", fields: [{ label: "Aadhaar Number", type: "text" }] },
-                        { name: "Order Aadhaar PVC Card Print", desc: "Order official tamper-proof PVC Aadhaar card by post", price: 150, time: "5 Days", docs: ["Aadhaar Card"], url: "https://myaadhaar.uidai.gov.in/genricPVC", fields: [{ label: "Aadhaar Number", type: "text" }, { label: "Delivery Address", type: "text" }] },
+                        { name: "Order Aadhaar PVC Card Print", desc: "Order official tamper-proof PVC Aadhaar card by post", price: 50, time: "5 Days", docs: ["Aadhaar Card"], url: "https://myaadhaar.uidai.gov.in/genricPVC", fields: [{ label: "Aadhaar Number", type: "text" }, { label: "Delivery Address", type: "text" }] },
                         { name: "Check Aadhaar PVC Card Status", desc: "Track dispatch & speed post tracking number for PVC card", price: 10, time: "5 Mins", docs: ["Payment Slip"], url: "https://myaadhaar.uidai.gov.in/checkStatus", fields: [{ label: "Service Request Number (SRN)", type: "text" }] },
                         { name: "Aadhaar Update History", desc: "View chronological log of demographic & biometric updates", price: 10, time: "10 Mins", docs: ["Aadhaar Card"], url: "https://myaadhaar.uidai.gov.in", fields: [{ label: "Aadhaar Number", type: "text" }] },
                         { name: "Aadhaar Authentication History", desc: "View previous biometric and OTP authentication events", price: 10, time: "10 Mins", docs: ["Aadhaar Card"], url: "https://myaadhaar.uidai.gov.in", fields: [{ label: "Aadhaar Number", type: "text" }] }
@@ -2254,7 +2254,18 @@
                     if (customServices) {
                         const parsed = JSON.parse(customServices);
                         if (parsed.meeseva) this.meesevaServices = parsed.meeseva;
-                        if (parsed.online) this.onlineCategories = parsed.online;
+                        if (parsed.online) {
+                            this.onlineCategories = parsed.online;
+                            this.onlineCategories.forEach(cat => {
+                                if (cat.subServices) {
+                                    cat.subServices.forEach(sub => {
+                                        if (sub.name === 'Order Aadhaar PVC Card Print' && sub.price === 150) {
+                                            sub.price = 50;
+                                        }
+                                    });
+                                }
+                            });
+                        }
                     }
                 } catch(e) {
                     console.warn("Storage loading fallback triggered", e);
