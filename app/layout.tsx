@@ -22,6 +22,8 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
           rel="stylesheet"
         />
+        <link rel="icon" type="image/png" href="/msn-logo.png" />
+        <link rel="apple-touch-icon" href="/msn-logo.png" />
         <script src="https://accounts.google.com/gsi/client" async defer></script>
       </head>
       <body className="antialiased">

@@ -11,7 +11,6 @@ import { DocumentManagement } from "@/components/portal/document-management";
 import { ApplicationHistory } from "@/components/portal/application-history";
 import { OwnerDashboard } from "@/components/portal/owner-dashboard";
 import { AdminDashboard } from "@/components/portal/admin-dashboard";
-import { CustomerDashboard } from "@/components/portal/customer-dashboard";
 import { ProfileModal } from "@/components/portal/profile-modal";
 import { PaymentModal } from "@/components/portal/payment-modal";
 import { DocumentModal } from "@/components/portal/document-modal";
@@ -41,8 +40,9 @@ function PortalApp() {
         <StarlightBackground />
         <div className="relative z-10 flex flex-col items-center gap-4 animate-in fade-in duration-300">
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#000080] via-[#000066] to-[#138808] p-0.5 shadow-xl flex items-center justify-center">
-            <div className="w-full h-full rounded-2xl bg-white dark:bg-slate-900 flex items-center justify-center text-3xl animate-pulse">
-              🏛️
+            <div className="w-full h-full rounded-2xl bg-white flex items-center justify-center p-1.5 shadow-inner">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/msn-logo.png" alt="MSN Communications" className="w-full h-full object-contain" />
             </div>
           </div>
           <div className="text-center space-y-1">
@@ -145,7 +145,6 @@ function PortalApp() {
         {currentView === "history" && <ApplicationHistory />}
         {currentView === "payments" && <ApplicationHistory />}
         {currentView === "inbox" && <ApplicationHistory />}
-        {currentView === "customer-dashboard" && <CustomerDashboard />}
         {currentView === "owner-dashboard" && <OwnerDashboard />}
         {currentView === "admin-dashboard" && <AdminDashboard />}
       </main>

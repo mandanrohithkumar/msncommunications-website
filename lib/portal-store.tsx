@@ -38,8 +38,7 @@ export type ViewType =
   | "payments"
   | "inbox"
   | "owner-dashboard"
-  | "admin-dashboard"
-  | "customer-dashboard";
+  | "admin-dashboard";
 
 export interface NavigationHistorySnapshot {
   view: ViewType;

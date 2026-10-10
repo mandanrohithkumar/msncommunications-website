@@ -17,7 +17,7 @@
     subtitle: 'Your active session will be ended.',
     cancelText: 'Cancel',
     exitText: 'Exit',
-    logoSrc: null, // Custom image URL if provided, otherwise default SVG shield emblem
+    logoSrc: 'msn-logo.png', // Official MSN Communications logo
     onExit: function () {
       // Default exit action: navigate back or close
       if (window.history.length > 1) {

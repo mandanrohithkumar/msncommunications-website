@@ -700,11 +700,12 @@ export const AuthView: React.FC = () => {
             <button
               type="button"
               onClick={() => setShowRoleSelector((prev) => !prev)}
-              className="group relative inline-flex items-center justify-center w-11 h-11 rounded-xl bg-gradient-to-tr from-[#FF9933] via-[#000080] to-[#138808] text-white font-black text-lg mb-1.5 shadow-md shadow-[#FF9933]/25 hover:shadow-[#FF9933]/40 hover:scale-105 active:scale-95 transition-all cursor-pointer border border-white/40"
+              className="group relative inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-white p-1 mb-1.5 shadow-lg shadow-[#000080]/15 hover:shadow-[#000080]/30 hover:scale-105 active:scale-95 transition-all cursor-pointer border-2 border-slate-200 dark:border-slate-700 overflow-hidden"
               title="Click MSN logo to reveal / change user role access"
             >
-              <span>MSN</span>
-              <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-[#138808] border-2 border-white dark:border-slate-900 rounded-full flex items-center justify-center text-[7px] font-bold text-white shadow-sm">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/msn-logo.png" alt="MSN Communications" className="w-full h-full object-contain" />
+              <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-[#138808] border-2 border-white dark:border-slate-900 rounded-full flex items-center justify-center text-[7px] font-bold text-white shadow-sm z-10">
                 ✓
               </span>
             </button>
