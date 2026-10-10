@@ -6,6 +6,11 @@ export const metadata: Metadata = {
   description:
     "MSN Communication & MeeSeva Services Portal — Instant government service applications, document management, and online works. Fast, secure, and certified.",
   keywords: ["MeeSeva", "government services", "MSN", "online works", "document management"],
+  icons: {
+    icon: "/msn-logo.png",
+    shortcut: "/favicon.ico",
+    apple: "/msn-logo.png",
+  },
 };
 
 export default function RootLayout({
