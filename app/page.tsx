@@ -11,6 +11,7 @@ import { DocumentManagement } from "@/components/portal/document-management";
 import { ApplicationHistory } from "@/components/portal/application-history";
 import { OwnerDashboard } from "@/components/portal/owner-dashboard";
 import { AdminDashboard } from "@/components/portal/admin-dashboard";
+import { CustomerDashboard } from "@/components/portal/customer-dashboard";
 import { ProfileModal } from "@/components/portal/profile-modal";
 import { PaymentModal } from "@/components/portal/payment-modal";
 import { DocumentModal } from "@/components/portal/document-modal";
@@ -144,6 +145,7 @@ function PortalApp() {
         {currentView === "history" && <ApplicationHistory />}
         {currentView === "payments" && <ApplicationHistory />}
         {currentView === "inbox" && <ApplicationHistory />}
+        {currentView === "customer-dashboard" && <CustomerDashboard />}
         {currentView === "owner-dashboard" && <OwnerDashboard />}
         {currentView === "admin-dashboard" && <AdminDashboard />}
       </main>

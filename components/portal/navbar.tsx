@@ -940,27 +940,30 @@ export const PortalNavbar: React.FC = () => {
                   <span className="text-[11px] font-semibold">{t("nav.clear")}</span>
                 </button>
 
-                {/* Admin/Owner Console Shortcut */}
-                {(user?.role === "owner" || user?.role === "superadmin") && (
-                  <div
-                    className={`pt-2 mt-2 border-t flex items-center justify-between ${
-                      theme === "light" ? "border-slate-100" : "border-white/10"
-                    }`}
+                {/* Console / Dashboard Shortcut for All Roles */}
+                <div
+                  className={`pt-2 mt-2 border-t flex items-center justify-between ${
+                    theme === "light" ? "border-slate-100" : "border-white/10"
+                  }`}
+                >
+                  <span className="text-[11px] text-slate-400 font-medium">{t("nav.console")}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (user?.role === "owner") setCurrentView("owner-dashboard");
+                      else if (user?.role === "superadmin") setCurrentView("admin-dashboard");
+                      else setCurrentView("customer-dashboard");
+                      setMenuOpen(false);
+                    }}
+                    className="text-xs font-bold text-[#000080] dark:text-[#60A5FA] hover:underline cursor-pointer"
                   >
-                    <span className="text-[11px] text-slate-400 font-medium">{t("nav.console")}</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (user?.role === "owner") setCurrentView("owner-dashboard");
-                        else setCurrentView("admin-dashboard");
-                        setMenuOpen(false);
-                      }}
-                      className="text-xs font-bold text-[#000080] dark:text-[#60A5FA] hover:underline cursor-pointer"
-                    >
-                      {user?.role === "owner" ? t("nav.owner_portal") : t("nav.admin_console")}
-                    </button>
-                  </div>
-                )}
+                    {user?.role === "owner"
+                      ? t("nav.owner_portal")
+                      : user?.role === "superadmin"
+                      ? t("nav.admin_console")
+                      : "Customer Dashboard"}
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -969,6 +972,18 @@ export const PortalNavbar: React.FC = () => {
 
       {/* Mobile Sticky Quick-View Navigator Chips */}
       <div className="flex sm:hidden items-center justify-center gap-1.5 mt-1.5 w-full max-w-xl px-1 overflow-x-auto no-scrollbar py-0.5">
+        <button
+          type="button"
+          onClick={() => setCurrentView("customer-dashboard")}
+          className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 shrink-0 ${
+            currentView === "customer-dashboard"
+              ? "bg-[#000080] text-white shadow-xs scale-105"
+              : "bg-white/80 dark:bg-slate-900/80 text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-800"
+          }`}
+        >
+          <span>👤</span>
+          <span>Dashboard</span>
+        </button>
         <button
           type="button"
           onClick={() => setCurrentView("meeseva")}
