@@ -218,6 +218,24 @@ export const PortalNavbar: React.FC = () => {
     }, 1500);
   };
 
+  // Automatically scroll active mobile chip into view when currentView changes
+  useEffect(() => {
+    const idMap: Record<string, string> = {
+      meeseva: "btnNavMeeSeva",
+      "online-works": "btnNavOnlineWorks",
+      "online-sub": "btnNavOnlineWorks",
+      documents: "btnNavDocuments",
+      dashboard: "btnNavDashboard",
+    };
+    const targetId = idMap[currentView as string];
+    if (targetId) {
+      const el = document.getElementById(targetId);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+      }
+    }
+  }, [currentView]);
+
   return (
     <header className="w-full flex flex-col items-center sticky top-0 sm:top-3 z-50 px-2 sm:px-4 pt-1.5 sm:pt-0">
       {/* Dynamic Capsule Navigation Bar */}
@@ -1018,6 +1036,8 @@ export const PortalNavbar: React.FC = () => {
         </button>
         <button
           type="button"
+          id="btnNavMeeSeva"
+          data-tab="meeseva"
           onClick={() => setCurrentView("meeseva")}
           className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 shrink-0 ${
             currentView === "meeseva"
@@ -1030,6 +1050,8 @@ export const PortalNavbar: React.FC = () => {
         </button>
         <button
           type="button"
+          id="btnNavOnlineWorks"
+          data-tab="online-works"
           onClick={() => setCurrentView("online-works")}
           className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 shrink-0 ${
             currentView === "online-works" || currentView === "online-sub"
@@ -1042,6 +1064,8 @@ export const PortalNavbar: React.FC = () => {
         </button>
         <button
           type="button"
+          id="btnNavDocuments"
+          data-tab="documents"
           onClick={() => setCurrentView("documents")}
           className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 shrink-0 ${
             currentView === "documents"

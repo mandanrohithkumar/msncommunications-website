@@ -24,6 +24,7 @@ function PortalApp() {
     isLoggedIn,
     isAuthChecking,
     currentView,
+    setCurrentView,
     theme,
     toggleTheme,
     isProfileOpen,
@@ -32,6 +33,62 @@ function PortalApp() {
     isAuthOpen,
     setIsAuthOpen,
   } = usePortal();
+
+  // Category tabs sequence for smooth horizontal swipe gestures
+  const categoryTabs = ["meeseva", "online-works", "documents"];
+  const [swipeDirection, setSwipeDirection] = React.useState<"left" | "right" | null>(null);
+  const touchStartRef = React.useRef<{ x: number; y: number; time: number } | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (!e.touches || e.touches.length === 0) return;
+    const target = e.target as HTMLElement | null;
+    // Don't intercept touches inside form inputs, textareas, dropdowns, dialogs, or horizontal table/chips
+    if (
+      target?.closest("input, textarea, select, [role='dialog'], .no-swipe, .overflow-x-auto, button[data-no-swipe]")
+    ) {
+      touchStartRef.current = null;
+      return;
+    }
+    const touch = e.touches[0];
+    touchStartRef.current = {
+      x: touch.clientX,
+      y: touch.clientY,
+      time: Date.now(),
+    };
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!touchStartRef.current || !e.changedTouches || e.changedTouches.length === 0) return;
+    const touch = e.changedTouches[0];
+    const dx = touch.clientX - touchStartRef.current.x;
+    const dy = touch.clientY - touchStartRef.current.y;
+    const dt = Date.now() - touchStartRef.current.time;
+    touchStartRef.current = null;
+
+    // Deliberate horizontal swipe: at least 45px, horizontal dominance, under 850ms
+    if (Math.abs(dx) >= 45 && Math.abs(dx) > Math.abs(dy) * 1.25 && dt < 850) {
+      const activeIdx = categoryTabs.indexOf(
+        currentView === "online-sub" ? "online-works" : (currentView as string)
+      );
+
+      if (dx < 0) {
+        // Swiped Left: Advance forward: Meeseva -> Online Works -> Documents
+        if (activeIdx !== -1 && activeIdx < categoryTabs.length - 1) {
+          setSwipeDirection("left");
+          setCurrentView(categoryTabs[activeIdx + 1] as any);
+        }
+      } else {
+        // Swiped Right: Move backward: Documents -> Online Works -> Meeseva
+        if (activeIdx > 0) {
+          setSwipeDirection("right");
+          setCurrentView(categoryTabs[activeIdx - 1] as any);
+        } else if (currentView === "history" || currentView === "payments" || currentView === "inbox") {
+          setSwipeDirection("right");
+          setCurrentView("documents");
+        }
+      }
+    }
+  };
 
   // 1. Initial Session Verification State (prevents flash of unauthenticated UI while verifying cookies)
   if (isAuthChecking) {
@@ -135,18 +192,33 @@ function PortalApp() {
         <PortalNavbar />
       </div>
 
-      {/* Main Content */}
-      <main className="relative z-10 pt-4 pb-16 min-h-screen">
-        {currentView === "meeseva" && <MeesevaDashboard />}
-        {currentView === "online-works" && <OnlineWorksDashboard />}
-        {currentView === "online-sub" && <OnlineWorksDashboard />}
-        {currentView === "form" && <DynamicForm />}
-        {currentView === "documents" && <DocumentManagement />}
-        {currentView === "history" && <ApplicationHistory />}
-        {currentView === "payments" && <ApplicationHistory />}
-        {currentView === "inbox" && <ApplicationHistory />}
-        {currentView === "owner-dashboard" && <OwnerDashboard />}
-        {currentView === "admin-dashboard" && <AdminDashboard />}
+      {/* Main Content with Touch Swipe Support */}
+      <main
+        className="relative z-10 pt-4 pb-16 min-h-screen touch-pan-y"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
+        <div
+          key={currentView}
+          className={
+            swipeDirection === "left"
+              ? "animate-in fade-in slide-in-from-right-8 duration-200"
+              : swipeDirection === "right"
+              ? "animate-in fade-in slide-in-from-left-8 duration-200"
+              : "animate-in fade-in duration-150"
+          }
+        >
+          {currentView === "meeseva" && <MeesevaDashboard />}
+          {currentView === "online-works" && <OnlineWorksDashboard />}
+          {currentView === "online-sub" && <OnlineWorksDashboard />}
+          {currentView === "form" && <DynamicForm />}
+          {currentView === "documents" && <DocumentManagement />}
+          {currentView === "history" && <ApplicationHistory />}
+          {currentView === "payments" && <ApplicationHistory />}
+          {currentView === "inbox" && <ApplicationHistory />}
+          {currentView === "owner-dashboard" && <OwnerDashboard />}
+          {currentView === "admin-dashboard" && <AdminDashboard />}
+        </div>
       </main>
 
       {/* Modals */}

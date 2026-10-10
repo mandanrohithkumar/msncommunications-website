@@ -474,6 +474,65 @@
                 display: none !important;
             }
         }
+
+        /* Smooth Tab Transition Animations for Touch Swipe & Tab Switching */
+        .tab-slide-left {
+            animation: tabSlideInFromRight 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .tab-slide-right {
+            animation: tabSlideInFromLeft 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .tab-slide-fade {
+            animation: tabFadeIn 0.22s ease-out forwards;
+        }
+
+        @keyframes tabSlideInFromRight {
+            0% {
+                opacity: 0;
+                transform: translateX(28px);
+            }
+            100% {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes tabSlideInFromLeft {
+            0% {
+                opacity: 0;
+                transform: translateX(-28px);
+            }
+            100% {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes tabFadeIn {
+            0% {
+                opacity: 0;
+                transform: translateY(6px);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Mobile Tab Bar Active Styling */
+        .mobile-quick-tab {
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .mobile-quick-tab.active {
+            background-color: var(--primary, #4f46e5) !important;
+            color: #ffffff !important;
+            box-shadow: 0 2px 10px rgba(79, 70, 229, 0.35);
+            border-color: transparent !important;
+        }
     </style>
 </head>
 <body>
@@ -642,16 +701,16 @@
             <button type="button" id="btnMobileNavDashboard" data-nav="dashboard" class="nav-tab-dashboard px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-indigo-600 text-white shrink-0" onclick="switchMainTab('meeseva')">
                 <span>📊</span> Dashboard
             </button>
-            <button type="button" id="btnMobileTabMeeSeva" class="px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-main)] shrink-0" onclick="switchMainTab('meeseva')">
+            <button type="button" id="btnMobileTabMeeSeva" class="mobile-quick-tab active px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-indigo-600 text-white shadow-sm shrink-0" onclick="switchMainTab('meeseva')">
                 <span>🏛️</span> MeeSeva
             </button>
-            <button type="button" id="btnMobileTabOnline" class="px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-main)] shrink-0" onclick="switchMainTab('online')">
+            <button type="button" id="btnMobileTabOnline" class="mobile-quick-tab px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-main)] shrink-0" onclick="switchMainTab('online')">
                 <span>⚡</span> Online Works
             </button>
-            <button type="button" id="btnMobileTabDocs" class="px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-main)] shrink-0" onclick="switchMainTab('documents')">
+            <button type="button" id="btnMobileTabDocs" class="mobile-quick-tab px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-main)] shrink-0" onclick="switchMainTab('documents')">
                 <span>📁</span> Documents
             </button>
-            <button type="button" id="btnMobileTabHistory" class="px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-main)] shrink-0" onclick="switchMainTab('history')">
+            <button type="button" id="btnMobileTabHistory" class="mobile-quick-tab px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-main)] shrink-0" onclick="switchMainTab('history')">
                 <span>📋</span> History
             </button>
         </div>
@@ -2163,6 +2222,7 @@
                 this.loadFromStorage();
                 this.setupTheme();
                 this.setupNav();
+                this.setupSwipeGestures();
                 this.renderRoleUI();
                 this.renderMeeSevaServices();
                 this.renderOnlineCategories();
@@ -2417,7 +2477,7 @@
                 }
             },
 
-            switchMainTab(tab) {
+            switchMainTab(tab, direction = 'fade') {
                 this.activeTab = tab;
                 const tabViews = {
                     meeseva: 'viewMeeSeva',
@@ -2433,27 +2493,143 @@
                     history: 'btnTabHistory'
                 };
 
-                // Hide all customer tabs
+                const mobileButtons = {
+                    meeseva: 'btnMobileTabMeeSeva',
+                    online: 'btnMobileTabOnline',
+                    documents: 'btnMobileTabDocs',
+                    history: 'btnMobileTabHistory'
+                };
+
+                // Hide all customer tabs and remove previous slide animation classes
                 Object.values(tabViews).forEach(id => {
                     const el = document.getElementById(id);
-                    if (el) el.classList.add('hidden');
+                    if (el) {
+                        el.classList.add('hidden');
+                        el.classList.remove('tab-slide-left', 'tab-slide-right', 'tab-slide-fade');
+                    }
                 });
 
-                // Remove active from buttons
+                // Remove active from desktop buttons
                 Object.values(tabButtons).forEach(id => {
                     const btn = document.getElementById(id);
                     if (btn) btn.classList.remove('active');
                 });
 
-                // Show selected
+                // Remove active from mobile quick buttons
+                Object.values(mobileButtons).forEach(id => {
+                    const btn = document.getElementById(id);
+                    if (btn) {
+                        btn.classList.remove('active');
+                        btn.classList.remove('bg-indigo-600', 'text-white', 'shadow-sm');
+                        btn.classList.add('bg-[var(--bg-elevated)]', 'border', 'border-[var(--border-subtle)]', 'text-[var(--text-main)]');
+                    }
+                });
+
+                // Show selected view with directional animation
                 const activeViewId = tabViews[tab] || 'viewMeeSeva';
                 const activeBtnId = tabButtons[tab] || 'btnTabMeeSeva';
-                document.getElementById(activeViewId).classList.remove('hidden');
-                document.getElementById(activeBtnId).classList.add('active');
+                const activeMobileBtnId = mobileButtons[tab] || 'btnMobileTabMeeSeva';
+
+                const activeViewEl = document.getElementById(activeViewId);
+                if (activeViewEl) {
+                    activeViewEl.classList.remove('hidden');
+                    if (direction === 'left') {
+                        activeViewEl.classList.add('tab-slide-left');
+                    } else if (direction === 'right') {
+                        activeViewEl.classList.add('tab-slide-right');
+                    } else {
+                        activeViewEl.classList.add('tab-slide-fade');
+                    }
+                }
+
+                // Activate desktop button
+                const activeBtn = document.getElementById(activeBtnId);
+                if (activeBtn) activeBtn.classList.add('active');
+
+                // Activate mobile button & center it smoothly in horizontal scroll menu
+                const activeMobileBtn = document.getElementById(activeMobileBtnId);
+                if (activeMobileBtn) {
+                    activeMobileBtn.classList.add('active');
+                    activeMobileBtn.classList.remove('bg-[var(--bg-elevated)]', 'border-[var(--border-subtle)]');
+                    activeMobileBtn.classList.add('bg-indigo-600', 'text-white', 'shadow-sm');
+                    activeMobileBtn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                }
 
                 if (tab === 'history') this.renderCustomerLedger();
                 if (tab === 'documents') this.renderDocumentLocker();
                 window.scrollTo({ top: 0, behavior: 'smooth' });
+            },
+
+            setupSwipeGestures() {
+                let touchStartX = 0;
+                let touchStartY = 0;
+                let touchStartTime = 0;
+                let isTracking = false;
+
+                const categoryTabs = ['meeseva', 'online', 'documents'];
+
+                const onTouchStart = (e) => {
+                    if (!e.touches || e.touches.length === 0) return;
+                    if (this.currentUser && this.currentUser.role !== 'Customer') return;
+
+                    const target = e.target;
+                    // Ignore interactive controls, modals, tables, and dialogs
+                    if (target.closest('input, textarea, select, [role="dialog"], #threeDotMenu, .gov-modal-overlay, #modalContainer, .gov-table-wrapper, #mobileExitModal')) {
+                        isTracking = false;
+                        return;
+                    }
+
+                    touchStartX = e.touches[0].clientX;
+                    touchStartY = e.touches[0].clientY;
+                    touchStartTime = Date.now();
+                    isTracking = true;
+                };
+
+                const onTouchEnd = (e) => {
+                    if (!isTracking) return;
+                    isTracking = false;
+
+                    if (!e.changedTouches || e.changedTouches.length === 0) return;
+                    const touch = e.changedTouches[0];
+                    const dx = touch.clientX - touchStartX;
+                    const dy = touch.clientY - touchStartY;
+                    const dt = Date.now() - touchStartTime;
+
+                    // Deliberate horizontal swipe: at least 45px, mostly horizontal, under 850ms
+                    if (Math.abs(dx) >= 45 && Math.abs(dx) > Math.abs(dy) * 1.25 && dt < 850) {
+                        const currentTab = this.activeTab || 'meeseva';
+                        const currentIndex = categoryTabs.indexOf(currentTab);
+
+                        if (dx < 0) {
+                            // Swiped Left: advance "Meeseva" -> "Online Works" -> "Documents"
+                            if (currentIndex !== -1 && currentIndex < categoryTabs.length - 1) {
+                                const nextTab = categoryTabs[currentIndex + 1];
+                                this.switchMainTab(nextTab, 'left');
+                            }
+                        } else {
+                            // Swiped Right: go backward "Documents" -> "Online Works" -> "Meeseva"
+                            if (currentIndex > 0) {
+                                const prevTab = categoryTabs[currentIndex - 1];
+                                this.switchMainTab(prevTab, 'right');
+                            } else if (currentTab === 'history') {
+                                this.switchMainTab('documents', 'right');
+                            }
+                        }
+                    }
+                };
+
+                // Attach to main content area and navigation header
+                const mainArea = document.querySelector('main') || document.getElementById('portalInterface');
+                const headerArea = document.querySelector('header');
+
+                if (mainArea) {
+                    mainArea.addEventListener('touchstart', onTouchStart, { passive: true });
+                    mainArea.addEventListener('touchend', onTouchEnd, { passive: true });
+                }
+                if (headerArea) {
+                    headerArea.addEventListener('touchstart', onTouchStart, { passive: true });
+                    headerArea.addEventListener('touchend', onTouchEnd, { passive: true });
+                }
             },
 
             renderMeeSevaServices(filterText = '') {
@@ -3724,8 +3900,8 @@
             MSN.logAudit("ROLE_SWITCH", `User switched role to ${role}`);
         }
 
-        function switchMainTab(tab) {
-            MSN.switchMainTab(tab);
+        function switchMainTab(tab, direction) {
+            MSN.switchMainTab(tab, direction);
         }
 
         function switchAdminTab(tab) {
