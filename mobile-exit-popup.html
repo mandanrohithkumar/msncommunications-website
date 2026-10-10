@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Mobile Exit Confirmation Popup</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./mobile-exit-popup.css">
+  
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: linear-gradient(135deg, #090e1a 0%, #0f1c30 50%, #08111e 100%);
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px;
+      line-height: 1.5;
+    }
+
+    .demo-container {
+      width: 100%;
+      max-width: 580px;
+      background: rgba(17, 24, 39, 0.7);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 20px;
+      padding: 24px;
+      margin-top: 20px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    }
+
+    .demo-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 600;
+      background: rgba(30, 58, 138, 0.4);
+      color: #93c5fd;
+      border: 1px solid rgba(147, 197, 253, 0.25);
+      margin-bottom: 14px;
+    }
+
+    .demo-badge .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #3b82f6;
+      box-shadow: 0 0 8px #3b82f6;
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 800;
+      color: #ffffff;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+    }
+
+    p.subtitle {
+      font-size: 14px;
+      color: #94a3b8;
+      margin-bottom: 20px;
+    }
+
+    .info-box {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(59, 130, 246, 0.2);
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 20px;
+      font-size: 13px;
+      color: #cbd5e1;
+    }
+
+    .info-box ul {
+      margin-top: 8px;
+      padding-left: 20px;
+    }
+
+    .info-box li {
+      margin-bottom: 4px;
+    }
+
+    .status-panel {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(15, 23, 42, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 13px;
+      margin-bottom: 12px;
+    }
+
+    .status-value {
+      font-weight: 700;
+      color: #38bdf8;
+    }
+
+    .action-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .btn-test {
+      width: 100%;
+      padding: 14px 20px;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      border: none;
+    }
+
+    .btn-primary-trigger {
+      background: linear-gradient(135deg, #1e3a8a 0%, #0f2744 100%);
+      color: #ffffff;
+      box-shadow: 0 4px 14px rgba(30, 58, 138, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .btn-primary-trigger:hover {
+      background: linear-gradient(135deg, #2563eb 0%, #1e3a8a 100%);
+      box-shadow: 0 6px 20px rgba(37, 99, 235, 0.45);
+      transform: translateY(-1px);
+    }
+
+    .btn-primary-trigger:active {
+      transform: translateY(1px);
+    }
+
+    .btn-secondary-mode {
+      background: rgba(255, 255, 255, 0.06);
+      color: #cbd5e1;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .btn-secondary-mode:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #ffffff;
+    }
+
+    .toast-msg {
+      margin-top: 16px;
+      font-size: 13px;
+      color: #10b981;
+      text-align: center;
+      min-height: 20px;
+      transition: opacity 0.3s;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="demo-container">
+    <div class="demo-badge">
+      <span class="status-dot"></span>
+      <span>Mobile Exit Modal Component</span>
+    </div>
+
+    <h1>Mobile Exit Popup</h1>
+    <p class="subtitle">A clean, high-performance modal popup triggered exclusively on mobile devices (width &le; 768px or mobile user agent).</p>
+
+    <div class="info-box">
+      <strong>Requirements Met:</strong>
+      <ul>
+        <li><strong>Mobile-Only Detection:</strong> Triggers when screen width &le; 768px OR mobile browser user-agent is detected.</li>
+        <li><strong>Overlay & Card:</strong> Dark translucent blurred backdrop with a crisp white centered card.</li>
+        <li><strong>Circular Logo Container:</strong> Centered circular emblem holding a brand logo.</li>
+        <li><strong>Prompt Text:</strong> "Do you want to exit?" right below the logo.</li>
+        <li><strong>Side-by-Side Buttons:</strong> Rounded-rectangle "Cancel" and "Exit" buttons styled in professional dark blue and white.</li>
+      </ul>
+    </div>
+
+    <div class="status-panel">
+      <span>Current Screen Width:</span>
+      <span class="status-value" id="current-width-label">-- px</span>
+    </div>
+    
+    <div class="status-panel">
+      <span>Device Mode Detection:</span>
+      <span class="status-value" id="mobile-detected-label">Checking...</span>
+    </div>
+
+    <div class="action-group">
+      <button type="button" class="btn-test btn-primary-trigger" id="test-trigger-btn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+          <polyline points="15 3 21 3 21 9"></polyline>
+          <line x1="10" y1="14" x2="21" y2="3"></line>
+        </svg>
+        <span>Trigger Exit Popup</span>
+      </button>
+
+      <button type="button" class="btn-test btn-secondary-mode" id="toggle-preview-mode-btn">
+        <span>Force Desktop Preview: <strong id="preview-state-text">OFF</strong></span>
+      </button>
+    </div>
+
+    <div class="toast-msg" id="toast-feedback"></div>
+  </div>
+
+  <!-- The popup HTML will be auto-generated by mobile-exit-popup.js or can be placed directly -->
+  <script src="./mobile-exit-popup.js"></script>
+
+  <script>
+    // Demo Page Script
+    const testTriggerBtn = document.getElementById('test-trigger-btn');
+    const togglePreviewBtn = document.getElementById('toggle-preview-mode-btn');
+    const widthLabel = document.getElementById('current-width-label');
+    const mobileLabel = document.getElementById('mobile-detected-label');
+    const previewStateText = document.getElementById('preview-state-text');
+    const toastFeedback = document.getElementById('toast-feedback');
+
+    let forceDesktopPreview = false;
+
+    function updateDisplay() {
+      if (widthLabel) widthLabel.textContent = `${window.innerWidth}px`;
+      const isMobile = window.MobileExitPopup && window.MobileExitPopup.isMobile ? window.MobileExitPopup.isMobile() : (window.innerWidth <= 768);
+      if (mobileLabel) {
+        mobileLabel.textContent = isMobile ? 'Mobile Detected (Eligible)' : 'Desktop (>768px)';
+        mobileLabel.style.color = isMobile ? '#10b981' : '#f59e0b';
+      }
+    }
+
+    window.addEventListener('resize', updateDisplay);
+    setTimeout(updateDisplay, 100);
+
+    function showToast(msg) {
+      if (!toastFeedback) return;
+      toastFeedback.textContent = msg;
+      toastFeedback.style.opacity = '1';
+      setTimeout(() => { toastFeedback.style.opacity = '0'; }, 3500);
+    }
+
+    testTriggerBtn.addEventListener('click', function() {
+      if (!window.MobileExitPopup) return;
+      const opened = window.MobileExitPopup.open(forceDesktopPreview);
+      if (!opened) {
+        showToast('Popup suppressed: Screen is >768px desktop. Click "Force Desktop Preview" to test on desktop.');
+      }
+    });
+
+    togglePreviewBtn.addEventListener('click', function() {
+      forceDesktopPreview = !forceDesktopPreview;
+      const modal = document.getElementById('mobile-exit-modal');
+      if (forceDesktopPreview) {
+        if (modal) modal.classList.add('force-preview-mode');
+        previewStateText.textContent = 'ON';
+        previewStateText.style.color = '#38bdf8';
+        showToast('Desktop preview enabled! Click "Trigger Exit Popup".');
+      } else {
+        if (modal) modal.classList.remove('force-preview-mode');
+        previewStateText.textContent = 'OFF';
+        previewStateText.style.color = '';
+        showToast('Desktop preview disabled.');
+      }
+    });
+  </script>
+</body>
+</html>

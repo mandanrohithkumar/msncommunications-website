@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Mobile Exit Confirmation Popup Demo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <style>
+    /* ==========================================================================
+       RESET & BASE DEMO PAGE STYLING
+       ========================================================================== */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: linear-gradient(135deg, #090e1a 0%, #0f1c30 50%, #08111e 100%);
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px;
+      line-height: 1.5;
+    }
+
+    .demo-container {
+      width: 100%;
+      max-width: 580px;
+      background: rgba(17, 24, 39, 0.7);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 20px;
+      padding: 24px;
+      margin-top: 20px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    }
+
+    .demo-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 600;
+      background: rgba(30, 58, 138, 0.4);
+      color: #93c5fd;
+      border: 1px solid rgba(147, 197, 253, 0.25);
+      margin-bottom: 14px;
+    }
+
+    .demo-badge .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #3b82f6;
+      box-shadow: 0 0 8px #3b82f6;
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 800;
+      color: #ffffff;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+    }
+
+    p.subtitle {
+      font-size: 14px;
+      color: #94a3b8;
+      margin-bottom: 20px;
+    }
+
+    .info-box {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(59, 130, 246, 0.2);
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 20px;
+      font-size: 13px;
+      color: #cbd5e1;
+    }
+
+    .info-box ul {
+      margin-top: 8px;
+      padding-left: 20px;
+    }
+
+    .info-box li {
+      margin-bottom: 4px;
+    }
+
+    .status-panel {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(15, 23, 42, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 13px;
+      margin-bottom: 20px;
+    }
+
+    .status-value {
+      font-weight: 700;
+      color: #38bdf8;
+    }
+
+    .action-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .btn-test {
+      width: 100%;
+      padding: 14px 20px;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      border: none;
+    }
+
+    .btn-primary-trigger {
+      background: linear-gradient(135deg, #1e3a8a 0%, #0f2744 100%);
+      color: #ffffff;
+      box-shadow: 0 4px 14px rgba(30, 58, 138, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .btn-primary-trigger:hover {
+      background: linear-gradient(135deg, #2563eb 0%, #1e3a8a 100%);
+      box-shadow: 0 6px 20px rgba(37, 99, 235, 0.45);
+      transform: translateY(-1px);
+    }
+
+    .btn-primary-trigger:active {
+      transform: translateY(1px);
+    }
+
+    .btn-secondary-mode {
+      background: rgba(255, 255, 255, 0.06);
+      color: #cbd5e1;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .btn-secondary-mode:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #ffffff;
+    }
+
+    .toast-msg {
+      margin-top: 16px;
+      font-size: 13px;
+      color: #10b981;
+      text-align: center;
+      min-height: 20px;
+      transition: opacity 0.3s;
+    }
+
+    /* ==========================================================================
+       MOBILE-ONLY EXIT CONFIRMATION POPUP COMPONENT (CSS)
+       Matches dark blue & white professional brand aesthetic
+       ========================================================================== */
+
+    /* Modal Overlay Backdrop */
+    .mobile-exit-modal-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 99999;
+      background: rgba(10, 20, 36, 0.65);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+                  visibility 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    /* Active State for Overlay */
+    .mobile-exit-modal-overlay.is-active {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+
+    /* Centered Modal Card */
+    .mobile-exit-modal-card {
+      position: relative;
+      width: 100%;
+      max-width: 320px;
+      background: #ffffff;
+      border-radius: 20px;
+      padding: 28px 24px 24px 24px;
+      text-align: center;
+      box-shadow: 0 20px 45px -10px rgba(10, 25, 47, 0.28),
+                  0 4px 12px rgba(10, 25, 47, 0.06);
+      border: 1px solid rgba(226, 232, 240, 0.9);
+      transform: scale(0.92) translateY(12px);
+      transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1),
+                  opacity 0.25s ease;
+      opacity: 0;
+    }
+
+    .mobile-exit-modal-overlay.is-active .mobile-exit-modal-card {
+      transform: scale(1) translateY(0);
+      opacity: 1;
+    }
+
+    /* Circular Container at Top for Logo Image */
+    .mobile-exit-logo-circle {
+      width: 76px;
+      height: 76px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #f0f4fc 0%, #e1e9f8 100%);
+      margin: 0 auto 16px auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 8px 18px -4px rgba(15, 39, 68, 0.12),
+                  0 0 0 4px #ffffff,
+                  0 0 0 6px #e2e8f0;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Logo Image inside the Circle */
+    .mobile-exit-logo-img {
+      width: 48px;
+      height: 48px;
+      object-fit: contain;
+      display: block;
+      transition: transform 0.2s ease;
+    }
+
+    .mobile-exit-modal-card:hover .mobile-exit-logo-img {
+      transform: scale(1.05);
+    }
+
+    /* Text Right Below Logo: "Do you want to exit?" */
+    .mobile-exit-title {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 19px;
+      font-weight: 700;
+      color: #0f2744; /* Clean dark blue */
+      line-height: 1.3;
+      margin: 0 0 6px 0;
+      letter-spacing: -0.015em;
+    }
+
+    /* Subtle informative helper text */
+    .mobile-exit-subtitle {
+      font-size: 13px;
+      color: #64748b;
+      margin: 0 0 22px 0;
+      line-height: 1.4;
+      font-weight: 400;
+    }
+
+    /* Bottom Button Row: Two Rounded-Rectangle Buttons Side-by-Side */
+    .mobile-exit-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      width: 100%;
+    }
+
+    /* Common Button Styles: Rounded-Rectangle */
+    .mobile-exit-btn {
+      flex: 1;
+      height: 44px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+      outline: none;
+      border: none;
+      font-family: inherit;
+    }
+
+    /* "Cancel" Button: Clean Slate / Soft Grey with Border */
+    .mobile-exit-btn-cancel {
+      background: #f8fafc;
+      color: #475569;
+      border: 1.5px solid #e2e8f0;
+    }
+
+    .mobile-exit-btn-cancel:hover {
+      background: #f1f5f9;
+      color: #1e293b;
+      border-color: #cbd5e1;
+    }
+
+    .mobile-exit-btn-cancel:active {
+      transform: scale(0.97);
+      background: #e2e8f0;
+    }
+
+    /* "Exit" Button: Professional Dark Blue */
+    .mobile-exit-btn-confirm {
+      background: linear-gradient(135deg, #0f2744 0%, #1e3a8a 100%);
+      color: #ffffff;
+      box-shadow: 0 4px 12px rgba(15, 39, 68, 0.28);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .mobile-exit-btn-confirm:hover {
+      background: linear-gradient(135deg, #0a1b30 0%, #172e6b 100%);
+      box-shadow: 0 6px 16px rgba(15, 39, 68, 0.35);
+    }
+
+    .mobile-exit-btn-confirm:active {
+      transform: scale(0.97);
+      box-shadow: 0 2px 6px rgba(15, 39, 68, 0.25);
+    }
+
+    /* Desktop Safety: Hide completely on screens > 768px unless force-preview flag is active */
+    @media (min-width: 769px) {
+      .mobile-exit-modal-overlay:not(.force-preview-mode) {
+        display: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ==========================================================================
+       DEMO CONTROLS CONTAINER (For previewing and testing)
+       ========================================================================== -->
+  <div class="demo-container">
+    <div class="demo-badge">
+      <span class="status-dot"></span>
+      <span>Mobile Exit Modal Component</span>
+    </div>
+
+    <h1>Mobile Exit Popup</h1>
+    <p class="subtitle">A clean, high-performance modal popup triggered exclusively on mobile devices (width &le; 768px or mobile user agent).</p>
+
+    <div class="info-box">
+      <strong>Requirements Met:</strong>
+      <ul>
+        <li><strong>Mobile-Only Detection:</strong> Triggers when screen width &le; 768px OR mobile browser user-agent is detected.</li>
+        <li><strong>Overlay & Card:</strong> Dark translucent blurred backdrop with a crisp white centered card.</li>
+        <li><strong>Circular Logo Container:</strong> Centered circular emblem holding a brand logo.</li>
+        <li><strong>Prompt Text:</strong> "Do you want to exit?" right below the logo.</li>
+        <li><strong>Side-by-Side Buttons:</strong> Rounded-rectangle "Cancel" and "Exit" buttons styled in professional dark blue and white.</li>
+      </ul>
+    </div>
+
+    <div class="status-panel">
+      <span>Current Screen Width:</span>
+      <span class="status-value" id="current-width-label">-- px</span>
+    </div>
+    
+    <div class="status-panel">
+      <span>Device Mode Detection:</span>
+      <span class="status-value" id="mobile-detected-label">Checking...</span>
+    </div>
+
+    <div class="action-group">
+      <button type="button" class="btn-test btn-primary-trigger" id="test-trigger-btn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+          <polyline points="15 3 21 3 21 9"></polyline>
+          <line x1="10" y1="14" x2="21" y2="3"></line>
+        </svg>
+        <span>Trigger Exit Popup</span>
+      </button>
+
+      <button type="button" class="btn-test btn-secondary-mode" id="toggle-preview-mode-btn">
+        <span>Force Desktop Preview: <strong id="preview-state-text">OFF</strong></span>
+      </button>
+    </div>
+
+    <div class="toast-msg" id="toast-feedback"></div>
+  </div>
+
+
+  <!-- ==========================================================================
+       MOBILE EXIT POPUP HTML COMPONENT
+       ========================================================================== -->
+  <div id="mobile-exit-modal" class="mobile-exit-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="mobile-exit-title">
+    <div class="mobile-exit-modal-card">
+      
+      <!-- 1. Circular container holding the logo image -->
+      <div class="mobile-exit-logo-circle">
+        <!-- Professional Dark Blue Brand Shield Emblem (SVG Logo / Image) -->
+        <svg class="mobile-exit-logo-img" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <!-- Outer Shield / Portal Badge -->
+          <path d="M24 4L40 9.8V22.5C40 33 33 40.8 24 44C15 40.8 8 33 8 22.5V9.8L24 4Z" fill="url(#brandGradient)" />
+          <!-- Inner Accent Arc -->
+          <path d="M24 8.5L36 12.8V22C36 30 30.5 36.2 24 39C17.5 36.2 12 30 12 22V12.8L24 8.5Z" fill="#1E3A8A" fill-opacity="0.25" />
+          <!-- Portal / Doorway Arch -->
+          <path d="M18 29V20C18 16.7 20.7 14 24 14C27.3 14 30 16.7 30 20V29" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
+          <!-- Keyhole / Core Beacon -->
+          <circle cx="24" cy="22" r="2.2" fill="#60A5FA" />
+          <!-- Gradient Definition -->
+          <defs>
+            <linearGradient id="brandGradient" x1="8" y1="4" x2="40" y2="44" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#0F2744" />
+              <stop offset="0.5" stop-color="#1E3A8A" />
+              <stop offset="1" stop-color="#2563EB" />
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+
+      <!-- 2. Text right below the logo -->
+      <h2 id="mobile-exit-title" class="mobile-exit-title">Do you want to exit?</h2>
+      <p class="mobile-exit-subtitle">Your active session will be ended.</p>
+
+      <!-- 3. Two rounded-rectangle buttons side-by-side: "Cancel" and "Exit" -->
+      <div class="mobile-exit-actions">
+        <button type="button" class="mobile-exit-btn mobile-exit-btn-cancel" id="mobile-exit-btn-cancel">
+          Cancel
+        </button>
+        <button type="button" class="mobile-exit-btn mobile-exit-btn-confirm" id="mobile-exit-btn-confirm">
+          Exit
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+
+  <!-- ==========================================================================
+       JAVASCRIPT LOGIC
+       ========================================================================== -->
+  <script>
+    (function () {
+      'use strict';
+
+      // Elements
+      const modal = document.getElementById('mobile-exit-modal');
+      const btnCancel = document.getElementById('mobile-exit-btn-cancel');
+      const btnConfirm = document.getElementById('mobile-exit-btn-confirm');
+      const testTriggerBtn = document.getElementById('test-trigger-btn');
+      const togglePreviewBtn = document.getElementById('toggle-preview-mode-btn');
+      const widthLabel = document.getElementById('current-width-label');
+      const mobileLabel = document.getElementById('mobile-detected-label');
+      const previewStateText = document.getElementById('preview-state-text');
+      const toastFeedback = document.getElementById('toast-feedback');
+
+      let forceDesktopPreview = false;
+
+      /**
+       * Requirement 1: Only trigger on mobile devices
+       * (Screen width <= 768px OR mobile user agent)
+       */
+      function isMobileDevice() {
+        const hasMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const isNarrowViewport = window.innerWidth <= 768 || window.matchMedia('(max-width: 768px)').matches;
+        return hasMobileUA || isNarrowViewport;
+      }
+
+      function updateDeviceStatusDisplay() {
+        if (widthLabel) widthLabel.textContent = `${window.innerWidth}px`;
+        const isMobile = isMobileDevice();
+        if (mobileLabel) {
+          mobileLabel.textContent = isMobile ? 'Mobile Detected (Eligible)' : 'Desktop (>768px)';
+          mobileLabel.style.color = isMobile ? '#10b981' : '#f59e0b';
+        }
+      }
+
+      window.addEventListener('resize', updateDeviceStatusDisplay);
+      updateDeviceStatusDisplay();
+
+      /**
+       * Show the exit popup
+       */
+      function openExitModal() {
+        const isMobile = isMobileDevice();
+
+        // If not on mobile AND force preview is not turned on, suppress popup
+        if (!isMobile && !forceDesktopPreview) {
+          showToast('Popup suppressed: Screen is >768px desktop. Enable "Force Desktop Preview" or resize under 768px to test.');
+          return false;
+        }
+
+        modal.classList.add('is-active');
+        document.body.style.overflow = 'hidden'; // Prevent background scrolling
+        return true;
+      }
+
+      /**
+       * Hide the exit popup
+       */
+      function closeExitModal() {
+        modal.classList.remove('is-active');
+        document.body.style.overflow = '';
+      }
+
+      /**
+       * Handle "Exit" confirmation
+       */
+      function handleExitConfirm() {
+        closeExitModal();
+        showToast('Exit confirmed. Redirecting or closing session...');
+        console.log('User confirmed exit.');
+        
+        // Example action: redirect to logout or sign-in page, or close window
+        setTimeout(function() {
+          // window.location.href = '/'; 
+        }, 1000);
+      }
+
+      /**
+       * Show toast message
+       */
+      function showToast(message) {
+        if (!toastFeedback) return;
+        toastFeedback.textContent = message;
+        toastFeedback.style.opacity = '1';
+        setTimeout(() => {
+          toastFeedback.style.opacity = '0';
+        }, 4000);
+      }
+
+      // Button listeners
+      if (btnCancel) {
+        btnCancel.addEventListener('click', function (e) {
+          e.stopPropagation();
+          closeExitModal();
+          showToast('Exit cancelled.');
+        });
+      }
+
+      if (btnConfirm) {
+        btnConfirm.addEventListener('click', function (e) {
+          e.stopPropagation();
+          handleExitConfirm();
+        });
+      }
+
+      // Close when clicking on backdrop overlay outside card
+      if (modal) {
+        modal.addEventListener('click', function (e) {
+          if (e.target === modal) {
+            closeExitModal();
+          }
+        });
+      }
+
+      // ESC key to close
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && modal.classList.contains('is-active')) {
+          closeExitModal();
+        }
+      });
+
+      // Manual test trigger button
+      if (testTriggerBtn) {
+        testTriggerBtn.addEventListener('click', openExitModal);
+      }
+
+      // Force preview toggle for desktop testing convenience
+      if (togglePreviewBtn) {
+        togglePreviewBtn.addEventListener('click', function () {
+          forceDesktopPreview = !forceDesktopPreview;
+          if (forceDesktopPreview) {
+            modal.classList.add('force-preview-mode');
+            previewStateText.textContent = 'ON';
+            previewStateText.style.color = '#38bdf8';
+            showToast('Desktop preview enabled. Click "Trigger Exit Popup" now!');
+          } else {
+            modal.classList.remove('force-preview-mode');
+            previewStateText.textContent = 'OFF';
+            previewStateText.style.color = '';
+            showToast('Desktop preview disabled.');
+          }
+        });
+      }
+
+      /**
+       * Mobile Browser Hardware/Navigation Back Button Integration:
+       * When on mobile, intercepts the back button and presents the exit confirmation!
+       */
+      if (window.history && window.history.pushState) {
+        // Push initial state to trap back button on mobile
+        window.history.pushState({ mobileExitTrap: true }, document.title, window.location.href);
+
+        window.addEventListener('popstate', function (event) {
+          if (isMobileDevice()) {
+            // Intercept navigation on mobile and display modal
+            const opened = openExitModal();
+            if (opened) {
+              // Re-push state so page doesn't actually unload until Exit is confirmed
+              window.history.pushState({ mobileExitTrap: true }, document.title, window.location.href);
+            }
+          }
+        });
+      }
+
+      // Expose globally for modular usage
+      window.MobileExitPopup = {
+        open: openExitModal,
+        close: closeExitModal,
+        isMobile: isMobileDevice
+      };
+
+    })();
+  </script>
+</body>
+</html>
