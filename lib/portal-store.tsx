@@ -37,6 +37,7 @@ export type ViewType =
   | "history"
   | "payments"
   | "inbox"
+  | "customer-dashboard"
   | "owner-dashboard"
   | "admin-dashboard";
 

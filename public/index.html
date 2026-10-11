@@ -494,65 +494,6 @@
                 display: none !important;
             }
         }
-
-        /* Smooth Tab Transition Animations for Touch Swipe & Tab Switching */
-        .tab-slide-left {
-            animation: tabSlideInFromRight 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
-
-        .tab-slide-right {
-            animation: tabSlideInFromLeft 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
-
-        .tab-slide-fade {
-            animation: tabFadeIn 0.22s ease-out forwards;
-        }
-
-        @keyframes tabSlideInFromRight {
-            0% {
-                opacity: 0;
-                transform: translateX(28px);
-            }
-            100% {
-                opacity: 1;
-                transform: translateX(0);
-            }
-        }
-
-        @keyframes tabSlideInFromLeft {
-            0% {
-                opacity: 0;
-                transform: translateX(-28px);
-            }
-            100% {
-                opacity: 1;
-                transform: translateX(0);
-            }
-        }
-
-        @keyframes tabFadeIn {
-            0% {
-                opacity: 0;
-                transform: translateY(6px);
-            }
-            100% {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        /* Mobile Tab Bar Active Styling */
-        .mobile-quick-tab {
-            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-            user-select: none;
-            -webkit-tap-highlight-color: transparent;
-        }
-        .mobile-quick-tab.active {
-            background-color: var(--primary, #4f46e5) !important;
-            color: #ffffff !important;
-            box-shadow: 0 2px 10px rgba(79, 70, 229, 0.35);
-            border-color: transparent !important;
-        }
     </style>
 </head>
 <body>
@@ -584,9 +525,9 @@
             <!-- Role Selector & Nav Links -->
             <div class="flex items-center gap-1 sm:gap-2">
                 <!-- Navigation Tabs (Only visible when signed in) -->
-                <div id="portalNavLinks" class="hidden md:flex items-center gap-1">
-                    <button class="nav-item-btn nav-tab-dashboard" id="btnTabDashboard" data-nav="dashboard" onclick="switchMainTab('meeseva')">
-                        <span>📊</span><span class="label-text" id="lblNavDashboard">Dashboard</span>
+                <div id="portalNavLinks" class="hidden md:flex items-center gap-1.5 sm:gap-2">
+                    <button class="nav-item-btn" id="btnTabCustomer" onclick="switchMainTab('customer')">
+                        <span>👤</span><span class="label-text" id="lblNavCustomer">Customer</span>
                     </button>
                     <button class="nav-item-btn active" id="btnTabMeeSeva" onclick="switchMainTab('meeseva')">
                         <span>🏛️</span><span class="label-text" id="lblNavMeeSeva">MeeSeva Services</span>
@@ -718,19 +659,19 @@
 
         <!-- Mobile Horizontal Scroll Menu for Customer Portal -->
         <div id="mobileQuickNav" class="flex md:hidden items-center gap-1.5 mt-1.5 w-full overflow-x-auto no-scrollbar py-1 px-1">
-            <button type="button" id="btnMobileNavDashboard" data-nav="dashboard" class="nav-tab-dashboard px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-indigo-600 text-white shrink-0" onclick="switchMainTab('meeseva')">
-                <span>📊</span> Dashboard
+            <button type="button" id="btnMobileTabCustomer" class="px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-main)] shrink-0" onclick="switchMainTab('customer')">
+                <span>👤</span> Customer
             </button>
-            <button type="button" id="btnMobileTabMeeSeva" class="mobile-quick-tab active px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-indigo-600 text-white shadow-sm shrink-0" onclick="switchMainTab('meeseva')">
+            <button type="button" id="btnMobileTabMeeSeva" class="px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-main)] shrink-0" onclick="switchMainTab('meeseva')">
                 <span>🏛️</span> MeeSeva
             </button>
-            <button type="button" id="btnMobileTabOnline" class="mobile-quick-tab px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-main)] shrink-0" onclick="switchMainTab('online')">
+            <button type="button" id="btnMobileTabOnline" class="px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-main)] shrink-0" onclick="switchMainTab('online')">
                 <span>⚡</span> Online Works
             </button>
-            <button type="button" id="btnMobileTabDocs" class="mobile-quick-tab px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-main)] shrink-0" onclick="switchMainTab('documents')">
+            <button type="button" id="btnMobileTabDocs" class="px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-main)] shrink-0" onclick="switchMainTab('documents')">
                 <span>📁</span> Documents
             </button>
-            <button type="button" id="btnMobileTabHistory" class="mobile-quick-tab px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-main)] shrink-0" onclick="switchMainTab('history')">
+            <button type="button" id="btnMobileTabHistory" class="px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-main)] shrink-0" onclick="switchMainTab('history')">
                 <span>📋</span> History
             </button>
         </div>
@@ -827,6 +768,160 @@
                     <button class="px-2.5 py-1 rounded-full border border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] whitespace-nowrap" onclick="filterServicesCategory('Revenue')">Revenue</button>
                     <button class="px-2.5 py-1 rounded-full border border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] whitespace-nowrap" onclick="filterServicesCategory('RTA')">RTA Services</button>
                     <button class="px-2.5 py-1 rounded-full border border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] whitespace-nowrap" onclick="filterServicesCategory('Pensions')">Pensions</button>
+                </div>
+            </section>
+
+            <!-- CUSTOMER VIEW: CUSTOMER MANAGEMENT DASHBOARD SECTION -->
+            <section id="viewCustomerDashboard" class="hidden space-y-6">
+                <!-- Customer Profile Card & Biometric Summary -->
+                <div class="bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl p-5 shadow-lg">
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div class="flex items-center gap-3.5">
+                            <div class="w-14 h-14 rounded-2xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center text-2xl font-bold shadow-inner">
+                                👤
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <h2 class="text-lg font-bold text-[var(--text-main)]" id="custDashName">Customer User</h2>
+                                    <span class="gov-pill badge-accepted text-[10px]" id="custDashRoleBadge">VERIFIED CITIZEN</span>
+                                </div>
+                                <p class="text-xs text-[var(--text-muted)] mt-0.5" id="custDashEmail">rohith.kumar@gmail.com</p>
+                                <div class="flex items-center gap-3 mt-1 text-[11px] text-[var(--text-dim)]">
+                                    <span>📱 +91 8125898068</span>
+                                    <span>•</span>
+                                    <span>🔒 256-Bit SSL Protected</span>
+                                    <span>•</span>
+                                    <span class="text-emerald-400">🛡️ Biometrics Registered</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button onclick="openProfileModal()" class="btn-outline text-xs py-2 px-3">
+                                ⚙️ Edit Profile
+                            </button>
+                            <button onclick="openInboxModal()" class="btn-primary text-xs py-2 px-3">
+                                💬 Messages
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- KPI Quick Stats Grid -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                    <div class="p-4 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-xs">
+                        <div class="flex items-center justify-between text-xs text-[var(--text-muted)] mb-1">
+                            <span>Total Applied</span>
+                            <span>📋</span>
+                        </div>
+                        <p class="text-xl sm:text-2xl font-black text-[var(--text-main)]" id="custStatTotalApps">0</p>
+                        <span class="text-[10px] text-indigo-400">All submissions</span>
+                    </div>
+                    <div class="p-4 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-xs">
+                        <div class="flex items-center justify-between text-xs text-[var(--text-muted)] mb-1">
+                            <span>In Progress</span>
+                            <span>⏳</span>
+                        </div>
+                        <p class="text-xl sm:text-2xl font-black text-amber-400" id="custStatInReview">0</p>
+                        <span class="text-[10px] text-amber-500/80">Under officer review</span>
+                    </div>
+                    <div class="p-4 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-xs">
+                        <div class="flex items-center justify-between text-xs text-[var(--text-muted)] mb-1">
+                            <span>Completed</span>
+                            <span>✅</span>
+                        </div>
+                        <p class="text-xl sm:text-2xl font-black text-emerald-400" id="custStatCompleted">0</p>
+                        <span class="text-[10px] text-emerald-500/80">Approved & certified</span>
+                    </div>
+                    <div class="p-4 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-xs">
+                        <div class="flex items-center justify-between text-xs text-[var(--text-muted)] mb-1">
+                            <span>Document Vault</span>
+                            <span>📁</span>
+                        </div>
+                        <p class="text-xl sm:text-2xl font-black text-indigo-400" id="custStatVaultDocs">0</p>
+                        <span class="text-[10px] text-indigo-400/80">Saved official records</span>
+                    </div>
+                </div>
+
+                <!-- Fast Actions & Application Management Shortcuts -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <!-- Quick Services Access -->
+                    <div class="lg:col-span-2 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl p-5 space-y-4">
+                        <div class="flex items-center justify-between border-b border-[var(--border-subtle)] pb-3">
+                            <h3 class="text-sm font-bold text-[var(--text-main)] flex items-center gap-2">
+                                <span>⚡</span> Frequently Used Citizen Services
+                            </h3>
+                            <button onclick="switchMainTab('meeseva')" class="text-xs text-indigo-400 hover:underline">
+                                View All MeeSeva →
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div class="p-3 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex items-center justify-between">
+                                <div class="flex items-center gap-2.5">
+                                    <span class="text-lg">💳</span>
+                                    <div>
+                                        <p class="text-xs font-bold text-[var(--text-main)]">Order Aadhaar PVC Card</p>
+                                        <p class="text-[10px] text-[var(--text-muted)]">Official UIDAI print • ₹50</p>
+                                    </div>
+                                </div>
+                                <button onclick="MSN.openApplyModal('ms-1', 'meeseva')" class="btn-primary text-xs py-1 px-2.5">Apply</button>
+                            </div>
+                            <div class="p-3 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex items-center justify-between">
+                                <div class="flex items-center gap-2.5">
+                                    <span class="text-lg">📜</span>
+                                    <div>
+                                        <p class="text-xs font-bold text-[var(--text-main)]">Income Certificate</p>
+                                        <p class="text-[10px] text-[var(--text-muted)]">Revenue Dept • ₹45</p>
+                                    </div>
+                                </div>
+                                <button onclick="MSN.openApplyModal('ms-2', 'meeseva')" class="btn-primary text-xs py-1 px-2.5">Apply</button>
+                            </div>
+                            <div class="p-3 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex items-center justify-between">
+                                <div class="flex items-center gap-2.5">
+                                    <span class="text-lg">🏛️</span>
+                                    <div>
+                                        <p class="text-xs font-bold text-[var(--text-main)]">Integrated Caste Certificate</p>
+                                        <p class="text-[10px] text-[var(--text-muted)]">SC/ST/BC Category • ₹45</p>
+                                    </div>
+                                </div>
+                                <button onclick="MSN.openApplyModal('ms-3', 'meeseva')" class="btn-primary text-xs py-1 px-2.5">Apply</button>
+                            </div>
+                            <div class="p-3 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex items-center justify-between">
+                                <div class="flex items-center gap-2.5">
+                                    <span class="text-lg">🌾</span>
+                                    <div>
+                                        <p class="text-xs font-bold text-[var(--text-main)]">Ration Card Application</p>
+                                        <p class="text-[10px] text-[var(--text-muted)]">Civil Supplies • ₹45</p>
+                                    </div>
+                                </div>
+                                <button onclick="MSN.openApplyModal('ms-6', 'meeseva')" class="btn-primary text-xs py-1 px-2.5">Apply</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Customer Quick Actions & Vault Card -->
+                    <div class="bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl p-5 space-y-4 flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between border-b border-[var(--border-subtle)] pb-3 mb-3">
+                                <h3 class="text-sm font-bold text-[var(--text-main)] flex items-center gap-2">
+                                    <span>📁</span> Citizen Locker & Vault
+                                </h3>
+                                <button onclick="switchMainTab('documents')" class="text-xs text-emerald-400 hover:underline">
+                                    Open Vault →
+                                </button>
+                            </div>
+                            <p class="text-xs text-[var(--text-muted)] leading-relaxed">
+                                Securely preserve Aadhaar, PAN, voter cards, passbooks, and certificates. Automatically pre-filled when applying for any government or utility service.
+                            </p>
+                        </div>
+                        <div class="pt-3 border-t border-[var(--border-subtle)] flex flex-col gap-2">
+                            <button onclick="switchMainTab('documents')" class="btn-outline w-full justify-center text-xs py-2">
+                                📂 Manage Stored Documents
+                            </button>
+                            <button onclick="switchMainTab('history')" class="btn-secondary w-full justify-center text-xs py-2">
+                                📋 View All Receipts & History
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -2273,7 +2368,6 @@
                 this.loadFromStorage();
                 this.setupTheme();
                 this.setupNav();
-                this.setupSwipeGestures();
                 this.renderRoleUI();
                 this.renderMeeSevaServices();
                 this.renderOnlineCategories();
@@ -2517,7 +2611,7 @@
 
             routeRoleWorkspace() {
                 // Hide all main role sections first
-                const views = ['viewMeeSeva', 'viewOnlineWorks', 'viewDocuments', 'viewHistory', 'viewOwnerDesk', 'viewAdminDashboard'];
+                const views = ['viewMeeSeva', 'viewOnlineWorks', 'viewDocuments', 'viewHistory', 'viewCustomerDashboard', 'viewOwnerDesk', 'viewAdminDashboard'];
                 views.forEach(v => {
                     const el = document.getElementById(v);
                     if (el) el.classList.add('hidden');
@@ -2543,9 +2637,31 @@
                 }
             },
 
-            switchMainTab(tab, direction = 'fade') {
+            renderCustomerDashboard() {
+                const nameEl = document.getElementById('custDashName');
+                const emailEl = document.getElementById('custDashEmail');
+                if (nameEl) nameEl.textContent = this.currentUser.fullName || this.currentUser.name || 'Citizen User';
+                if (emailEl) emailEl.textContent = this.currentUser.email || this.currentUser.phone || '';
+
+                const totalApps = this.customerApplications.length;
+                const inReview = this.customerApplications.filter(a => a.status === 'Submitted' || a.status === 'In Progress').length;
+                const completed = this.customerApplications.filter(a => a.status === 'Completed' || a.status === 'Approved').length;
+                const vaultDocsCount = Object.keys(this.uploadedLockerFiles).length;
+
+                const elTotal = document.getElementById('custStatTotalApps');
+                const elReview = document.getElementById('custStatInReview');
+                const elComp = document.getElementById('custStatCompleted');
+                const elVault = document.getElementById('custStatVaultDocs');
+                if (elTotal) elTotal.textContent = totalApps;
+                if (elReview) elReview.textContent = inReview;
+                if (elComp) elComp.textContent = completed;
+                if (elVault) elVault.textContent = vaultDocsCount;
+            },
+
+            switchMainTab(tab) {
                 this.activeTab = tab;
                 const tabViews = {
+                    customer: 'viewCustomerDashboard',
                     meeseva: 'viewMeeSeva',
                     online: 'viewOnlineWorks',
                     documents: 'viewDocuments',
@@ -2553,149 +2669,47 @@
                 };
 
                 const tabButtons = {
+                    customer: 'btnTabCustomer',
                     meeseva: 'btnTabMeeSeva',
                     online: 'btnTabOnlineWorks',
                     documents: 'btnTabDocs',
                     history: 'btnTabHistory'
                 };
 
-                const mobileButtons = {
-                    meeseva: 'btnMobileTabMeeSeva',
-                    online: 'btnMobileTabOnline',
-                    documents: 'btnMobileTabDocs',
-                    history: 'btnMobileTabHistory'
-                };
-
-                // Hide all customer tabs and remove previous slide animation classes
+                // Hide all customer tabs
                 Object.values(tabViews).forEach(id => {
                     const el = document.getElementById(id);
-                    if (el) {
-                        el.classList.add('hidden');
-                        el.classList.remove('tab-slide-left', 'tab-slide-right', 'tab-slide-fade');
-                    }
+                    if (el) el.classList.add('hidden');
                 });
 
-                // Remove active from desktop buttons
+                // Remove active from buttons
                 Object.values(tabButtons).forEach(id => {
                     const btn = document.getElementById(id);
                     if (btn) btn.classList.remove('active');
                 });
 
-                // Remove active from mobile quick buttons
-                Object.values(mobileButtons).forEach(id => {
-                    const btn = document.getElementById(id);
-                    if (btn) {
-                        btn.classList.remove('active');
-                        btn.classList.remove('bg-indigo-600', 'text-white', 'shadow-sm');
-                        btn.classList.add('bg-[var(--bg-elevated)]', 'border', 'border-[var(--border-subtle)]', 'text-[var(--text-main)]');
-                    }
-                });
-
-                // Show selected view with directional animation
+                // Show selected
                 const activeViewId = tabViews[tab] || 'viewMeeSeva';
                 const activeBtnId = tabButtons[tab] || 'btnTabMeeSeva';
-                const activeMobileBtnId = mobileButtons[tab] || 'btnMobileTabMeeSeva';
-
                 const activeViewEl = document.getElementById(activeViewId);
-                if (activeViewEl) {
-                    activeViewEl.classList.remove('hidden');
-                    if (direction === 'left') {
-                        activeViewEl.classList.add('tab-slide-left');
-                    } else if (direction === 'right') {
-                        activeViewEl.classList.add('tab-slide-right');
+                const activeBtnEl = document.getElementById(activeBtnId);
+                if (activeViewEl) activeViewEl.classList.remove('hidden');
+                if (activeBtnEl) activeBtnEl.classList.add('active');
+
+                // Update mobile button highlights
+                const mobCustomerBtn = document.getElementById('btnMobileTabCustomer');
+                if (mobCustomerBtn) {
+                    if (tab === 'customer') {
+                        mobCustomerBtn.className = 'px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-indigo-600 text-white shrink-0 shadow-sm';
                     } else {
-                        activeViewEl.classList.add('tab-slide-fade');
+                        mobCustomerBtn.className = 'px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-main)] shrink-0';
                     }
                 }
 
-                // Activate desktop button
-                const activeBtn = document.getElementById(activeBtnId);
-                if (activeBtn) activeBtn.classList.add('active');
-
-                // Activate mobile button & center it smoothly in horizontal scroll menu
-                const activeMobileBtn = document.getElementById(activeMobileBtnId);
-                if (activeMobileBtn) {
-                    activeMobileBtn.classList.add('active');
-                    activeMobileBtn.classList.remove('bg-[var(--bg-elevated)]', 'border-[var(--border-subtle)]');
-                    activeMobileBtn.classList.add('bg-indigo-600', 'text-white', 'shadow-sm');
-                    activeMobileBtn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-                }
-
+                if (tab === 'customer') this.renderCustomerDashboard();
                 if (tab === 'history') this.renderCustomerLedger();
                 if (tab === 'documents') this.renderDocumentLocker();
                 window.scrollTo({ top: 0, behavior: 'smooth' });
-            },
-
-            setupSwipeGestures() {
-                let touchStartX = 0;
-                let touchStartY = 0;
-                let touchStartTime = 0;
-                let isTracking = false;
-
-                const categoryTabs = ['meeseva', 'online', 'documents'];
-
-                const onTouchStart = (e) => {
-                    if (!e.touches || e.touches.length === 0) return;
-                    if (this.currentUser && this.currentUser.role !== 'Customer') return;
-
-                    const target = e.target;
-                    // Ignore interactive controls, modals, tables, and dialogs
-                    if (target.closest('input, textarea, select, [role="dialog"], #threeDotMenu, .gov-modal-overlay, #modalContainer, .gov-table-wrapper, #mobileExitModal')) {
-                        isTracking = false;
-                        return;
-                    }
-
-                    touchStartX = e.touches[0].clientX;
-                    touchStartY = e.touches[0].clientY;
-                    touchStartTime = Date.now();
-                    isTracking = true;
-                };
-
-                const onTouchEnd = (e) => {
-                    if (!isTracking) return;
-                    isTracking = false;
-
-                    if (!e.changedTouches || e.changedTouches.length === 0) return;
-                    const touch = e.changedTouches[0];
-                    const dx = touch.clientX - touchStartX;
-                    const dy = touch.clientY - touchStartY;
-                    const dt = Date.now() - touchStartTime;
-
-                    // Deliberate horizontal swipe: at least 45px, mostly horizontal, under 850ms
-                    if (Math.abs(dx) >= 45 && Math.abs(dx) > Math.abs(dy) * 1.25 && dt < 850) {
-                        const currentTab = this.activeTab || 'meeseva';
-                        const currentIndex = categoryTabs.indexOf(currentTab);
-
-                        if (dx < 0) {
-                            // Swiped Left: advance "Meeseva" -> "Online Works" -> "Documents"
-                            if (currentIndex !== -1 && currentIndex < categoryTabs.length - 1) {
-                                const nextTab = categoryTabs[currentIndex + 1];
-                                this.switchMainTab(nextTab, 'left');
-                            }
-                        } else {
-                            // Swiped Right: go backward "Documents" -> "Online Works" -> "Meeseva"
-                            if (currentIndex > 0) {
-                                const prevTab = categoryTabs[currentIndex - 1];
-                                this.switchMainTab(prevTab, 'right');
-                            } else if (currentTab === 'history') {
-                                this.switchMainTab('documents', 'right');
-                            }
-                        }
-                    }
-                };
-
-                // Attach to main content area and navigation header
-                const mainArea = document.querySelector('main') || document.getElementById('portalInterface');
-                const headerArea = document.querySelector('header');
-
-                if (mainArea) {
-                    mainArea.addEventListener('touchstart', onTouchStart, { passive: true });
-                    mainArea.addEventListener('touchend', onTouchEnd, { passive: true });
-                }
-                if (headerArea) {
-                    headerArea.addEventListener('touchstart', onTouchStart, { passive: true });
-                    headerArea.addEventListener('touchend', onTouchEnd, { passive: true });
-                }
             },
 
             renderMeeSevaServices(filterText = '') {
@@ -3966,8 +3980,8 @@
             MSN.logAudit("ROLE_SWITCH", `User switched role to ${role}`);
         }
 
-        function switchMainTab(tab, direction) {
-            MSN.switchMainTab(tab, direction);
+        function switchMainTab(tab) {
+            MSN.switchMainTab(tab);
         }
 
         let adminMobileNavOpen = false;

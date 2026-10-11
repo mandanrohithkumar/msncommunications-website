@@ -1017,13 +1017,9 @@ export const DocumentManagement: React.FC = () => {
 
   // Main Documents Page View
   return (
-    <div className="w-full max-w-5xl mx-auto px-4 py-8 animate-in fade-in duration-300 space-y-8">
+    <div className="w-full max-w-5xl mx-auto px-4 pt-3 sm:pt-4 pb-8 animate-in fade-in duration-300 space-y-6 sm:space-y-8">
       {/* Title */}
-      <div className="text-center">
-        <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#FFF3E0] dark:bg-amber-950/20 border border-[#FFE082] text-[#E65100] text-xs font-bold mb-3">
-          <Shield className="w-3.5 h-3.5" />
-          <span>{t("docs.badge")}</span>
-        </div>
+      <div className="text-center pt-1">
         <h1 className="text-3xl md:text-4xl font-black tracking-tight text-[#000080] dark:text-white mb-2">
           Document Management & Family Digital Vault
         </h1>

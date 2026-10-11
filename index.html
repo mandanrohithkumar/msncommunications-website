@@ -525,10 +525,7 @@
             <!-- Role Selector & Nav Links -->
             <div class="flex items-center gap-1 sm:gap-2">
                 <!-- Navigation Tabs (Only visible when signed in) -->
-                <div id="portalNavLinks" class="hidden md:flex items-center gap-1">
-                    <button class="nav-item-btn nav-tab-dashboard" id="btnTabDashboard" data-nav="dashboard" onclick="switchMainTab('meeseva')">
-                        <span>📊</span><span class="label-text" id="lblNavDashboard">Dashboard</span>
-                    </button>
+                <div id="portalNavLinks" class="hidden md:flex items-center gap-1.5 sm:gap-2">
                     <button class="nav-item-btn active" id="btnTabMeeSeva" onclick="switchMainTab('meeseva')">
                         <span>🏛️</span><span class="label-text" id="lblNavMeeSeva">MeeSeva Services</span>
                     </button>
@@ -659,9 +656,6 @@
 
         <!-- Mobile Horizontal Scroll Menu for Customer Portal -->
         <div id="mobileQuickNav" class="flex md:hidden items-center gap-1.5 mt-1.5 w-full overflow-x-auto no-scrollbar py-1 px-1">
-            <button type="button" id="btnMobileNavDashboard" data-nav="dashboard" class="nav-tab-dashboard px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-indigo-600 text-white shrink-0" onclick="switchMainTab('meeseva')">
-                <span>📊</span> Dashboard
-            </button>
             <button type="button" id="btnMobileTabMeeSeva" class="px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-main)] shrink-0" onclick="switchMainTab('meeseva')">
                 <span>🏛️</span> MeeSeva
             </button>
