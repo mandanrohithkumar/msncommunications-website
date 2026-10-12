@@ -44,7 +44,10 @@ export const DynamicForm: React.FC = () => {
     submitApplication,
     user,
     setPreviewDoc,
-    t
+    t,
+    vaultDocuments,
+    findVaultDocumentForSlot,
+    uploadVaultDocument
   } = usePortal();
 
   const [formData, setFormData] = useState<Record<string, string>>({
@@ -72,10 +75,38 @@ export const DynamicForm: React.FC = () => {
   }, [user]);
 
   const [attachedFiles, setAttachedFiles] = useState<Record<string, UploadedFileMeta>>({});
+  const [vaultAttachedSlots, setVaultAttachedSlots] = useState<Record<string, boolean>>({});
   const [ownerNote, setOwnerNote] = useState("");
   const [validationError, setValidationError] = useState<string | null>(null);
   const [errorFieldId, setErrorFieldId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Scenario A (Vault -> Service):
+  // When opening any service form, check if a valid document already exists in the Family Digital Vault
+  // and automatically pre-populate / auto-attach it to the service form slot.
+  useEffect(() => {
+    if (!selectedService?.docs) return;
+
+    selectedService.docs.forEach((doc) => {
+      // If slot not already attached
+      if (!attachedFiles[doc.label]) {
+        const match = findVaultDocumentForSlot(doc.label, selectedService.category);
+        if (match) {
+          setAttachedFiles((prev) => {
+            if (prev[doc.label]) return prev;
+            return {
+              ...prev,
+              [doc.label]: match.fileMeta
+            };
+          });
+          setVaultAttachedSlots((prev) => ({
+            ...prev,
+            [doc.label]: true
+          }));
+        }
+      }
+    });
+  }, [selectedService, findVaultDocumentForSlot, vaultDocuments]);
 
   // Mobile swipe navigation between 'Required Documents' and 'Applicant Information'
   const [activeMobileSection, setActiveMobileSection] = useState<"docs" | "applicant">("docs");
@@ -490,6 +521,9 @@ export const DynamicForm: React.FC = () => {
             <div className="space-y-3.5">
               {selectedService.docs.map((doc) => {
                 const isAttached = attachedFiles[doc.label];
+                const isFromVault = Boolean(vaultAttachedSlots[doc.label]);
+                const vaultMatch = findVaultDocumentForSlot(doc.label, selectedService.category);
+
                 return (
                   <div key={doc.label} id={`doc-box-${doc.label.replace(/[^a-zA-Z0-9]/g, "-")}`}>
                     <FileUploadBox
@@ -498,16 +532,50 @@ export const DynamicForm: React.FC = () => {
                       required={doc.required}
                       acceptedTypes={doc.acceptedTypes || [".pdf", ".jpg", ".jpeg", ".png"]}
                       currentFile={isAttached}
+                      isFromVault={isFromVault}
+                      vaultDocAvailable={vaultMatch ? vaultMatch.fileMeta : null}
+                      onUseFromVault={() => {
+                        if (vaultMatch) {
+                          setAttachedFiles((prev) => ({
+                            ...prev,
+                            [doc.label]: vaultMatch.fileMeta
+                          }));
+                          setVaultAttachedSlots((prev) => ({
+                            ...prev,
+                            [doc.label]: true
+                          }));
+                          setValidationError(null);
+                          setErrorFieldId(null);
+                        }
+                      }}
                       onConfirmUpload={(_file, fileMeta) => {
+                        // Scenario B (Service -> Vault) & Scenario C (Updates/Overrides):
+                        // Save to active service session AND automatically push to central Family Digital Vault
                         setAttachedFiles((prev) => ({
                           ...prev,
                           [doc.label]: fileMeta
                         }));
+                        setVaultAttachedSlots((prev) => ({
+                          ...prev,
+                          [doc.label]: true
+                        }));
                         setValidationError(null);
                         setErrorFieldId(null);
+
+                        uploadVaultDocument(doc.label, fileMeta, _file, {
+                          source: "service_form",
+                          serviceId: selectedService.id,
+                          categoryName: selectedService.category,
+                          slotName: doc.label
+                        });
                       }}
                       onRemove={() => {
                         setAttachedFiles((prev) => {
+                          const copy = { ...prev };
+                          delete copy[doc.label];
+                          return copy;
+                        });
+                        setVaultAttachedSlots((prev) => {
                           const copy = { ...prev };
                           delete copy[doc.label];
                           return copy;

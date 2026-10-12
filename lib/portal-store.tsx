@@ -22,7 +22,10 @@ import {
   PasswordResetRequest,
   PasswordChangeAuditLog,
   Gender,
-  FaceLoginLog
+  FaceLoginLog,
+  UserDocumentRecord,
+  ServiceDocumentLinkRecord,
+  UserDocumentMetadata
 } from "@/types/portal";
 import { MEESEVA_SERVICES, ONLINE_CATEGORIES, DOCUMENT_CATEGORIES } from "./services-data";
 import { getTranslation, Language } from "./translations";
@@ -150,6 +153,34 @@ interface PortalContextType {
   setPreviewDoc: (doc: UploadedFileMeta | null) => void;
   submissionDocsMap: Record<string, Record<string, UploadedFileMeta>>;
   getApplicationDocuments: (app: Application) => Record<string, UploadedFileMeta>;
+
+  // Centralized Vault Documents & Sync
+  vaultDocuments: UserDocumentRecord[];
+  refreshVaultDocuments: () => Promise<void>;
+  uploadVaultDocument: (
+    docName: string,
+    fileMeta: UploadedFileMeta,
+    file?: File | null,
+    options?: {
+      familyMemberId?: string;
+      categoryName?: string;
+      source?: "vault" | "service_form";
+      serviceId?: string;
+      applicationId?: string;
+      slotName?: string;
+    }
+  ) => Promise<UserDocumentRecord | null>;
+  findVaultDocumentForSlot: (
+    slotLabel: string,
+    categoryName?: string,
+    familyMemberId?: string
+  ) => { doc: UserDocumentRecord; fileMeta: UploadedFileMeta } | null;
+  linkDocumentWorkflow: (
+    documentId: string,
+    serviceId: string,
+    slotName: string,
+    applicationId?: string
+  ) => Promise<boolean>;
 
   // Applications
   applications: Application[];
@@ -3230,6 +3261,268 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, []);
 
+  // Centralized Vault Documents state
+  const [vaultDocuments, setVaultDocuments] = useState<UserDocumentRecord[]>([]);
+
+  const refreshVaultDocuments = useCallback(async () => {
+    const currentId = user?.id || user?.email || "usr-cust-1";
+    try {
+      const res = await fetch(`/api/vault/documents?userId=${encodeURIComponent(currentId)}`);
+      const data = await res.json();
+      if (data.success && Array.isArray(data.documents)) {
+        setVaultDocuments(data.documents);
+      }
+    } catch (err) {
+      console.warn("[PortalStore] Failed to fetch vault documents:", err);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    refreshVaultDocuments();
+  }, [refreshVaultDocuments]);
+
+  // Synchronizes document with backend central table user_documents
+  const uploadVaultDocument = useCallback(
+    async (
+      docName: string,
+      fileMeta: UploadedFileMeta,
+      file?: File | null,
+      options?: {
+        familyMemberId?: string;
+        categoryName?: string;
+        source?: "vault" | "service_form";
+        serviceId?: string;
+        applicationId?: string;
+        slotName?: string;
+      }
+    ): Promise<UserDocumentRecord | null> => {
+      const userId = user?.id || user?.email || "usr-cust-1";
+      const familyMemberId = options?.familyMemberId || "self";
+      const categoryName = options?.categoryName || "Identity & Personal Documents";
+      const source = options?.source || "vault";
+
+      // Immediate local UI update
+      const email = (user?.email || user?.id || "rohith.kumar@gmail.com").toLowerCase().trim();
+      setUserDocsMap((prev) => {
+        const userDocs = { ...(prev[email] || {}) };
+        userDocs[docName] = fileMeta;
+        const updated = { ...prev, [email]: userDocs };
+        try {
+          localStorage.setItem("msn_portal_user_documents", JSON.stringify(updated));
+        } catch (e) {}
+        return updated;
+      });
+
+      try {
+        let res: Response;
+        if (file) {
+          const formData = new FormData();
+          formData.append("file", file);
+          formData.append("userId", userId);
+          formData.append("familyMemberId", familyMemberId);
+          formData.append("docName", docName);
+          formData.append("categoryName", categoryName);
+          formData.append(
+            "metadata",
+            JSON.stringify({
+              ...fileMeta,
+              source,
+              serviceId: options?.serviceId,
+              applicationId: options?.applicationId,
+              slotName: options?.slotName || docName
+            })
+          );
+          res = await fetch("/api/vault/upload", {
+            method: "POST",
+            body: formData
+          });
+        } else {
+          res = await fetch("/api/vault/upload", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userId,
+              familyMemberId,
+              docName,
+              categoryName,
+              fileUrl: fileMeta.dataUrl || fileMeta.fileUrl || "/msn-logo.png",
+              fileName: fileMeta.name,
+              size: fileMeta.size,
+              type: fileMeta.type,
+              metadata: {
+                ...fileMeta,
+                source,
+                serviceId: options?.serviceId,
+                applicationId: options?.applicationId,
+                slotName: options?.slotName || docName
+              }
+            })
+          });
+        }
+
+        const data = await res.json();
+        if (data.success && data.document) {
+          const newRecord: UserDocumentRecord = data.document;
+          setVaultDocuments((prev) => {
+            const idx = prev.findIndex((d) => d.id === newRecord.id);
+            if (idx !== -1) {
+              const copy = [...prev];
+              copy[idx] = newRecord;
+              return copy;
+            }
+            return [newRecord, ...prev];
+          });
+          return newRecord;
+        }
+      } catch (e) {
+        console.warn("[uploadVaultDocument Error]", e);
+      }
+      return null;
+    },
+    [user]
+  );
+
+  // Queries the central repository when opening any service form to pre-populate/auto-attach
+  const findVaultDocumentForSlot = useCallback(
+    (
+      slotLabel: string,
+      categoryName?: string,
+      familyMemberId: string = "self"
+    ): { doc: UserDocumentRecord; fileMeta: UploadedFileMeta } | null => {
+      if (!slotLabel) return null;
+      const cleanLabel = slotLabel.trim().toLowerCase();
+
+      // Detect target family member from slot name if present
+      let targetMember = familyMemberId;
+      if (/\[father\]|father's|father\s+aadhaar/i.test(slotLabel)) {
+        targetMember = "father";
+      } else if (/\[mother\]|mother's|mother\s+aadhaar/i.test(slotLabel)) {
+        targetMember = "mother";
+      } else if (/\[wife\]|\[husband\]|\[spouse\]|spouse|wife|husband/i.test(slotLabel)) {
+        targetMember = "spouse";
+      }
+
+      // Canonical document code detection
+      let targetCode = "";
+      if (/aadhaar|aadhar|uidai/i.test(cleanLabel)) targetCode = "aadhaar_card";
+      else if (/\bpan\b|pan card/i.test(cleanLabel)) targetCode = "pan_card";
+      else if (/voter|epic|election/i.test(cleanLabel)) targetCode = "voter_id";
+      else if (/driving|licence|license|\bdl\b/i.test(cleanLabel)) targetCode = "driving_licence";
+      else if (/photo|photograph/i.test(cleanLabel)) targetCode = "passport_photo";
+      else if (/sign|signature/i.test(cleanLabel)) targetCode = "signature";
+      else if (/ration/i.test(cleanLabel)) targetCode = "ration_card";
+      else if (/gas\s*bill/i.test(cleanLabel)) targetCode = "gas_bill";
+      else if (/electric|current\s*bill/i.test(cleanLabel)) targetCode = "electricity_bill";
+      else if (/income/i.test(cleanLabel)) targetCode = "income_certificate";
+      else if (/caste/i.test(cleanLabel)) targetCode = "caste_certificate";
+      else if (/birth/i.test(cleanLabel)) targetCode = "birth_certificate";
+      else if (/death/i.test(cleanLabel)) targetCode = "death_certificate";
+      else if (/bank|passbook/i.test(cleanLabel)) targetCode = "bank_passbook";
+
+      // 1. Search in central vaultDocuments
+      const foundDoc = vaultDocuments.find((d) => {
+        const memberMatches = (d.family_member_id || "self").toLowerCase() === targetMember.toLowerCase();
+        if (!memberMatches && targetMember !== "self") return false;
+
+        if (targetCode && d.document_type_code.toLowerCase() === targetCode.toLowerCase()) {
+          return true;
+        }
+
+        const dDocName = (d.metadata?.docName || "").toLowerCase();
+        const dFileName = (d.metadata?.fileName || "").toLowerCase();
+        if (dDocName && (dDocName.includes(cleanLabel) || cleanLabel.includes(dDocName))) {
+          return true;
+        }
+        if (dFileName && cleanLabel.includes(dFileName.replace(/\.[^.]+$/, ""))) {
+          return true;
+        }
+        return false;
+      });
+
+      if (foundDoc) {
+        const meta: UploadedFileMeta = {
+          id: foundDoc.id,
+          name: foundDoc.metadata?.fileName || `${slotLabel}.pdf`,
+          size: foundDoc.metadata?.fileSize || "120 KB",
+          type: foundDoc.metadata?.fileType || "application/pdf",
+          uploadedAt: new Date(foundDoc.uploaded_at).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit"
+          }),
+          docName: slotLabel,
+          dataUrl: foundDoc.file_url,
+          fileUrl: foundDoc.file_url,
+          customerId: foundDoc.user_id,
+          previewType: foundDoc.file_url.includes("image") || foundDoc.metadata?.fileType?.includes("image") ? "image" : "pdf",
+          verificationStatus: foundDoc.metadata?.verificationStatus || "APPROVED",
+          verificationMessage: foundDoc.metadata?.verificationMessage || "Verified & Fetched from Family Digital Vault",
+          isGenuineAadhaar: foundDoc.document_type_code === "aadhaar_card"
+        };
+        return { doc: foundDoc, fileMeta: meta };
+      }
+
+      // 2. Search in local userDocsMap
+      const email = (user?.email || "").toLowerCase().trim();
+      const userVault = userDocsMap[email] || uploadedDocs || {};
+      for (const [key, meta] of Object.entries(userVault)) {
+        const kLower = key.toLowerCase();
+        if (
+          kLower === cleanLabel ||
+          (targetCode === "aadhaar_card" && /aadhaar/i.test(kLower)) ||
+          (targetCode === "pan_card" && /pan/i.test(kLower)) ||
+          (targetCode === "voter_id" && /voter/i.test(kLower))
+        ) {
+          return {
+            doc: {
+              id: meta.id || `local-${Date.now()}`,
+              user_id: user?.id || "usr-cust-1",
+              family_member_id: targetMember,
+              document_type_code: targetCode || "document",
+              file_url: meta.fileUrl || meta.dataUrl || "",
+              uploaded_at: new Date().toISOString(),
+              metadata: { ...meta, source: "vault" }
+            },
+            fileMeta: meta
+          };
+        }
+      }
+
+      return null;
+    },
+    [vaultDocuments, userDocsMap, uploadedDocs, user]
+  );
+
+  // Binds an existing vault document ID to a service submission workflow
+  const linkDocumentWorkflow = useCallback(
+    async (
+      documentId: string,
+      serviceId: string,
+      slotName: string,
+      applicationId?: string
+    ): Promise<boolean> => {
+      try {
+        const userId = user?.id || user?.email || "usr-cust-1";
+        const res = await fetch("/api/services/link-document", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            documentId,
+            userId,
+            serviceId,
+            applicationId,
+            slotName
+          })
+        });
+        const data = await res.json();
+        return Boolean(data.success);
+      } catch (e) {
+        console.warn("[linkDocumentWorkflow Error]", e);
+        return false;
+      }
+    },
+    [user]
+  );
+
   // Documents - Scoped strictly to authenticated user's email with persistent storage
   const uploadDocument = (docName: string, file: File, maybeMeta?: UploadedFileMeta) => {
     const email = (user?.email || user?.id || "").toLowerCase().trim();
@@ -3258,6 +3551,9 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
         return updated;
       });
+
+      // Synchronize with central user_documents API table (Scenario A/C)
+      uploadVaultDocument(docName, newDoc, file, { source: "vault" });
 
       setNotifications((prev) => [
         {
@@ -3312,6 +3608,9 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
         return updated;
       });
+
+      // Synchronize with central user_documents API table (Scenario A/C)
+      uploadVaultDocument(docName, newDoc, file, { source: "vault" });
     };
 
     reader.readAsDataURL(file);
@@ -3440,6 +3739,13 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         } catch (e) {}
       }
       return updated;
+    });
+
+    // 3. Link documents to service submission workflow via API
+    Object.entries(linkedDocs).forEach(([slotLabel, fileMeta]) => {
+      if (fileMeta.id) {
+        linkDocumentWorkflow(fileMeta.id, service.id, slotLabel, newId);
+      }
     });
 
     if (service.price !== "Free" && service.price !== "0") {
@@ -3880,6 +4186,11 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setPreviewDoc: safeSetPreviewDoc,
         submissionDocsMap,
         getApplicationDocuments,
+        vaultDocuments,
+        refreshVaultDocuments,
+        uploadVaultDocument,
+        findVaultDocumentForSlot,
+        linkDocumentWorkflow,
         applications,
         submitApplication,
         acceptTask,

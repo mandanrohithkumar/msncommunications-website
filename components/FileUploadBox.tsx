@@ -38,6 +38,10 @@ export interface FileUploadBoxProps {
   className?: string;
   hideLabel?: boolean;
   categoryName?: string;
+  isFromVault?: boolean;
+  onReplace?: () => void;
+  onUseFromVault?: () => void;
+  vaultDocAvailable?: UploadedFileMeta | null;
 }
 
 export const FileUploadBox: React.FC<FileUploadBoxProps> = ({
@@ -51,7 +55,11 @@ export const FileUploadBox: React.FC<FileUploadBoxProps> = ({
   disabled = false,
   className = "",
   hideLabel = false,
-  categoryName
+  categoryName,
+  isFromVault = false,
+  onReplace,
+  onUseFromVault,
+  vaultDocAvailable = null
 }) => {
   const [isMounted, setIsMounted] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
@@ -320,10 +328,16 @@ export const FileUploadBox: React.FC<FileUploadBoxProps> = ({
             </div>
 
             <div className="min-w-0 flex-1 overflow-hidden">
-              <div className="flex items-center gap-1.5 mb-0.5">
+              <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
                 <span className="text-[9px] font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-300 bg-emerald-100/80 dark:bg-emerald-900/60 px-1.5 py-0.2 rounded shrink-0">
                   Attached
                 </span>
+                {isFromVault && (
+                  <span className="text-[9px] font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-700 px-1.5 py-0.2 rounded flex items-center gap-1 shrink-0">
+                    <ShieldCheck className="w-2.5 h-2.5 text-emerald-600 dark:text-emerald-400" />
+                    <span>Fetched from Digital Vault</span>
+                  </span>
+                )}
                 <span className="text-[9px] font-mono text-slate-500 dark:text-slate-400 truncate">
                   {activeDoc.size}
                 </span>
@@ -355,7 +369,7 @@ export const FileUploadBox: React.FC<FileUploadBoxProps> = ({
             </div>
           </div>
 
-          {/* Action Buttons: View and Delete */}
+          {/* Action Buttons: View, Replace, and Delete */}
           <div className="pt-1.5 border-t border-emerald-200/60 dark:border-emerald-900/40 flex items-center gap-1.5">
             <button
               type="button"
@@ -375,6 +389,22 @@ export const FileUploadBox: React.FC<FileUploadBoxProps> = ({
 
             <button
               type="button"
+              onClick={() => {
+                if (onReplace) {
+                  onReplace();
+                } else if (fileInputRef.current) {
+                  fileInputRef.current.value = "";
+                  fileInputRef.current.click();
+                }
+              }}
+              className="py-1 px-2.5 rounded-lg border border-amber-300 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-amber-800 dark:text-amber-300 text-[11px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer"
+              title="Replace document"
+            >
+              <span>Replace</span>
+            </button>
+
+            <button
+              type="button"
               onClick={handleRemoveAttached}
               className="py-1 px-2.5 rounded-lg border border-rose-200 dark:border-rose-900/50 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 text-[11px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer"
               title="Remove document"
@@ -385,7 +415,7 @@ export const FileUploadBox: React.FC<FileUploadBoxProps> = ({
           </div>
         </div>
       ) : (
-        /* The compact upload state: Click or Drop to Attach, with Select button */
+        /* The compact upload state: Click or Drop to Attach, with Select & Use from Vault buttons */
         <div
           onDrop={handleDrop}
           onDragOver={handleDragOver}
@@ -413,9 +443,25 @@ export const FileUploadBox: React.FC<FileUploadBoxProps> = ({
             </div>
           </div>
 
-          <span className="px-2 py-0.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/80 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-[10px] font-bold shrink-0 whitespace-nowrap">
-            Select
-          </span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {(vaultDocAvailable || onUseFromVault) && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onUseFromVault) onUseFromVault();
+                }}
+                className="px-2 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold flex items-center gap-1 shadow-xs cursor-pointer transition-colors"
+                title="Attach verified document directly from Family Digital Vault"
+              >
+                <ShieldCheck className="w-3 h-3" />
+                <span>Use from Vault</span>
+              </button>
+            )}
+            <span className="px-2 py-0.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/80 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-[10px] font-bold whitespace-nowrap">
+              Select
+            </span>
+          </div>
         </div>
       )}
 

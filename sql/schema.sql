@@ -90,3 +90,58 @@ CREATE TABLE IF NOT EXISTS admin_customer_messages (
 );
 
 CREATE INDEX IF NOT EXISTS idx_messages_customer ON admin_customer_messages(customer_id);
+
+-- ==============================================================================
+-- 6. Centralized Document Table: user_documents (Family Digital Vault)
+-- Unified storage for all user & family member identity/statutory documents
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS user_documents (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id VARCHAR(64) NOT NULL,
+    family_member_id VARCHAR(64) DEFAULT 'self',
+    document_type_code VARCHAR(100) NOT NULL,
+    file_url TEXT NOT NULL,
+    storage_path TEXT,
+    uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    metadata JSONB DEFAULT '{}'::jsonb,
+    CONSTRAINT fk_user_documents_customer FOREIGN KEY (user_id) REFERENCES customers(id) ON DELETE CASCADE
+);
+
+-- Essential Performance Indexes
+CREATE INDEX IF NOT EXISTS idx_user_documents_user ON user_documents(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_documents_member ON user_documents(user_id, family_member_id);
+CREATE INDEX IF NOT EXISTS idx_user_documents_type ON user_documents(document_type_code);
+CREATE INDEX IF NOT EXISTS idx_user_documents_lookup ON user_documents(user_id, family_member_id, document_type_code);
+
+-- Backward compatibility alias view for family_vault_documents
+CREATE OR REPLACE VIEW family_vault_documents AS
+SELECT 
+    id,
+    user_id,
+    family_member_id,
+    document_type_code,
+    file_url,
+    storage_path,
+    uploaded_at,
+    metadata
+FROM user_documents;
+
+-- ==============================================================================
+-- 7. Service Linked Documents Table
+-- Binds existing vault document records to specific service submission workflows
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS service_linked_documents (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    document_id UUID NOT NULL REFERENCES user_documents(id) ON DELETE CASCADE,
+    user_id VARCHAR(64) NOT NULL,
+    service_id VARCHAR(100) NOT NULL,
+    application_id VARCHAR(100),
+    slot_name VARCHAR(150) NOT NULL,
+    linked_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    metadata JSONB DEFAULT '{}'::jsonb
+);
+
+CREATE INDEX IF NOT EXISTS idx_service_linked_docs_user ON service_linked_documents(user_id);
+CREATE INDEX IF NOT EXISTS idx_service_linked_docs_app ON service_linked_documents(application_id);
+CREATE INDEX IF NOT EXISTS idx_service_linked_docs_service ON service_linked_documents(service_id);
+

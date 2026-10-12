@@ -205,7 +205,7 @@ export interface UploadedFileMeta {
   categoryName?: string;
   docName?: string;
   previewType?: 'image' | 'pdf' | 'certificate';
-  verificationStatus?: 'APPROVED' | 'REJECTED';
+  verificationStatus?: 'APPROVED' | 'REJECTED' | 'PENDING' | 'VERIFIED';
   verificationMessage?: string;
   isGenuineAadhaar?: boolean;
 }
@@ -297,3 +297,47 @@ export interface DocumentCategoryDef {
   icon: string;
   items: string[];
 }
+
+export interface UserDocumentMetadata {
+  fileName?: string;
+  fileSize?: string;
+  fileSizeBytes?: number;
+  fileType?: string;
+  docName?: string;
+  categoryName?: string;
+  verificationStatus?: 'APPROVED' | 'REJECTED' | 'PENDING' | 'VERIFIED';
+  verificationMessage?: string;
+  isGenuine?: boolean;
+  documentNumber?: string;
+  source?: 'vault' | 'service_form';
+  serviceId?: string;
+  applicationId?: string;
+  slotName?: string;
+  sha256Hash?: string;
+  structuredFields?: Record<string, any>;
+  [key: string]: any;
+}
+
+export interface UserDocumentRecord {
+  id: string; // UUID primary key
+  user_id: string; // Foreign Key to user/customer UUID or email
+  family_member_id?: string; // Foreign Key / Member ID: 'self' | 'father' | 'mother' | etc.
+  document_type_code: string; // e.g., 'aadhaar_card', 'pan_card', 'voter_id'
+  file_url: string; // Accessible URL or dataUrl
+  storage_path?: string; // Internal storage path
+  uploaded_at: string; // Timestamp
+  metadata: UserDocumentMetadata; // JSON metadata
+}
+
+export interface ServiceDocumentLinkRecord {
+  id: string; // UUID
+  document_id: string; // UUID references user_documents.id
+  user_id: string;
+  service_id: string;
+  application_id?: string;
+  slot_name: string;
+  linked_at: string;
+  metadata?: Record<string, any>;
+  document?: UserDocumentRecord;
+}
+
