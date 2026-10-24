@@ -24,7 +24,8 @@ import {
   Scan,
   Eye,
   ShieldCheck,
-  LogIn
+  LogIn,
+  Menu
 } from "lucide-react";
 import { ExtendedFamilyModal } from "./extended-family-modal";
 import { FaceRecognitionModal } from "./face-recognition-modal";
@@ -537,7 +538,7 @@ export const PortalNavbar: React.FC = () => {
             <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 border border-white dark:border-[#11131c]" />
           </button>
 
-          {/* Three-Dots Icon (...) */}
+          {/* Mobile Drawer / Three-Dots Menu Button */}
           <button
             type="button"
             onClick={() => setMenuOpen(!menuOpen)}
@@ -550,10 +551,17 @@ export const PortalNavbar: React.FC = () => {
                 ? "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
                 : "text-slate-300 hover:text-white hover:bg-white/10"
             }`}
-            title="Account & Language Menu (...)"
-            aria-label="Account and Language Menu"
+            title="Menu & Account Navigation"
+            aria-label="Menu and Account Navigation"
           >
-            <MoreHorizontal className="w-4 h-4 sm:w-5 sm:h-5" />
+            {menuOpen ? (
+              <X className="w-4 h-4 sm:w-5 sm:h-5" />
+            ) : (
+              <>
+                <Menu className="w-4 h-4 sm:hidden" />
+                <MoreHorizontal className="hidden sm:block w-5 h-5" />
+              </>
+            )}
             {unreadCount > 0 && (
               <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-[#FF9933] border-2 border-white dark:border-[#11131c] animate-pulse" />
             )}
@@ -575,6 +583,97 @@ export const PortalNavbar: React.FC = () => {
                   <span>Session records cleared!</span>
                 </div>
               )}
+
+              {/* Mobile Drawer Navigation Links */}
+              <div className="sm:hidden mb-3 pb-3 border-b border-slate-200/80 dark:border-white/10 space-y-2">
+                <div className="flex items-center justify-between px-1">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                    Quick Navigation Menu
+                  </span>
+                  <span className="text-[10px] font-semibold text-[#000080] dark:text-blue-300">
+                    MSN Portal
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrentView("meeseva");
+                      setMenuOpen(false);
+                    }}
+                    className={`p-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all text-left ${
+                      currentView === "meeseva"
+                        ? "bg-[#FFF3E0] text-[#E65100] border border-[#FFE0B2]"
+                        : "bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300"
+                    }`}
+                  >
+                    <span>🏛️</span>
+                    <span className="truncate">{t("nav.meeseva")}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrentView("online-works");
+                      setMenuOpen(false);
+                    }}
+                    className={`p-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all text-left ${
+                      currentView === "online-works" || currentView === "online-sub"
+                        ? "bg-[#EFF6FF] text-[#000080] border border-[#BFDBFE]"
+                        : "bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300"
+                    }`}
+                  >
+                    <span>🌐</span>
+                    <span className="truncate">{t("nav.online_works")}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrentView("documents");
+                      setMenuOpen(false);
+                    }}
+                    className={`p-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all text-left ${
+                      currentView === "documents"
+                        ? "bg-[#E8F5E9] text-[#138808] border border-[#C8E6C9]"
+                        : "bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300"
+                    }`}
+                  >
+                    <span>📁</span>
+                    <span className="truncate">{t("nav.documents")}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrentView("history");
+                      setMenuOpen(false);
+                    }}
+                    className={`p-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all text-left ${
+                      currentView === "history"
+                        ? "bg-[#EFF6FF] text-[#000080] border border-[#BFDBFE]"
+                        : "bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300"
+                    }`}
+                  >
+                    <span>📜</span>
+                    <span className="truncate">History</span>
+                  </button>
+                  {(user?.role === "owner" || user?.role === "superadmin") && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCurrentView("owner-dashboard");
+                        setMenuOpen(false);
+                      }}
+                      className={`col-span-2 p-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                        currentView === "owner-dashboard"
+                          ? "bg-[#FFF3E0] text-[#E65100] border border-[#FFE082]"
+                          : "bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200"
+                      }`}
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5 text-[#E65100]" />
+                      <span>Owner Workbench</span>
+                    </button>
+                  )}
+                </div>
+              </div>
 
               {/* 1. Logged-in Account Profile Card */}
               <div
@@ -998,7 +1097,7 @@ export const PortalNavbar: React.FC = () => {
       </nav>
 
       {/* Mobile Sticky Quick-View Navigator Chips */}
-      <div className="flex sm:hidden items-center justify-center gap-1.5 mt-1.5 w-full max-w-xl px-1 overflow-x-auto no-scrollbar py-0.5">
+      <div className="flex sm:hidden items-center gap-1.5 mt-1.5 w-full max-w-xl px-2 overflow-x-auto no-scrollbar scroll-smooth touch-pan-x py-0.5">
         <button
           type="button"
           id="btnNavMeeSeva"
@@ -1041,6 +1140,32 @@ export const PortalNavbar: React.FC = () => {
           <span>📁</span>
           <span>{t("nav.documents")}</span>
         </button>
+        <button
+          type="button"
+          onClick={() => setCurrentView("history")}
+          className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 shrink-0 ${
+            currentView === "history"
+              ? "bg-[#EFF6FF] dark:bg-blue-950/70 text-[#000080] dark:text-[#93C5FD] border border-[#BFDBFE] dark:border-blue-800 shadow-xs scale-105"
+              : "bg-white/80 dark:bg-slate-900/80 text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-800"
+          }`}
+        >
+          <span>📜</span>
+          <span>History</span>
+        </button>
+        {(user?.role === "owner" || user?.role === "superadmin") && (
+          <button
+            type="button"
+            onClick={() => setCurrentView("owner-dashboard")}
+            className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 shrink-0 ${
+              currentView === "owner-dashboard"
+                ? "bg-[#FFF3E0] dark:bg-amber-950/70 text-[#E65100] dark:text-[#FFB74D] border border-[#FFE082] shadow-xs scale-105"
+                : "bg-white/80 dark:bg-slate-900/80 text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-800"
+            }`}
+          >
+            <span>🛡️</span>
+            <span>Owner</span>
+          </button>
+        )}
       </div>
 
       {/* Confirmation Modal for Reset Session Records */}

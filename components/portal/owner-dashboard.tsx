@@ -823,10 +823,10 @@ export const OwnerDashboard: React.FC = () => {
         </div>
 
         {/* Tab Switchers */}
-        <div className="flex flex-row items-center justify-between gap-2 p-1.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 self-stretch sm:self-auto shadow-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 p-1.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 w-full md:w-auto shadow-sm">
           <button
             onClick={() => setActiveTab("available")}
-            className={`flex-1 text-center px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            className={`w-full text-center px-4 py-2.5 sm:py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center justify-center ${
               activeTab === "available"
                 ? "bg-[#FF9933] text-white shadow-md shadow-[#FF9933]/25"
                 : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
@@ -836,7 +836,7 @@ export const OwnerDashboard: React.FC = () => {
           </button>
           <button
             onClick={() => setActiveTab("mine")}
-            className={`flex-1 text-center px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            className={`w-full text-center px-4 py-2.5 sm:py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center justify-center ${
               activeTab === "mine"
                 ? "bg-[#000080] text-white shadow-md shadow-[#000080]/25"
                 : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
@@ -846,7 +846,7 @@ export const OwnerDashboard: React.FC = () => {
           </button>
           <button
             onClick={() => setActiveTab("completed")}
-            className={`flex-1 text-center px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            className={`w-full text-center px-4 py-2.5 sm:py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center justify-center ${
               activeTab === "completed"
                 ? "bg-[#138808] text-white shadow-md shadow-[#138808]/25"
                 : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
@@ -863,16 +863,16 @@ export const OwnerDashboard: React.FC = () => {
       {activeTab === "available" && (
         <div className="space-y-6">
           {/* Category Filter Toolbar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-2xl bg-[#F9FAFB] dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800">
-            <div className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 p-3 sm:p-3.5 rounded-2xl bg-[#F9FAFB] dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 overflow-hidden">
+            <div className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300 shrink-0">
               <Filter className="w-3.5 h-3.5 text-[#000080]" />
               <span>Category Filter:</span>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 w-full sm:w-auto no-scrollbar scrollbar-none touch-pan-x -mx-1 px-1">
               <button
                 onClick={() => setCategoryFilter("all")}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 whitespace-nowrap ${
                   categoryFilter === "all"
                     ? "bg-[#000080] text-white shadow-sm"
                     : "bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50"
@@ -883,7 +883,7 @@ export const OwnerDashboard: React.FC = () => {
 
               <button
                 onClick={() => setCategoryFilter("online")}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
                   categoryFilter === "online"
                     ? "bg-[#000080] text-white shadow-sm"
                     : "bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[#000080] dark:text-blue-300 hover:bg-slate-50"
@@ -895,7 +895,7 @@ export const OwnerDashboard: React.FC = () => {
 
               <button
                 onClick={() => setCategoryFilter("meeseva")}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
                   categoryFilter === "meeseva"
                     ? "bg-[#FF9933] text-white shadow-sm"
                     : "bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[#E65100] dark:text-amber-400 hover:bg-slate-50"
@@ -938,28 +938,28 @@ export const OwnerDashboard: React.FC = () => {
               return (
                 <div
                   key={app.id}
-                  className="p-5 md:p-7 rounded-3xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 backdrop-blur-md shadow-sm space-y-6 hover:border-[#FF9933]/50 transition-all duration-200"
+                  className="w-full p-4 sm:p-5 md:p-7 rounded-2xl sm:rounded-3xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 backdrop-blur-md shadow-sm space-y-4 sm:space-y-6 hover:border-[#FF9933]/50 transition-all duration-200"
                 >
                   {/* Dynamic Service Selection & Pricing Tracker Header */}
-                  <div className="p-4 rounded-2xl bg-gradient-to-r from-[#FFF3E0]/70 via-white to-[#E8F5E9]/70 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="space-y-1.5">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-mono text-xs font-bold text-[#000080] dark:text-blue-300 bg-[#E8EEF5] px-2.5 py-0.5 rounded-md border border-[#BBDEFB]">
+                  <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-gradient-to-r from-[#FFF3E0]/70 via-white to-[#E8F5E9]/70 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
+                    <div className="space-y-1.5 min-w-0">
+                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                        <span className="font-mono text-xs font-bold text-[#000080] dark:text-blue-300 bg-[#E8EEF5] px-2.5 py-0.5 rounded-md border border-[#BBDEFB] shrink-0">
                           {app.id}
                         </span>
 
                         {/* Category Tagging: Bold distinctive pill for Online Works vs MeeSeva Works */}
-                        <span className={`px-2.5 py-1 rounded-md text-xs font-black uppercase tracking-wider shadow-sm ${cat.pillClass}`}>
+                        <span className={`px-2.5 py-1 rounded-md text-xs font-black uppercase tracking-wider shadow-sm shrink-0 ${cat.pillClass}`}>
                           {cat.label}
                         </span>
 
                         {cat.subLabel && (
-                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${cat.badgeClass}`}>
+                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold shrink-0 ${cat.badgeClass}`}>
                             {cat.subLabel}
                           </span>
                         )}
 
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#E8F5E9] text-[#138808] border border-[#C8E6C9]">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#E8F5E9] text-[#138808] border border-[#C8E6C9] shrink-0">
                           <Activity className="w-2.5 h-2.5 animate-pulse text-[#138808]" />
                           Real-Time Sync
                         </span>
@@ -967,21 +967,21 @@ export const OwnerDashboard: React.FC = () => {
                         <span className="text-xs text-slate-500 dark:text-slate-400">• Submitted {app.createdAt}</span>
                       </div>
 
-                      <h3 className="text-lg font-black text-[#000080] dark:text-white">
+                      <h3 className="text-base sm:text-lg font-black text-[#000080] dark:text-white break-words">
                         {liveData.serviceName}
                       </h3>
                     </div>
 
-                    <div className="flex items-center gap-3 self-start md:self-auto">
-                      <div className="text-right">
+                    <div className="flex items-center justify-between sm:justify-end gap-3 w-full md:w-auto pt-2.5 md:pt-0 border-t md:border-t-0 border-slate-200/80 dark:border-slate-800">
+                      <div className="text-left sm:text-right">
                         <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500 block">
                           Statutory Fee
                         </span>
-                        <span className="text-xl font-black text-[#138808]">
+                        <span className="text-lg sm:text-xl font-black text-[#138808]">
                           {liveData.price}
                         </span>
                       </div>
-                      <span className="text-xs font-bold px-3 py-1 rounded-full bg-[#FFF3E0] text-[#E65100] border border-[#FF9933]/30">
+                      <span className="text-xs font-bold px-3 py-1 rounded-full bg-[#FFF3E0] text-[#E65100] border border-[#FF9933]/30 whitespace-nowrap shrink-0">
                         {app.status}
                       </span>
                     </div>
@@ -1270,28 +1270,28 @@ export const OwnerDashboard: React.FC = () => {
               return (
                 <div
                   key={app.id}
-                  className="p-5 md:p-7 rounded-3xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 backdrop-blur-md shadow-sm space-y-6 hover:border-[#000080]/40 transition-all duration-200"
+                  className="w-full p-4 sm:p-5 md:p-7 rounded-2xl sm:rounded-3xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 backdrop-blur-md shadow-sm space-y-4 sm:space-y-6 hover:border-[#000080]/40 transition-all duration-200"
                 >
                   {/* Dynamic Service Selection & Pricing Tracker Header */}
-                  <div className="p-4 rounded-2xl bg-gradient-to-r from-[#E8EEF5]/70 via-white to-[#E8F5E9]/70 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="space-y-1.5">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-mono text-xs font-bold text-[#000080] dark:text-blue-300 bg-[#E8EEF5] px-2.5 py-0.5 rounded-md border border-[#BBDEFB]">
+                  <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-gradient-to-r from-[#E8EEF5]/70 via-white to-[#E8F5E9]/70 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
+                    <div className="space-y-1.5 min-w-0">
+                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                        <span className="font-mono text-xs font-bold text-[#000080] dark:text-blue-300 bg-[#E8EEF5] px-2.5 py-0.5 rounded-md border border-[#BBDEFB] shrink-0">
                           {app.id}
                         </span>
 
                         {/* Bold Category Tag */}
-                        <span className={`px-2.5 py-1 rounded-md text-xs font-black uppercase tracking-wider shadow-sm ${cat.pillClass}`}>
+                        <span className={`px-2.5 py-1 rounded-md text-xs font-black uppercase tracking-wider shadow-sm shrink-0 ${cat.pillClass}`}>
                           {cat.label}
                         </span>
 
                         {cat.subLabel && (
-                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${cat.badgeClass}`}>
+                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold shrink-0 ${cat.badgeClass}`}>
                             {cat.subLabel}
                           </span>
                         )}
 
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#E8F5E9] text-[#138808] border border-[#C8E6C9]">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#E8F5E9] text-[#138808] border border-[#C8E6C9] shrink-0">
                           <Activity className="w-2.5 h-2.5 animate-pulse text-[#138808]" />
                           Real-Time Sync
                         </span>
@@ -1299,21 +1299,21 @@ export const OwnerDashboard: React.FC = () => {
                         <span className="text-xs text-slate-500 dark:text-slate-400">• Updated {app.updatedAt}</span>
                       </div>
 
-                      <h3 className="text-lg font-black text-[#000080] dark:text-white">
+                      <h3 className="text-base sm:text-lg font-black text-[#000080] dark:text-white break-words">
                         {liveData.serviceName}
                       </h3>
                     </div>
 
-                    <div className="flex items-center gap-3 self-start md:self-auto">
-                      <div className="text-right">
+                    <div className="flex items-center justify-between sm:justify-end gap-3 w-full md:w-auto pt-2.5 md:pt-0 border-t md:border-t-0 border-slate-200/80 dark:border-slate-800">
+                      <div className="text-left sm:text-right">
                         <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500 block">
                           Statutory Fee
                         </span>
-                        <span className="text-xl font-black text-[#138808]">
+                        <span className="text-lg sm:text-xl font-black text-[#138808]">
                           {liveData.price}
                         </span>
                       </div>
-                      <span className="text-xs font-bold px-3 py-1 rounded-full bg-[#E8F5E9] text-[#138808] border border-[#C8E6C9]">
+                      <span className="text-xs font-bold px-3 py-1 rounded-full bg-[#E8F5E9] text-[#138808] border border-[#C8E6C9] whitespace-nowrap shrink-0">
                         {app.status}
                       </span>
                     </div>
@@ -1653,24 +1653,24 @@ export const OwnerDashboard: React.FC = () => {
               return (
                 <div
                   key={app.id}
-                  className="p-5 md:p-6 rounded-2xl bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3"
+                  className="w-full p-4 sm:p-5 md:p-6 rounded-2xl bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3"
                 >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs font-bold text-[#138808]">{app.id}</span>
-                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ${cat.pillClass}`}>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-slate-100 dark:border-slate-800 pb-2">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                        <span className="font-mono text-xs font-bold text-[#138808] shrink-0">{app.id}</span>
+                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider shrink-0 ${cat.pillClass}`}>
                           {cat.label}
                         </span>
                         <span className="text-xs text-slate-500">• Finished on {app.updatedAt}</span>
                       </div>
-                      <h4 className="text-base font-bold text-[#000080] dark:text-white mt-1">
+                      <h4 className="text-base font-bold text-[#000080] dark:text-white mt-1 break-words">
                         {liveData.serviceName}
                       </h4>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs font-bold px-3 py-1 rounded-full bg-[#E8F5E9] text-[#138808] border border-[#C8E6C9]">
+                    <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800">
+                      <span className="text-xs font-bold px-3 py-1 rounded-full bg-[#E8F5E9] text-[#138808] border border-[#C8E6C9] whitespace-nowrap shrink-0">
                         Completed
                       </span>
                       <span className="text-base font-black text-[#138808]">{liveData.price}</span>
