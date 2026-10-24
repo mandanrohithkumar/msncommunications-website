@@ -823,10 +823,10 @@ export const OwnerDashboard: React.FC = () => {
         </div>
 
         {/* Tab Switchers */}
-        <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 self-start md:self-auto shadow-sm">
+        <div className="flex flex-row items-center justify-between gap-2 p-1.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 self-stretch sm:self-auto shadow-sm">
           <button
             onClick={() => setActiveTab("available")}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`flex-1 text-center px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
               activeTab === "available"
                 ? "bg-[#FF9933] text-white shadow-md shadow-[#FF9933]/25"
                 : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
@@ -836,7 +836,7 @@ export const OwnerDashboard: React.FC = () => {
           </button>
           <button
             onClick={() => setActiveTab("mine")}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`flex-1 text-center px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
               activeTab === "mine"
                 ? "bg-[#000080] text-white shadow-md shadow-[#000080]/25"
                 : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
@@ -846,35 +846,13 @@ export const OwnerDashboard: React.FC = () => {
           </button>
           <button
             onClick={() => setActiveTab("completed")}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`flex-1 text-center px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
               activeTab === "completed"
                 ? "bg-[#138808] text-white shadow-md shadow-[#138808]/25"
                 : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
             }`}
           >
             Completed ({completedTasks.length})
-          </button>
-          <button
-            onClick={() => setActiveTab("services")}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-              activeTab === "services"
-                ? "bg-gradient-to-r from-[#FF9933] to-[#E65100] text-white shadow-md shadow-[#FF9933]/25"
-                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-            }`}
-          >
-            <Building2 className="w-3.5 h-3.5" />
-            <span>Services Catalog ({meesevaServices.length} MeeSeva)</span>
-          </button>
-          <button
-            onClick={() => setActiveTab("portals")}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-              activeTab === "portals"
-                ? "bg-gradient-to-r from-[#000080] to-blue-700 text-white shadow-md shadow-blue-900/25"
-                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-            }`}
-          >
-            <Globe className="w-3.5 h-3.5" />
-            <span>Official Portals (9)</span>
           </button>
         </div>
       </div>
