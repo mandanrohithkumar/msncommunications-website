@@ -805,7 +805,7 @@ export const OwnerDashboard: React.FC = () => {
   };
 
   return (
-    <div className="w-full max-w-6xl mx-auto px-4 py-8 animate-in fade-in duration-300 space-y-8">
+    <div className="w-full max-w-6xl mx-auto px-4 py-8 animate-in fade-in duration-300 space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-200 dark:border-slate-800">
         <div>
@@ -853,70 +853,6 @@ export const OwnerDashboard: React.FC = () => {
             }`}
           >
             Completed ({completedTasks.length})
-          </button>
-        </div>
-      </div>
-
-      {/* Quick Official Dept Portals Shortcut Strip */}
-      <div className="flex flex-wrap items-center justify-between gap-2.5 p-3 rounded-2xl bg-gradient-to-r from-blue-50/70 via-white to-emerald-50/70 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 border border-slate-200/80 dark:border-slate-800 text-xs shadow-xs">
-        <div className="flex items-center gap-2">
-          <span className="p-1.5 rounded-lg bg-[#000080] text-white">
-            <Globe className="w-3.5 h-3.5" />
-          </span>
-          <span className="font-bold text-slate-800 dark:text-slate-200">Official Dept Shortcuts:</span>
-        </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          <a
-            href="https://meeseva.telangana.gov.in"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-blue-500 text-[11px] font-semibold text-blue-700 dark:text-blue-300 flex items-center gap-1 shadow-2xs hover:shadow-xs transition-all"
-          >
-            <span>MeeSeva 2.0</span>
-            <ExternalLink className="w-2.5 h-2.5 opacity-60" />
-          </a>
-          <a
-            href="https://epds.telangana.gov.in"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-emerald-500 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 flex items-center gap-1 shadow-2xs hover:shadow-xs transition-all"
-          >
-            <span>EPDS Ration</span>
-            <ExternalLink className="w-2.5 h-2.5 opacity-60" />
-          </a>
-          <a
-            href="https://cdma.cgg.gov.in"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-amber-500 text-[11px] font-semibold text-amber-700 dark:text-amber-300 flex items-center gap-1 shadow-2xs hover:shadow-xs transition-all"
-          >
-            <span>CDMA Birth/Death</span>
-            <ExternalLink className="w-2.5 h-2.5 opacity-60" />
-          </a>
-          <a
-            href="https://www.ghmc.gov.in"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-purple-500 text-[11px] font-semibold text-purple-700 dark:text-purple-300 flex items-center gap-1 shadow-2xs hover:shadow-xs transition-all"
-          >
-            <span>GHMC / UBC</span>
-            <ExternalLink className="w-2.5 h-2.5 opacity-60" />
-          </a>
-          <a
-            href="https://dharani.telangana.gov.in"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-emerald-600 text-[11px] font-semibold text-emerald-800 dark:text-emerald-200 flex items-center gap-1 shadow-2xs hover:shadow-xs transition-all"
-          >
-            <span>Dharani</span>
-            <ExternalLink className="w-2.5 h-2.5 opacity-60" />
-          </a>
-          <button
-            type="button"
-            onClick={() => setActiveTab("portals")}
-            className="px-2.5 py-1 rounded-lg bg-[#000080] text-white text-[11px] font-bold hover:bg-blue-900 transition-colors cursor-pointer"
-          >
-            All 9 Portals &rarr;
           </button>
         </div>
       </div>
