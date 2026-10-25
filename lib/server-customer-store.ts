@@ -29,17 +29,9 @@ function readCustomersFromDisk(): UserAccount[] {
       if (raw.trim()) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
-          // Filter out any legacy mock accounts with names like rahul_kumar or anjali_sharma placeholder data
+          // Keep all valid customer records with id and email
           return parsed.filter(
-            (c) =>
-              c &&
-              c.id &&
-              c.email &&
-              c.username !== "rahul_kumar" &&
-              c.username !== "anjali_sharma" &&
-              c.username !== "vikram_reddy" &&
-              c.username !== "sneha_patel" &&
-              c.username !== "suresh_reddy"
+            (c) => Boolean(c && c.id && c.email)
           );
         }
       }
@@ -59,15 +51,7 @@ function writeCustomersToDisk(customers: UserAccount[]): boolean {
       fs.mkdirSync(STORAGE_DIR, { recursive: true });
     }
     const cleanCustomers = customers.filter(
-      (c) =>
-        c &&
-        c.id &&
-        c.email &&
-        c.username !== "rahul_kumar" &&
-        c.username !== "anjali_sharma" &&
-        c.username !== "vikram_reddy" &&
-        c.username !== "sneha_patel" &&
-        c.username !== "suresh_reddy"
+      (c) => Boolean(c && c.id && c.email)
     );
     fs.writeFileSync(CUSTOMERS_FILE, JSON.stringify(cleanCustomers, null, 2), "utf-8");
     return true;
@@ -118,10 +102,14 @@ function enrichCustomerRecord(customer: UserAccount): UserAccount {
   const dynamicWorksCount = getCustomerWorksCount(customer.id, customer.email);
   const totalUploads = Math.max(customer.totalUploads || 0, dynamicWorksCount);
 
-  // Check for active session in session logs
-  const hasActiveSession = (customer.sessionLogs || []).some((s) => s.status === "active");
+  // Check for active session in session logs or activeSessionId property
+  const hasActiveSession =
+    Boolean(customer.activeSessionId) ||
+    (customer.sessionLogs || []).some((s) => s.status === "active");
   const activeSessionId = hasActiveSession
-    ? customer.activeSessionId || `sess-live-${customer.id}`
+    ? customer.activeSessionId ||
+      customer.sessionLogs?.find((s) => s.status === "active")?.sessionId ||
+      `sess-live-${customer.id}`
     : undefined;
 
   return {

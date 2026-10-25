@@ -10,7 +10,7 @@
     "status": "active",
     "gender": "Male",
     "faceVerified": true,
-    "lastLogin": "Oct 16, 2026, 03:09 PM",
+    "lastLogin": "Oct 25, 2026, 03:09 PM",
     "registeredAt": "Feb 14, 2026, 10:30 AM",
     "totalLogins": 14,
     "totalLogouts": 13,
@@ -23,7 +23,7 @@
         "id": "sess-1",
         "sessionId": "sess-live-usr-cust-1",
         "userEmail": "rohith.kumar@gmail.com",
-        "loginTime": "Oct 16, 2026, 03:09 PM",
+        "loginTime": "Oct 25, 2026, 03:09 PM",
         "durationSeconds": 1800,
         "status": "active",
         "device": "Chrome / Windows 11",
@@ -76,14 +76,25 @@
     "status": "active",
     "gender": "Female",
     "faceVerified": true,
-    "lastLogin": "Oct 16, 2026, 08:39 PM",
+    "lastLogin": "Oct 25, 2026, 02:45 PM",
     "registeredAt": "Oct 16, 2026, 08:30 PM",
-    "totalLogins": 5,
-    "totalLogouts": 5,
-    "totalUploads": 1,
-    "totalTimeSpentSeconds": 2100,
+    "totalLogins": 8,
+    "totalLogouts": 7,
+    "totalUploads": 2,
+    "totalTimeSpentSeconds": 3100,
+    "activeSessionId": "sess-live-kaveri-1792",
     "createdAt": "2026-10-16",
     "sessionLogs": [
+      {
+        "id": "sess-kaveri-live",
+        "sessionId": "sess-live-kaveri-1792",
+        "userEmail": "kaveri.mallepakula@gmail.com",
+        "loginTime": "Oct 25, 2026, 02:45 PM",
+        "durationSeconds": 1420,
+        "status": "active",
+        "device": "Chrome / Windows 11",
+        "ipAddress": "49.205.18.22"
+      },
       {
         "id": "sess-2",
         "sessionId": "sess-1792163229888",
@@ -103,6 +114,13 @@
         "action": "Uploaded Aadhaar Card",
         "timestamp": "Oct 16, 2026, 08:39 PM",
         "details": "Uploaded Screenshot 2026-10-12 114629.png to Aadhaar Services"
+      },
+      {
+        "id": "act-kaveri-2",
+        "userEmail": "kaveri.mallepakula@gmail.com",
+        "action": "Biometric Face Recognition",
+        "timestamp": "Oct 25, 2026, 02:45 PM",
+        "details": "Verified via live camera snapshot with 99.1% match"
       }
     ]
   },
@@ -117,14 +135,25 @@
     "status": "active",
     "gender": "Male",
     "faceVerified": true,
-    "lastLogin": "Oct 12, 2026, 01:09 PM",
+    "lastLogin": "Oct 25, 2026, 01:20 PM",
     "registeredAt": "Oct 12, 2026, 01:00 PM",
-    "totalLogins": 3,
-    "totalLogouts": 3,
+    "totalLogins": 5,
+    "totalLogouts": 4,
     "totalUploads": 1,
-    "totalTimeSpentSeconds": 1560,
+    "totalTimeSpentSeconds": 2200,
+    "activeSessionId": "sess-live-venkatesh-1791",
     "createdAt": "2026-10-12",
     "sessionLogs": [
+      {
+        "id": "sess-venk-live",
+        "sessionId": "sess-live-venkatesh-1791",
+        "userEmail": "venkatesh.mandan@gmail.com",
+        "loginTime": "Oct 25, 2026, 01:20 PM",
+        "durationSeconds": 2100,
+        "status": "active",
+        "device": "Edge / Windows 11",
+        "ipAddress": "106.51.74.19"
+      },
       {
         "id": "sess-3",
         "sessionId": "sess-1791342719418",
@@ -144,6 +173,344 @@
         "action": "Uploaded Aadhaar Card",
         "timestamp": "Oct 12, 2026, 01:09 PM",
         "details": "Uploaded IMG_20250912_193814.png to Identity & Personal Documents"
+      },
+      {
+        "id": "act-venk-2",
+        "userEmail": "venkatesh.mandan@gmail.com",
+        "action": "Session Resumed",
+        "timestamp": "Oct 25, 2026, 01:20 PM",
+        "details": "Authenticated via secure SMS OTP verification"
+      }
+    ]
+  },
+  {
+    "id": "usr-cust-2",
+    "name": "Anjali Sharma",
+    "username": "anjali_sharma",
+    "email": "anjali.sharma@gmail.com",
+    "phone": "9123456780",
+    "password": "Password@23",
+    "role": "customer",
+    "status": "active",
+    "gender": "Female",
+    "faceVerified": true,
+    "lastLogin": "Oct 25, 2026, 12:15 PM",
+    "registeredAt": "Mar 10, 2026, 09:15 AM",
+    "totalLogins": 9,
+    "totalLogouts": 8,
+    "totalUploads": 2,
+    "totalTimeSpentSeconds": 4300,
+    "activeSessionId": "sess-live-anjali-2026",
+    "createdAt": "2026-03-10",
+    "sessionLogs": [
+      {
+        "id": "sess-anjali-live",
+        "sessionId": "sess-live-anjali-2026",
+        "userEmail": "anjali.sharma@gmail.com",
+        "loginTime": "Oct 25, 2026, 12:15 PM",
+        "durationSeconds": 2400,
+        "status": "active",
+        "device": "Firefox / Windows 11",
+        "ipAddress": "115.112.98.45"
+      },
+      {
+        "id": "sess-anjali-prev",
+        "sessionId": "sess-anjali-prev-1",
+        "userEmail": "anjali.sharma@gmail.com",
+        "loginTime": "Oct 18, 2026, 10:30 AM",
+        "logoutTime": "Oct 18, 2026, 11:15 AM",
+        "durationSeconds": 2700,
+        "status": "ended",
+        "device": "Firefox / Windows 11",
+        "ipAddress": "115.112.98.45"
+      }
+    ],
+    "activityLogs": [
+      {
+        "id": "act-anjali-1",
+        "userEmail": "anjali.sharma@gmail.com",
+        "action": "Applied for Residence Certificate",
+        "timestamp": "Oct 18, 2026, 10:45 AM",
+        "details": "Submitted MeeSeva application for Residence Certificate"
+      },
+      {
+        "id": "act-anjali-2",
+        "userEmail": "anjali.sharma@gmail.com",
+        "action": "Face Biometric Authenticated",
+        "timestamp": "Oct 25, 2026, 12:15 PM",
+        "details": "Live blink recognition passed (98.6% match)"
+      }
+    ]
+  },
+  {
+    "id": "usr-cust-3",
+    "name": "Suresh Reddy",
+    "username": "suresh_reddy",
+    "email": "suresh.reddy@gmail.com",
+    "phone": "9849011223",
+    "password": "Password@23",
+    "role": "customer",
+    "status": "active",
+    "gender": "Male",
+    "faceVerified": true,
+    "lastLogin": "Oct 24, 2026, 06:40 PM",
+    "registeredAt": "Jan 18, 2026, 02:00 PM",
+    "totalLogins": 11,
+    "totalLogouts": 11,
+    "totalUploads": 3,
+    "totalTimeSpentSeconds": 6100,
+    "createdAt": "2026-01-18",
+    "sessionLogs": [
+      {
+        "id": "sess-suresh-1",
+        "sessionId": "sess-suresh-20261024",
+        "userEmail": "suresh.reddy@gmail.com",
+        "loginTime": "Oct 24, 2026, 06:40 PM",
+        "logoutTime": "Oct 24, 2026, 07:20 PM",
+        "durationSeconds": 2400,
+        "status": "ended",
+        "device": "Chrome / Android 14",
+        "ipAddress": "183.82.110.12"
+      }
+    ],
+    "activityLogs": [
+      {
+        "id": "act-suresh-1",
+        "userEmail": "suresh.reddy@gmail.com",
+        "action": "Uploaded Land Pahani Document",
+        "timestamp": "Oct 24, 2026, 06:55 PM",
+        "details": "Uploaded RoR 1B document to Dharani Revenue category"
+      }
+    ]
+  },
+  {
+    "id": "usr-cust-4",
+    "name": "Praveen Varma",
+    "username": "praveen_varma",
+    "email": "praveen.varma@gmail.com",
+    "phone": "9876543210",
+    "password": "Password@23",
+    "role": "customer",
+    "status": "active",
+    "gender": "Male",
+    "faceVerified": false,
+    "lastLogin": "Oct 23, 2026, 04:10 PM",
+    "registeredAt": "Apr 05, 2026, 11:45 AM",
+    "totalLogins": 4,
+    "totalLogouts": 4,
+    "totalUploads": 1,
+    "totalTimeSpentSeconds": 1450,
+    "createdAt": "2026-04-05",
+    "sessionLogs": [
+      {
+        "id": "sess-prav-1",
+        "sessionId": "sess-praveen-20261023",
+        "userEmail": "praveen.varma@gmail.com",
+        "loginTime": "Oct 23, 2026, 04:10 PM",
+        "logoutTime": "Oct 23, 2026, 04:35 PM",
+        "durationSeconds": 1500,
+        "status": "ended",
+        "device": "Chrome / Windows 11",
+        "ipAddress": "122.164.20.10"
+      }
+    ],
+    "activityLogs": [
+      {
+        "id": "act-prav-1",
+        "userEmail": "praveen.varma@gmail.com",
+        "action": "New PAN Card Submission",
+        "timestamp": "Oct 23, 2026, 04:15 PM",
+        "details": "Submitted application for PAN Form 49A"
+      }
+    ]
+  },
+  {
+    "id": "usr-cust-5",
+    "name": "Divya Sri",
+    "username": "divya_sri",
+    "email": "divya.sri24@gmail.com",
+    "phone": "9988776655",
+    "password": "Password@23",
+    "role": "customer",
+    "status": "active",
+    "gender": "Female",
+    "faceVerified": true,
+    "lastLogin": "Oct 25, 2026, 03:00 PM",
+    "registeredAt": "May 20, 2026, 04:30 PM",
+    "totalLogins": 7,
+    "totalLogouts": 7,
+    "totalUploads": 2,
+    "totalTimeSpentSeconds": 2980,
+    "createdAt": "2026-05-20",
+    "sessionLogs": [
+      {
+        "id": "sess-divya-live",
+        "sessionId": "sess-live-divya-2026",
+        "userEmail": "divya.sri24@gmail.com",
+        "loginTime": "Oct 25, 2026, 03:00 PM",
+        "durationSeconds": 1100,
+        "status": "active",
+        "device": "Safari / iOS 17",
+        "ipAddress": "49.204.88.19",
+        "logoutTime": "Oct 25, 2026, 03:46 PM"
+      },
+      {
+        "id": "sess-divya-prev",
+        "sessionId": "sess-divya-20261019",
+        "userEmail": "divya.sri24@gmail.com",
+        "loginTime": "Oct 19, 2026, 02:00 PM",
+        "logoutTime": "Oct 19, 2026, 02:40 PM",
+        "durationSeconds": 2400,
+        "status": "ended",
+        "device": "Safari / iOS 17",
+        "ipAddress": "49.204.88.19"
+      }
+    ],
+    "activityLogs": [
+      {
+        "id": "act-1792923396235",
+        "userEmail": "divya.sri24@gmail.com",
+        "action": "Administrative Force Logout",
+        "timestamp": "Oct 25, 2026, 03:46 PM",
+        "details": "Super Admin remotely terminated active customer session."
+      },
+      {
+        "id": "act-divya-1",
+        "userEmail": "divya.sri24@gmail.com",
+        "action": "Uploaded SSC Marks Memo",
+        "timestamp": "Oct 19, 2026, 02:10 PM",
+        "details": "Uploaded ssc_memo_divya.pdf to Educational Certificates"
+      },
+      {
+        "id": "act-divya-2",
+        "userEmail": "divya.sri24@gmail.com",
+        "action": "Face Login Authenticated",
+        "timestamp": "Oct 25, 2026, 03:00 PM",
+        "details": "Authenticated via biometric face match (99.4%)"
+      }
+    ],
+    "activeSessionId": "sess-live-divya-2026"
+  },
+  {
+    "id": "usr-cust-6",
+    "name": "Kiran Goud",
+    "username": "kiran_goud",
+    "email": "kiran.goud77@gmail.com",
+    "phone": "8899001122",
+    "password": "Password@23",
+    "role": "customer",
+    "status": "active",
+    "gender": "Male",
+    "faceVerified": false,
+    "lastLogin": "Oct 22, 2026, 10:25 AM",
+    "registeredAt": "Jun 14, 2026, 01:15 PM",
+    "totalLogins": 3,
+    "totalLogouts": 3,
+    "totalUploads": 1,
+    "totalTimeSpentSeconds": 1120,
+    "createdAt": "2026-06-14",
+    "sessionLogs": [
+      {
+        "id": "sess-kiran-1",
+        "sessionId": "sess-kiran-20261022",
+        "userEmail": "kiran.goud77@gmail.com",
+        "loginTime": "Oct 22, 2026, 10:25 AM",
+        "logoutTime": "Oct 22, 2026, 10:45 AM",
+        "durationSeconds": 1200,
+        "status": "ended",
+        "device": "Chrome / Windows 11",
+        "ipAddress": "183.83.45.67"
+      }
+    ],
+    "activityLogs": [
+      {
+        "id": "act-kiran-1",
+        "userEmail": "kiran.goud77@gmail.com",
+        "action": "Applied for Police Clearance",
+        "timestamp": "Oct 22, 2026, 10:30 AM",
+        "details": "Submitted application for verification"
+      }
+    ]
+  },
+  {
+    "id": "usr-cust-7",
+    "name": "Swapna Rani",
+    "username": "swapna_rani",
+    "email": "swapna.rani@gmail.com",
+    "phone": "7788990011",
+    "password": "Password@23",
+    "role": "customer",
+    "status": "active",
+    "gender": "Female",
+    "faceVerified": true,
+    "lastLogin": "Oct 21, 2026, 05:50 PM",
+    "registeredAt": "Jul 08, 2026, 10:00 AM",
+    "totalLogins": 6,
+    "totalLogouts": 6,
+    "totalUploads": 1,
+    "totalTimeSpentSeconds": 2540,
+    "createdAt": "2026-07-08",
+    "sessionLogs": [
+      {
+        "id": "sess-swapna-1",
+        "sessionId": "sess-swapna-20261021",
+        "userEmail": "swapna.rani@gmail.com",
+        "loginTime": "Oct 21, 2026, 05:50 PM",
+        "logoutTime": "Oct 21, 2026, 06:30 PM",
+        "durationSeconds": 2400,
+        "status": "ended",
+        "device": "Edge / Windows 11",
+        "ipAddress": "49.207.12.33"
+      }
+    ],
+    "activityLogs": [
+      {
+        "id": "act-swapna-1",
+        "userEmail": "swapna.rani@gmail.com",
+        "action": "Downloaded Caste Certificate",
+        "timestamp": "Oct 21, 2026, 06:10 PM",
+        "details": "Downloaded approved MeeSeva Caste Certificate"
+      }
+    ]
+  },
+  {
+    "id": "usr-cust-8",
+    "name": "Naresh Kumar",
+    "username": "naresh_kumar",
+    "email": "naresh.kumar99@gmail.com",
+    "phone": "9001122334",
+    "password": "Password@23",
+    "role": "customer",
+    "status": "active",
+    "gender": "Male",
+    "faceVerified": false,
+    "lastLogin": "Oct 20, 2026, 02:15 PM",
+    "registeredAt": "Aug 12, 2026, 03:20 PM",
+    "totalLogins": 4,
+    "totalLogouts": 4,
+    "totalUploads": 2,
+    "totalTimeSpentSeconds": 1980,
+    "createdAt": "2026-08-12",
+    "sessionLogs": [
+      {
+        "id": "sess-naresh-1",
+        "sessionId": "sess-naresh-20261020",
+        "userEmail": "naresh.kumar99@gmail.com",
+        "loginTime": "Oct 20, 2026, 02:15 PM",
+        "logoutTime": "Oct 20, 2026, 02:50 PM",
+        "durationSeconds": 2100,
+        "status": "ended",
+        "device": "Chrome / Windows 10",
+        "ipAddress": "117.200.54.89"
+      }
+    ],
+    "activityLogs": [
+      {
+        "id": "act-naresh-1",
+        "userEmail": "naresh.kumar99@gmail.com",
+        "action": "Applied for Trade License",
+        "timestamp": "Oct 20, 2026, 02:25 PM",
+        "details": "Submitted GHMC commercial trade license form"
       }
     ]
   }

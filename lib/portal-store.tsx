@@ -894,15 +894,8 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (stored) {
           const parsed = JSON.parse(stored);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            // Strip out deprecated mock accounts (rahul_kumar, anjali_sharma, suresh_reddy, vikram_reddy, sneha_patel)
             const cleanAccounts = parsed.filter(
-              (a) =>
-                a &&
-                a.username !== "rahul_kumar" &&
-                a.username !== "anjali_sharma" &&
-                a.username !== "suresh_reddy" &&
-                a.username !== "vikram_reddy" &&
-                a.username !== "sneha_patel"
+              (a) => Boolean(a && a.id && a.email)
             );
             return cleanAccounts.length > 0 ? cleanAccounts : INITIAL_ACCOUNTS;
           }
@@ -2893,10 +2886,26 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   };
 
+  const [serverActiveCount, setServerActiveCount] = useState<number>(0);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      fetch("/api/admin/customers?limit=1", { cache: "no-store" })
+        .then((res) => res.json())
+        .then((data) => {
+          if (typeof data?.metrics?.activeNow === "number") {
+            setServerActiveCount(data.metrics.activeNow);
+          }
+        })
+        .catch(() => {});
+    }
+  }, []);
+
   const activeUsersCount = useMemo(() => {
+    if (serverActiveCount > 0) return serverActiveCount;
     const activeFromAccounts = accounts.filter((a) => Boolean(a.activeSessionId)).length;
     return activeFromAccounts || (user ? 1 : 0);
-  }, [accounts, user]);
+  }, [serverActiveCount, accounts, user]);
 
   // Active modal detection for routing snapshot
   const activeModalName: NavigationHistorySnapshot["modal"] = useMemo(() => {

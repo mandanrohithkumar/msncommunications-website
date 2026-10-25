@@ -207,6 +207,7 @@ export const AdminDashboard: React.FC = () => {
   // User-specific Activity & Session Analytics modal state
   const [selectedUserForAnalytics, setSelectedUserForAnalytics] = useState<UserAccount | null>(null);
   const [analyticsTab, setAnalyticsTab] = useState<"sessions" | "activity">("sessions");
+  const [analyticsLogsPage, setAnalyticsLogsPage] = useState<number>(1);
 
   // Dedicated Customer View search, pagination & modal state
   // Dedicated Customer View search, dynamic pagination & modal state
@@ -291,12 +292,16 @@ export const AdminDashboard: React.FC = () => {
         const params = new URLSearchParams({
           page: String(pageNum),
           limit: String(targetLimit),
+          _t: String(Date.now()), // Cache-busting real-time query
         });
         if (targetSearch.trim()) {
           params.set("search", targetSearch.trim());
         }
 
-        const res = await fetch(`/api/admin/customers?${params.toString()}`);
+        const res = await fetch(`/api/admin/customers?${params.toString()}`, {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache" },
+        });
         if (!res.ok) {
           throw new Error(`Failed to load customer directory (HTTP ${res.status}: ${res.statusText})`);
         }
@@ -341,7 +346,7 @@ export const AdminDashboard: React.FC = () => {
 
   // Handlers for dynamic pagination controls
   const handlePageChange = (newPage: number) => {
-    if (newPage < 1 || newPage > customerPagination.totalPages || newPage === customerPage) return;
+    if (newPage < 1 || newPage > customerPagination.totalPages) return;
     setCustomerPage(newPage);
     fetchCustomersFromApi(newPage, customerPageSize, debouncedCustomerFilter);
   };
@@ -350,6 +355,12 @@ export const AdminDashboard: React.FC = () => {
     setCustomerPageSize(newSize);
     setCustomerPage(1);
     fetchCustomersFromApi(1, newSize, debouncedCustomerFilter);
+  };
+
+  // Real-time refresh handler for database records & live session tokens
+  const handleRefreshCustomers = async () => {
+    await fetchCustomersFromApi(customerPage, customerPageSize, debouncedCustomerFilter, true);
+    showToastMsg("Customer database & live active sessions refreshed successfully!");
   };
 
   // Admin Actions Handlers
@@ -377,7 +388,7 @@ export const AdminDashboard: React.FC = () => {
     // Sync with backend API
     try {
       await fetch(`/api/admin/customers/${targetId}/force-logout`, { method: "POST" });
-      fetchCustomersFromApi(true);
+      await fetchCustomersFromApi(customerPage, customerPageSize, debouncedCustomerFilter, true);
     } catch (e) {
       console.warn("Backend force logout sync failed:", e);
     }
@@ -393,7 +404,7 @@ export const AdminDashboard: React.FC = () => {
     // Sync with backend API
     try {
       await fetch(`/api/admin/customers/${targetId}`, { method: "DELETE" });
-      fetchCustomersFromApi(true);
+      await fetchCustomersFromApi(customerPage, customerPageSize, debouncedCustomerFilter, true);
     } catch (e) {
       console.warn("Backend delete sync failed:", e);
     }
@@ -2426,7 +2437,7 @@ export const AdminDashboard: React.FC = () => {
                     {/* Live Logged-In Users Count */}
                     <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#E8F5E9] dark:bg-emerald-950/80 text-[#138808] dark:text-emerald-400 border border-[#C8E6C9] dark:border-emerald-800 flex items-center gap-1.5 animate-pulse">
                       <span className="w-1.5 h-1.5 rounded-full bg-[#138808]" />
-                      {activeUsersCount} Active / Logged In Now
+                      {customerStats.activeNow} Active / Logged In Now
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
@@ -2812,10 +2823,10 @@ export const AdminDashboard: React.FC = () => {
                         {/* Direct Refresh from Server API */}
                         <button
                           type="button"
-                          onClick={() => fetchCustomersFromApi(customerPage, customerPageSize, debouncedCustomerFilter, true)}
+                          onClick={handleRefreshCustomers}
                           disabled={isLoadingCustomers || isRefreshingCustomers}
                           className="py-2.5 px-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer disabled:opacity-50"
-                          title="Refresh customer data from backend server"
+                          title="Refresh customer data and live session states from backend server"
                         >
                           <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingCustomers ? "animate-spin text-indigo-600 dark:text-indigo-400" : ""}`} />
                           <span className="hidden sm:inline">Refresh</span>
@@ -3142,11 +3153,18 @@ export const AdminDashboard: React.FC = () => {
                                         {cust.lastLogin || "Never"}
                                       </span>
                                       {isLiveActive ? (
-                                        <span className="px-2 py-0.2 rounded-full text-[9px] font-black bg-[#E8F5E9] dark:bg-emerald-950 text-[#138808] dark:text-emerald-400 border border-[#C8E6C9] inline-flex items-center gap-1">
-                                          <span className="w-1.5 h-1.5 rounded-full bg-[#138808]" /> Logged In Now
+                                        <span
+                                          className="px-2 py-0.5 rounded-full text-[9px] font-black bg-[#E8F5E9] dark:bg-emerald-950 text-[#138808] dark:text-emerald-400 border border-[#C8E6C9] inline-flex items-center gap-1.5 shadow-2xs"
+                                          title={cust.activeSessionId ? `Active Session Token: ${cust.activeSessionId}` : "Active Live Session"}
+                                        >
+                                          <span className="w-1.5 h-1.5 rounded-full bg-[#138808] animate-ping" />
+                                          <span>Logged In Now</span>
                                         </span>
                                       ) : (
-                                        <span className="text-[10px] text-slate-400">Offline</span>
+                                        <span className="px-2 py-0.5 rounded-full text-[9px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 inline-flex items-center gap-1">
+                                          <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                                          <span>Offline</span>
+                                        </span>
                                       )}
                                     </div>
                                   </td>
@@ -3215,6 +3233,7 @@ export const AdminDashboard: React.FC = () => {
                                         onClick={() => {
                                           setSelectedUserForAnalytics(cust);
                                           setAnalyticsTab("sessions");
+                                          setAnalyticsLogsPage(1);
                                         }}
                                         className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
                                         title="View comprehensive session and operational logs"
@@ -4006,7 +4025,10 @@ export const AdminDashboard: React.FC = () => {
 
                       <button
                         type="button"
-                        onClick={() => setAnalyticsTab("activity")}
+                        onClick={() => {
+                          setAnalyticsTab("activity");
+                          setAnalyticsLogsPage(1);
+                        }}
                         className={`pb-2.5 border-b-2 cursor-pointer transition-colors flex items-center gap-2 ${
                           analyticsTab === "activity"
                             ? "border-[#000080] text-[#000080]"
@@ -4022,86 +4044,164 @@ export const AdminDashboard: React.FC = () => {
                     <div className="p-6 overflow-y-auto max-h-[380px] space-y-3">
                       {analyticsTab === "sessions" ? (
                         /* Login History and Sessions list */
-                        selectedUserForAnalytics.sessionLogs && selectedUserForAnalytics.sessionLogs.length > 0 ? (
-                          <div className="space-y-2.5">
-                            {selectedUserForAnalytics.sessionLogs.map((sess) => (
-                              <div
-                                key={sess.id}
-                                className="p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
-                              >
-                                <div className="space-y-1">
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-mono font-bold text-slate-900 dark:text-white">
-                                      {sess.sessionId}
-                                    </span>
-                                    <span
-                                      className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase ${
-                                        sess.status === "active"
-                                          ? "bg-[#E8F5E9] dark:bg-emerald-950 text-[#138808] dark:text-emerald-400 border border-[#C8E6C9]"
-                                          : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
-                                      }`}
-                                    >
-                                      {sess.status === "active" ? "Active Now" : "Ended"}
-                                    </span>
-                                  </div>
-                                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                                    Logged In: <strong>{sess.loginTime}</strong>
-                                    {sess.logoutTime && (
-                                      <span> • Logged Out: <strong>{sess.logoutTime}</strong></span>
-                                    )}
-                                  </p>
-                                </div>
+                        (() => {
+                          const allSessions = selectedUserForAnalytics.sessionLogs || [];
+                          const pageSize = 4;
+                          const totalSessionPages = Math.max(1, Math.ceil(allSessions.length / pageSize));
+                          const pagedSessions = allSessions.slice((analyticsLogsPage - 1) * pageSize, analyticsLogsPage * pageSize);
 
-                                <div className="flex flex-wrap sm:flex-col sm:items-end gap-1 text-[11px] text-slate-500 dark:text-slate-400">
-                                  <span className="font-semibold text-[#000080] dark:text-blue-400 font-mono">
-                                    Duration: {Math.floor(sess.durationSeconds / 60)}m {sess.durationSeconds % 60}s
-                                  </span>
-                                  <span>{sess.device || "Chrome / Windows 11"}</span>
-                                  <span className="font-mono text-[10px]">IP: {sess.ipAddress || "49.205.14.88"}</span>
+                          return allSessions.length > 0 ? (
+                            <div className="space-y-2.5">
+                              {pagedSessions.map((sess) => (
+                                <div
+                                  key={sess.id}
+                                  className="p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                                >
+                                  <div className="space-y-1">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-mono font-bold text-slate-900 dark:text-white">
+                                        {sess.sessionId}
+                                      </span>
+                                      <span
+                                        className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase ${
+                                          sess.status === "active"
+                                            ? "bg-[#E8F5E9] dark:bg-emerald-950 text-[#138808] dark:text-emerald-400 border border-[#C8E6C9]"
+                                            : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
+                                        }`}
+                                      >
+                                        {sess.status === "active" ? "Active Now" : "Ended"}
+                                      </span>
+                                    </div>
+                                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                      Logged In: <strong>{sess.loginTime}</strong>
+                                      {sess.logoutTime && (
+                                        <span> • Logged Out: <strong>{sess.logoutTime}</strong></span>
+                                      )}
+                                    </p>
+                                  </div>
+
+                                  <div className="flex flex-wrap sm:flex-col sm:items-end gap-1 text-[11px] text-slate-500 dark:text-slate-400">
+                                    <span className="font-semibold text-[#000080] dark:text-blue-400 font-mono">
+                                      Duration: {Math.floor(sess.durationSeconds / 60)}m {sess.durationSeconds % 60}s
+                                    </span>
+                                    <span>{sess.device || "Chrome / Windows 11"}</span>
+                                    <span className="font-mono text-[10px]">IP: {sess.ipAddress || "49.205.14.88"}</span>
+                                  </div>
                                 </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="text-center py-8 text-slate-400 text-xs">
-                            No individual session logs recorded yet for this user.
-                          </div>
-                        )
+                              ))}
+
+                              {/* Session Logs Pagination Bar */}
+                              {totalSessionPages > 1 && (
+                                <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800 text-xs text-slate-500">
+                                  <span>
+                                    Showing {(analyticsLogsPage - 1) * pageSize + 1} to {Math.min(analyticsLogsPage * pageSize, allSessions.length)} of {allSessions.length} sessions
+                                  </span>
+                                  <div className="flex items-center gap-1.5">
+                                    <button
+                                      type="button"
+                                      disabled={analyticsLogsPage <= 1}
+                                      onClick={() => setAnalyticsLogsPage((p) => Math.max(1, p - 1))}
+                                      className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed font-semibold text-xs flex items-center gap-1 cursor-pointer"
+                                    >
+                                      <ChevronLeft className="w-3 h-3" />
+                                      <span>Prev</span>
+                                    </button>
+                                    <span className="font-bold text-xs px-1 text-slate-700 dark:text-slate-300">
+                                      {analyticsLogsPage} / {totalSessionPages}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      disabled={analyticsLogsPage >= totalSessionPages}
+                                      onClick={() => setAnalyticsLogsPage((p) => Math.min(totalSessionPages, p + 1))}
+                                      className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed font-semibold text-xs flex items-center gap-1 cursor-pointer"
+                                    >
+                                      <span>Next</span>
+                                      <ChevronRight className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="text-center py-8 text-slate-400 text-xs">
+                              No individual session logs recorded yet for this user.
+                            </div>
+                          );
+                        })()
                       ) : (
                         /* Operational Actions & Activity list */
-                        selectedUserForAnalytics.activityLogs && selectedUserForAnalytics.activityLogs.length > 0 ? (
-                          <div className="space-y-2.5">
-                            {selectedUserForAnalytics.activityLogs.map((act) => (
-                              <div
-                                key={act.id}
-                                className="p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/60 flex items-start gap-3 text-xs"
-                              >
-                                <div className="p-2 rounded-xl bg-[#FFF3E0] dark:bg-amber-950/80 text-[#E65100] shrink-0 mt-0.5">
-                                  <Activity className="w-4 h-4" />
-                                </div>
-                                <div className="flex-1">
-                                  <div className="flex items-center justify-between gap-2">
-                                    <span className="font-extrabold text-slate-900 dark:text-white">
-                                      {act.action}
-                                    </span>
-                                    <span className="text-[10px] text-slate-400 font-mono">
-                                      {act.timestamp}
-                                    </span>
+                        (() => {
+                          const allActivities = selectedUserForAnalytics.activityLogs || [];
+                          const pageSize = 4;
+                          const totalActivityPages = Math.max(1, Math.ceil(allActivities.length / pageSize));
+                          const pagedActivities = allActivities.slice((analyticsLogsPage - 1) * pageSize, analyticsLogsPage * pageSize);
+
+                          return allActivities.length > 0 ? (
+                            <div className="space-y-2.5">
+                              {pagedActivities.map((act) => (
+                                <div
+                                  key={act.id}
+                                  className="p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/60 flex items-start gap-3 text-xs"
+                                >
+                                  <div className="p-2 rounded-xl bg-[#FFF3E0] dark:bg-amber-950/80 text-[#E65100] shrink-0 mt-0.5">
+                                    <Activity className="w-4 h-4" />
                                   </div>
-                                  {act.details && (
-                                    <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">
-                                      {act.details}
-                                    </p>
-                                  )}
+                                  <div className="flex-1">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <span className="font-extrabold text-slate-900 dark:text-white">
+                                        {act.action}
+                                      </span>
+                                      <span className="text-[10px] text-slate-400 font-mono">
+                                        {act.timestamp}
+                                      </span>
+                                    </div>
+                                    {act.details && (
+                                      <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">
+                                        {act.details}
+                                      </p>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="text-center py-8 text-slate-400 text-xs">
-                            No operational activities logged yet for this user.
-                          </div>
-                        )
+                              ))}
+
+                              {/* Activity Logs Pagination Bar */}
+                              {totalActivityPages > 1 && (
+                                <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800 text-xs text-slate-500">
+                                  <span>
+                                    Showing {(analyticsLogsPage - 1) * pageSize + 1} to {Math.min(analyticsLogsPage * pageSize, allActivities.length)} of {allActivities.length} logs
+                                  </span>
+                                  <div className="flex items-center gap-1.5">
+                                    <button
+                                      type="button"
+                                      disabled={analyticsLogsPage <= 1}
+                                      onClick={() => setAnalyticsLogsPage((p) => Math.max(1, p - 1))}
+                                      className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed font-semibold text-xs flex items-center gap-1 cursor-pointer"
+                                    >
+                                      <ChevronLeft className="w-3 h-3" />
+                                      <span>Prev</span>
+                                    </button>
+                                    <span className="font-bold text-xs px-1 text-slate-700 dark:text-slate-300">
+                                      {analyticsLogsPage} / {totalActivityPages}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      disabled={analyticsLogsPage >= totalActivityPages}
+                                      onClick={() => setAnalyticsLogsPage((p) => Math.min(totalActivityPages, p + 1))}
+                                      className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed font-semibold text-xs flex items-center gap-1 cursor-pointer"
+                                    >
+                                      <span>Next</span>
+                                      <ChevronRight className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="text-center py-8 text-slate-400 text-xs">
+                              No operational activities logged yet for this user.
+                            </div>
+                          );
+                        })()
                       )}
                     </div>
 

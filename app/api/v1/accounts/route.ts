@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryServerCustomers, registerServerCustomer } from "@/lib/server-customer-store";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 /**
  * GET /api/v1/accounts
  * Dynamic API endpoint returning registered customer accounts from the production database.
