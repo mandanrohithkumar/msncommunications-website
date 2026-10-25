@@ -1,0 +1,150 @@
+[
+  {
+    "id": "usr-cust-1",
+    "name": "Rohith Kumar",
+    "username": "rohith_kumar",
+    "email": "rohith.kumar@gmail.com",
+    "phone": "8125898068",
+    "password": "Password@23",
+    "role": "customer",
+    "status": "active",
+    "gender": "Male",
+    "faceVerified": true,
+    "lastLogin": "Oct 16, 2026, 03:09 PM",
+    "registeredAt": "Feb 14, 2026, 10:30 AM",
+    "totalLogins": 14,
+    "totalLogouts": 13,
+    "totalUploads": 4,
+    "totalTimeSpentSeconds": 5420,
+    "activeSessionId": "sess-live-usr-cust-1",
+    "createdAt": "2026-02-14",
+    "sessionLogs": [
+      {
+        "id": "sess-1",
+        "sessionId": "sess-live-usr-cust-1",
+        "userEmail": "rohith.kumar@gmail.com",
+        "loginTime": "Oct 16, 2026, 03:09 PM",
+        "durationSeconds": 1800,
+        "status": "active",
+        "device": "Chrome / Windows 11",
+        "ipAddress": "152.58.12.84"
+      },
+      {
+        "id": "sess-prev-1",
+        "sessionId": "sess-20261012-prev",
+        "userEmail": "rohith.kumar@gmail.com",
+        "loginTime": "Oct 12, 2026, 07:15 AM",
+        "logoutTime": "Oct 12, 2026, 08:00 AM",
+        "durationSeconds": 2700,
+        "status": "ended",
+        "device": "Chrome / Windows 11",
+        "ipAddress": "152.58.12.84"
+      }
+    ],
+    "activityLogs": [
+      {
+        "id": "act-1",
+        "userEmail": "rohith.kumar@gmail.com",
+        "action": "Uploaded Income Certificate",
+        "timestamp": "Oct 12, 2026, 07:35 AM",
+        "details": "Uploaded rohith_income_cert_v2.pdf to Financial & Property Documents"
+      },
+      {
+        "id": "act-2",
+        "userEmail": "rohith.kumar@gmail.com",
+        "action": "Linked Service Application",
+        "timestamp": "Oct 12, 2026, 07:36 AM",
+        "details": "Linked Income Certificate to MeeSeva Income Certificate Application"
+      },
+      {
+        "id": "act-3",
+        "userEmail": "rohith.kumar@gmail.com",
+        "action": "Uploaded Aadhaar Card",
+        "timestamp": "Oct 12, 2026, 07:21 AM",
+        "details": "Uploaded rohith_aadhaar_updated.pdf to Identity & Personal Documents"
+      }
+    ]
+  },
+  {
+    "id": "cust-1792163229888",
+    "name": "Kaveri Mallepakula",
+    "username": "kaveri_m",
+    "email": "kaveri.mallepakula@gmail.com",
+    "phone": "9848012345",
+    "password": "Password@23",
+    "role": "customer",
+    "status": "active",
+    "gender": "Female",
+    "faceVerified": true,
+    "lastLogin": "Oct 16, 2026, 08:39 PM",
+    "registeredAt": "Oct 16, 2026, 08:30 PM",
+    "totalLogins": 5,
+    "totalLogouts": 5,
+    "totalUploads": 1,
+    "totalTimeSpentSeconds": 2100,
+    "createdAt": "2026-10-16",
+    "sessionLogs": [
+      {
+        "id": "sess-2",
+        "sessionId": "sess-1792163229888",
+        "userEmail": "kaveri.mallepakula@gmail.com",
+        "loginTime": "Oct 16, 2026, 08:39 PM",
+        "logoutTime": "Oct 16, 2026, 09:10 PM",
+        "durationSeconds": 1860,
+        "status": "ended",
+        "device": "Chrome / Windows 11",
+        "ipAddress": "49.205.18.22"
+      }
+    ],
+    "activityLogs": [
+      {
+        "id": "act-4",
+        "userEmail": "kaveri.mallepakula@gmail.com",
+        "action": "Uploaded Aadhaar Card",
+        "timestamp": "Oct 16, 2026, 08:39 PM",
+        "details": "Uploaded Screenshot 2026-10-12 114629.png to Aadhaar Services"
+      }
+    ]
+  },
+  {
+    "id": "cust-1791342719418",
+    "name": "Venkatesh Mandan",
+    "username": "venkatesh_m",
+    "email": "venkatesh.mandan@gmail.com",
+    "phone": "9440112233",
+    "password": "Password@23",
+    "role": "customer",
+    "status": "active",
+    "gender": "Male",
+    "faceVerified": true,
+    "lastLogin": "Oct 12, 2026, 01:09 PM",
+    "registeredAt": "Oct 12, 2026, 01:00 PM",
+    "totalLogins": 3,
+    "totalLogouts": 3,
+    "totalUploads": 1,
+    "totalTimeSpentSeconds": 1560,
+    "createdAt": "2026-10-12",
+    "sessionLogs": [
+      {
+        "id": "sess-3",
+        "sessionId": "sess-1791342719418",
+        "userEmail": "venkatesh.mandan@gmail.com",
+        "loginTime": "Oct 12, 2026, 01:09 PM",
+        "logoutTime": "Oct 12, 2026, 01:35 PM",
+        "durationSeconds": 1560,
+        "status": "ended",
+        "device": "Edge / Windows 11",
+        "ipAddress": "106.51.74.19"
+      }
+    ],
+    "activityLogs": [
+      {
+        "id": "act-5",
+        "userEmail": "venkatesh.mandan@gmail.com",
+        "action": "Uploaded Aadhaar Card",
+        "timestamp": "Oct 12, 2026, 01:09 PM",
+        "details": "Uploaded IMG_20250912_193814.png to Identity & Personal Documents"
+      }
+    ]
+  }
+]

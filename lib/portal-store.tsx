@@ -238,131 +238,8 @@ interface PortalContextType {
 
 const PortalContext = createContext<PortalContextType | undefined>(undefined);
 
-// Initial mock applications for realistic demo
+// Staff and Management system accounts (Super Admin & Owner)
 const INITIAL_ACCOUNTS: UserAccount[] = [
-  {
-    id: "usr-cust-1",
-    name: "Rahul Kumar",
-    username: "rahul_kumar",
-    email: "rohith.kumar@gmail.com",
-    phone: "8125898068",
-    password: "Password@23",
-    role: "customer",
-    status: "active",
-    avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80",
-    faceEmbedding: "emb-face-usr-cust-1",
-    faceVerified: true,
-    lastFaceLoginSnapshot: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=256&q=80",
-    faceLoginTimestamp: "Sep 28, 2026, 02:45 PM",
-    lastLogin: "Sep 25, 2026, 05:15 PM",
-    dailyServiceCount: 3,
-    monthlyServiceCount: 14,
-    totalLogins: 42,
-    totalLogouts: 38,
-    totalUploads: 6,
-    totalTimeSpentSeconds: 4620,
-    createdAt: "2026-02-14",
-    registeredAt: "Feb 14, 2026, 10:30 AM",
-    sessionLogs: [
-      {
-        id: "sess-c1",
-        sessionId: "sess-20260925-c1",
-        userEmail: "rohith.kumar@gmail.com",
-        loginTime: "Sep 25, 2026, 05:15 PM",
-        logoutTime: "Sep 25, 2026, 05:40 PM",
-        durationSeconds: 1500,
-        status: "ended",
-        device: "Chrome / Windows 11",
-        ipAddress: "152.58.12.84"
-      },
-      {
-        id: "sess-c2",
-        sessionId: "sess-20260924-c2",
-        userEmail: "rohith.kumar@gmail.com",
-        loginTime: "Sep 24, 2026, 11:20 AM",
-        logoutTime: "Sep 24, 2026, 11:55 AM",
-        durationSeconds: 2100,
-        status: "ended",
-        device: "Mobile / Android",
-        ipAddress: "152.58.12.84"
-      }
-    ],
-    activityLogs: [
-      {
-        id: "act-c1",
-        userEmail: "rohith.kumar@gmail.com",
-        action: "Submitted Application",
-        timestamp: "Sep 25, 2026, 05:20 PM",
-        details: "Application MSN-2026-004128 submitted for Police Verification"
-      },
-      {
-        id: "act-c2",
-        userEmail: "rohith.kumar@gmail.com",
-        action: "Payment Completed",
-        timestamp: "Sep 25, 2026, 05:22 PM",
-        details: "Completed ₹180 payment via UPI (Ref: UPI/2026/894120938)"
-      },
-      {
-        id: "act-c3",
-        userEmail: "rohith.kumar@gmail.com",
-        action: "User Logged In",
-        timestamp: "Sep 25, 2026, 05:15 PM",
-        details: "Authenticated via SMS OTP on 8125898068"
-      }
-    ]
-  },
-  {
-    id: "usr-cust-2",
-    name: "Anjali Sharma",
-    username: "anjali_sharma",
-    email: "anjali.sharma@gmail.com",
-    phone: "9849011223",
-    password: "Password@23",
-    role: "customer",
-    status: "active",
-    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=256&q=80",
-    faceEmbedding: "emb-face-usr-cust-2",
-    faceVerified: true,
-    lastFaceLoginSnapshot: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=256&q=80",
-    faceLoginTimestamp: "Sep 27, 2026, 10:15 AM",
-    lastLogin: "Sep 27, 2026, 10:15 AM",
-    dailyServiceCount: 1,
-    monthlyServiceCount: 6,
-    totalLogins: 19,
-    totalLogouts: 17,
-    totalUploads: 4,
-    totalTimeSpentSeconds: 2850,
-    createdAt: "2026-03-01",
-    registeredAt: "Mar 01, 2026, 11:00 AM",
-    sessionLogs: [],
-    activityLogs: []
-  },
-  {
-    id: "usr-cust-3",
-    name: "Suresh Reddy",
-    username: "suresh_reddy",
-    email: "suresh.reddy@gmail.com",
-    phone: "9121098765",
-    password: "Password@23",
-    role: "customer",
-    status: "active",
-    avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=256&q=80",
-    faceEmbedding: "emb-face-usr-cust-3",
-    faceVerified: true,
-    lastFaceLoginSnapshot: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=256&q=80",
-    faceLoginTimestamp: "Sep 26, 2026, 03:40 PM",
-    lastLogin: "Sep 26, 2026, 03:40 PM",
-    dailyServiceCount: 0,
-    monthlyServiceCount: 3,
-    totalLogins: 8,
-    totalLogouts: 7,
-    totalUploads: 2,
-    totalTimeSpentSeconds: 1200,
-    createdAt: "2026-03-15",
-    registeredAt: "Mar 15, 2026, 02:20 PM",
-    sessionLogs: [],
-    activityLogs: []
-  },
   {
     id: "usr-owner-1",
     name: "MANDAN ROHITH KUMAR",
@@ -1017,7 +894,17 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (stored) {
           const parsed = JSON.parse(stored);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            return parsed;
+            // Strip out deprecated mock accounts (rahul_kumar, anjali_sharma, suresh_reddy, vikram_reddy, sneha_patel)
+            const cleanAccounts = parsed.filter(
+              (a) =>
+                a &&
+                a.username !== "rahul_kumar" &&
+                a.username !== "anjali_sharma" &&
+                a.username !== "suresh_reddy" &&
+                a.username !== "vikram_reddy" &&
+                a.username !== "sneha_patel"
+            );
+            return cleanAccounts.length > 0 ? cleanAccounts : INITIAL_ACCOUNTS;
           }
         }
       } catch (e) {}
@@ -1103,6 +990,24 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
 
     setAccounts((prev) => [newCustomer, ...prev]);
+
+    // Persist new registration to production database
+    if (typeof window !== "undefined") {
+      fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: cleanEmail,
+          phone: cleanPhone,
+          password: data.password,
+          name: displayName,
+          gender: data.gender,
+          avatar: data.avatar,
+          faceEmbedding: data.faceEmbedding,
+          faceVerified: data.faceVerified || Boolean(data.faceEmbedding),
+        }),
+      }).catch((err) => console.warn("[Register Server Sync Error]", err));
+    }
 
     // Initialize clean, isolated empty documents workspace for newly registered account
     setUserDocsMap((prev) => ({

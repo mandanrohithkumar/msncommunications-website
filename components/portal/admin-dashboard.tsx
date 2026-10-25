@@ -209,9 +209,11 @@ export const AdminDashboard: React.FC = () => {
   const [analyticsTab, setAnalyticsTab] = useState<"sessions" | "activity">("sessions");
 
   // Dedicated Customer View search, pagination & modal state
+  // Dedicated Customer View search, dynamic pagination & modal state
   const [customerFilterText, setCustomerFilterText] = useState("");
+  const [debouncedCustomerFilter, setDebouncedCustomerFilter] = useState("");
   const [customerPage, setCustomerPage] = useState(1);
-  const [customerPageSize, setCustomerPageSize] = useState(6);
+  const [customerPageSize, setCustomerPageSize] = useState(5);
   const [inspectingFaceCustomer, setInspectingFaceCustomer] = useState<UserAccount | null>(null);
   const [messagingCustomer, setMessagingCustomer] = useState<UserAccount | null>(null);
   const [messageForm, setMessageForm] = useState<{
@@ -230,122 +232,125 @@ export const AdminDashboard: React.FC = () => {
   const [accountSubTab, setAccountSubTab] = useState<"customers" | "staff">("customers");
   const [showHistoryApprovals, setShowHistoryApprovals] = useState(false);
 
-  // Dedicated Customer View API synchronization & loading state
-  const [apiCustomers, setApiCustomers] = useState<UserAccount[]>([]);
+  // Dedicated Customer View dynamic API query state (bound directly to production database)
+  const [customerAccountsList, setCustomerAccountsList] = useState<UserAccount[]>([]);
+  const [customerPagination, setCustomerPagination] = useState<{
+    page: number;
+    pageSize: number;
+    totalCustomers: number;
+    totalPages: number;
+    showingFrom: number;
+    showingTo: number;
+    hasNextPage: boolean;
+    hasPrevPage: boolean;
+  }>({
+    page: 1,
+    pageSize: 5,
+    totalCustomers: 0,
+    totalPages: 1,
+    showingFrom: 0,
+    showingTo: 0,
+    hasNextPage: false,
+    hasPrevPage: false,
+  });
+  const [customerStats, setCustomerStats] = useState<{
+    totalCustomers: number;
+    activeNow: number;
+    faceVerifiedCount: number;
+    totalWorksAndUploads: number;
+  }>({
+    totalCustomers: 0,
+    activeNow: 0,
+    faceVerifiedCount: 0,
+    totalWorksAndUploads: 0,
+  });
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
+  const [isSearchingCustomers, setIsSearchingCustomers] = useState(false);
   const [customerFetchError, setCustomerFetchError] = useState<string | null>(null);
   const [isRefreshingCustomers, setIsRefreshingCustomers] = useState(false);
 
-  // Fetch registered/logged-in customer list directly from backend API /api/admin/customers
-  const fetchCustomersFromApi = useCallback(async (isRefresh = false) => {
-    if (isRefresh) {
-      setIsRefreshingCustomers(true);
-    } else {
-      setIsLoadingCustomers(true);
-    }
-    setCustomerFetchError(null);
+  // Fetch registered customer list dynamically from backend API /api/admin/customers
+  const fetchCustomersFromApi = useCallback(
+    async (
+      targetPage: number | boolean = customerPage,
+      targetLimit = customerPageSize,
+      targetSearch = debouncedCustomerFilter,
+      isRefresh = false
+    ) => {
+      const pageNum = typeof targetPage === "number" ? targetPage : customerPage;
+      const refresh = typeof targetPage === "boolean" ? targetPage : isRefresh;
 
-    try {
-      const res = await fetch("/api/admin/customers");
-      if (!res.ok) {
-        throw new Error(`Failed to load customer list (HTTP ${res.status})`);
-      }
-      const data = await res.json();
-      if (data.success && Array.isArray(data.customers)) {
-        setApiCustomers(data.customers);
+      if (refresh) {
+        setIsRefreshingCustomers(true);
       } else {
-        throw new Error(data.error || "Failed to retrieve customer accounts from server");
+        setIsLoadingCustomers(true);
       }
-    } catch (err: any) {
-      console.error("[Customer View Fetch Error]:", err);
-      setCustomerFetchError(err.message || "Failed to load customers from server");
-    } finally {
-      setIsLoadingCustomers(false);
-      setIsRefreshingCustomers(false);
-    }
-  }, []);
+      setCustomerFetchError(null);
 
-  // Fetch customers on initial load
-  useEffect(() => {
-    fetchCustomersFromApi();
-  }, [fetchCustomersFromApi]);
-
-  // Merged Customer Accounts (API records combined with portal store accounts)
-  const mergedCustomerAccounts = useMemo(() => {
-    const localCustomers = accounts.filter((a) => a.role === "customer");
-    if (!apiCustomers || apiCustomers.length === 0) {
-      return localCustomers;
-    }
-
-    const map = new Map<string, UserAccount>();
-    // Start with server customers
-    for (const cust of apiCustomers) {
-      map.set(cust.email.toLowerCase(), cust);
-    }
-    // Overlay local customers if any
-    for (const localCust of localCustomers) {
-      const existing = map.get(localCust.email.toLowerCase());
-      if (existing) {
-        map.set(localCust.email.toLowerCase(), {
-          ...existing,
-          ...localCust,
-          totalLogins: Math.max(existing.totalLogins || 0, localCust.totalLogins || 0),
-          totalLogouts: Math.max(existing.totalLogouts || 0, localCust.totalLogouts || 0),
-          totalUploads: Math.max(existing.totalUploads || 0, localCust.totalUploads || 0),
-          lastFaceLoginSnapshot: localCust.lastFaceLoginSnapshot || existing.lastFaceLoginSnapshot,
-          faceVerified: localCust.faceVerified ?? existing.faceVerified,
+      try {
+        const params = new URLSearchParams({
+          page: String(pageNum),
+          limit: String(targetLimit),
         });
-      } else {
-        map.set(localCust.email.toLowerCase(), localCust);
+        if (targetSearch.trim()) {
+          params.set("search", targetSearch.trim());
+        }
+
+        const res = await fetch(`/api/admin/customers?${params.toString()}`);
+        if (!res.ok) {
+          throw new Error(`Failed to load customer directory (HTTP ${res.status}: ${res.statusText})`);
+        }
+        const data = await res.json();
+        if (data.success && Array.isArray(data.customers)) {
+          setCustomerAccountsList(data.customers);
+          if (data.pagination) {
+            setCustomerPagination(data.pagination);
+            setCustomerPage(data.pagination.page);
+          }
+          if (data.metrics) {
+            setCustomerStats(data.metrics);
+          }
+        } else {
+          throw new Error(data.error || "Failed to retrieve customer records from database");
+        }
+      } catch (err: any) {
+        console.error("[Customer View Fetch Error]:", err);
+        setCustomerFetchError(err.message || "Failed to load customers from server database");
+      } finally {
+        setIsLoadingCustomers(false);
+        setIsRefreshingCustomers(false);
+        setIsSearchingCustomers(false);
       }
-    }
-    return Array.from(map.values());
-  }, [apiCustomers, accounts]);
+    },
+    [customerPage, customerPageSize, debouncedCustomerFilter]
+  );
 
-  // Customer List with Search & Strict Isolation
-  const customerAccountsList = useMemo(() => {
-    return mergedCustomerAccounts.filter((a) => {
-      if (!customerFilterText.trim()) return true;
-      const q = customerFilterText.toLowerCase().trim();
-      return (
-        a.name.toLowerCase().includes(q) ||
-        a.email.toLowerCase().includes(q) ||
-        (a.username && a.username.toLowerCase().includes(q)) ||
-        (a.phone && a.phone.includes(q)) ||
-        a.id.toLowerCase().includes(q)
-      );
-    });
-  }, [mergedCustomerAccounts, customerFilterText]);
-
-  // Reset pagination on search filter change
+  // Dynamic backend search: Debounce query typing by 300ms
   useEffect(() => {
-    setCustomerPage(1);
+    setIsSearchingCustomers(true);
+    const handler = setTimeout(() => {
+      setDebouncedCustomerFilter(customerFilterText);
+    }, 300);
+    return () => clearTimeout(handler);
   }, [customerFilterText]);
 
-  const totalCustomerPages = Math.max(1, Math.ceil(customerAccountsList.length / customerPageSize));
-  const paginatedCustomers = useMemo(() => {
-    const start = (customerPage - 1) * customerPageSize;
-    return customerAccountsList.slice(start, start + customerPageSize);
-  }, [customerAccountsList, customerPage, customerPageSize]);
+  // When debounced search filter or page size changes, query database for page 1
+  useEffect(() => {
+    fetchCustomersFromApi(1, customerPageSize, debouncedCustomerFilter);
+  }, [debouncedCustomerFilter, customerPageSize]);
 
-  // Summary Metrics for Customer View Grid Box
-  const customerStats = useMemo(() => {
-    const allCustomers = mergedCustomerAccounts;
-    const totalCustomers = allCustomers.length;
-    const activeNow = allCustomers.filter((a) => Boolean(a.activeSessionId)).length;
-    const faceVerifiedCount = allCustomers.filter(
-      (a) => Boolean(a.lastFaceLoginSnapshot) || Boolean(a.faceVerified)
-    ).length;
-    const totalWorksAndUploads = allCustomers.reduce((acc, c) => {
-      const works = applications.filter(
-        (app) => app.customerId === c.id || (app.customerEmail && app.customerEmail.toLowerCase() === c.email.toLowerCase())
-      ).length;
-      const docs = getUserDocCount(c.email);
-      return acc + (c.totalUploads || 0) + works + docs;
-    }, 0);
+  // Handlers for dynamic pagination controls
+  const handlePageChange = (newPage: number) => {
+    if (newPage < 1 || newPage > customerPagination.totalPages || newPage === customerPage) return;
+    setCustomerPage(newPage);
+    fetchCustomersFromApi(newPage, customerPageSize, debouncedCustomerFilter);
+  };
 
-    return { totalCustomers, activeNow, faceVerifiedCount, totalWorksAndUploads };
-  }, [mergedCustomerAccounts, applications, getUserDocCount]);
+  const handlePageSizeChange = (newSize: number) => {
+    setCustomerPageSize(newSize);
+    setCustomerPage(1);
+    fetchCustomersFromApi(1, newSize, debouncedCustomerFilter);
+  };
 
   // Admin Actions Handlers
   const handleSendMessageSubmit = (e: React.FormEvent) => {
@@ -2470,7 +2475,7 @@ export const AdminDashboard: React.FC = () => {
                         : "bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
                     }`}
                   >
-                    {customerAccountsList.length}
+                    {customerPagination.totalCustomers}
                   </span>
                 </button>
 
@@ -2775,8 +2780,12 @@ export const AdminDashboard: React.FC = () => {
 
                       {/* Customer Search Bar & Actions */}
                       <div className="flex items-center gap-2.5">
-                        <div className="relative min-w-[240px] sm:min-w-[300px]">
-                          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <div className="relative min-w-[240px] sm:min-w-[320px]">
+                          {isSearchingCustomers ? (
+                            <RefreshCw className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-indigo-500 animate-spin" />
+                          ) : (
+                            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                          )}
                           <input
                             type="text"
                             placeholder="Search by username, full name, email or phone..."
@@ -2787,8 +2796,13 @@ export const AdminDashboard: React.FC = () => {
                           {customerFilterText && (
                             <button
                               type="button"
-                              onClick={() => setCustomerFilterText("")}
+                              onClick={() => {
+                                setCustomerFilterText("");
+                                setDebouncedCustomerFilter("");
+                                fetchCustomersFromApi(1, customerPageSize, "");
+                              }}
                               className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer p-0.5"
+                              title="Clear search"
                             >
                               <X className="w-3.5 h-3.5" />
                             </button>
@@ -2798,7 +2812,7 @@ export const AdminDashboard: React.FC = () => {
                         {/* Direct Refresh from Server API */}
                         <button
                           type="button"
-                          onClick={() => fetchCustomersFromApi(true)}
+                          onClick={() => fetchCustomersFromApi(customerPage, customerPageSize, debouncedCustomerFilter, true)}
                           disabled={isLoadingCustomers || isRefreshingCustomers}
                           className="py-2.5 px-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer disabled:opacity-50"
                           title="Refresh customer data from backend server"
@@ -2905,66 +2919,129 @@ export const AdminDashboard: React.FC = () => {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
-                          {isLoadingCustomers && customerAccountsList.length === 0 ? (
+                          {isLoadingCustomers ? (
+                            /* Loading Skeleton: Pulsing table rows with realistic placeholder elements */
+                            Array.from({ length: customerPageSize }).map((_, idx) => (
+                              <tr key={`skeleton-row-${idx}`} className="animate-pulse">
+                                <td className="py-3 px-3 text-center">
+                                  <div className="w-11 h-11 rounded-2xl bg-slate-200 dark:bg-slate-800 mx-auto" />
+                                </td>
+                                <td className="py-3 px-3">
+                                  <div className="space-y-1.5">
+                                    <div className="w-24 h-3 bg-slate-200 dark:bg-slate-800 rounded" />
+                                    <div className="w-16 h-2 bg-slate-200 dark:bg-slate-800 rounded" />
+                                  </div>
+                                </td>
+                                <td className="py-3 px-3">
+                                  <div className="w-28 h-3.5 bg-slate-200 dark:bg-slate-800 rounded" />
+                                </td>
+                                <td className="py-3 px-3">
+                                  <div className="w-32 h-3 bg-slate-200 dark:bg-slate-800 rounded" />
+                                </td>
+                                <td className="py-3 px-3">
+                                  <div className="w-24 h-3 bg-slate-200 dark:bg-slate-800 rounded" />
+                                </td>
+                                <td className="py-3 px-3">
+                                  <div className="space-y-1">
+                                    <div className="w-20 h-3 bg-slate-200 dark:bg-slate-800 rounded" />
+                                    <div className="w-14 h-2 bg-slate-200 dark:bg-slate-800 rounded" />
+                                  </div>
+                                </td>
+                                <td className="py-3 px-3 text-center">
+                                  <div className="w-8 h-4 bg-slate-200 dark:bg-slate-800 rounded-full mx-auto" />
+                                </td>
+                                <td className="py-3 px-3 text-center">
+                                  <div className="w-8 h-4 bg-slate-200 dark:bg-slate-800 rounded-full mx-auto" />
+                                </td>
+                                <td className="py-3 px-3 text-center">
+                                  <div className="w-14 h-4 bg-slate-200 dark:bg-slate-800 rounded-full mx-auto" />
+                                </td>
+                                <td className="py-3 px-3 text-right">
+                                  <div className="flex items-center justify-end gap-1.5">
+                                    <div className="w-6 h-6 bg-slate-200 dark:bg-slate-800 rounded-lg" />
+                                    <div className="w-6 h-6 bg-slate-200 dark:bg-slate-800 rounded-lg" />
+                                    <div className="w-6 h-6 bg-slate-200 dark:bg-slate-800 rounded-lg" />
+                                    <div className="w-6 h-6 bg-slate-200 dark:bg-slate-800 rounded-lg" />
+                                  </div>
+                                </td>
+                              </tr>
+                            ))
+                          ) : customerFetchError ? (
+                            /* Error State with Retry Button */
                             <tr>
-                              <td colSpan={10} className="py-14 text-center text-slate-400 text-xs">
-                                <div className="max-w-xs mx-auto space-y-3">
-                                  <RefreshCw className="w-8 h-8 text-indigo-600 dark:text-indigo-400 animate-spin mx-auto" />
-                                  <p className="font-bold text-slate-800 dark:text-slate-200">
-                                    Loading Customer Directory...
+                              <td colSpan={10} className="py-12 text-center text-xs">
+                                <div className="max-w-md mx-auto p-5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 space-y-3 shadow-xs">
+                                  <AlertTriangle className="w-7 h-7 text-rose-500 mx-auto" />
+                                  <p className="font-bold text-sm text-rose-700 dark:text-rose-400">
+                                    Unable to load customer database records
                                   </p>
-                                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                                    Connecting to server database and retrieving biometric records.
-                                  </p>
-                                </div>
-                              </td>
-                            </tr>
-                          ) : customerFetchError && customerAccountsList.length === 0 ? (
-                            <tr>
-                              <td colSpan={10} className="py-10 text-center text-xs">
-                                <div className="max-w-sm mx-auto p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 space-y-2">
-                                  <AlertTriangle className="w-6 h-6 text-rose-500 mx-auto" />
-                                  <p className="font-bold text-rose-700 dark:text-rose-400">
-                                    Unable to load customer list
-                                  </p>
-                                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                  <p className="text-xs text-slate-500 dark:text-slate-400">
                                     {customerFetchError}
                                   </p>
                                   <button
                                     type="button"
-                                    onClick={() => fetchCustomersFromApi(true)}
-                                    className="px-4 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-colors cursor-pointer"
+                                    onClick={() => fetchCustomersFromApi(customerPage, customerPageSize, debouncedCustomerFilter, true)}
+                                    className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-colors cursor-pointer inline-flex items-center gap-1.5 shadow-xs"
                                   >
-                                    Retry Connection
+                                    <RefreshCw className="w-3.5 h-3.5" />
+                                    <span>Retry Database Connection</span>
                                   </button>
                                 </div>
                               </td>
                             </tr>
                           ) : customerAccountsList.length === 0 ? (
+                            /* Empty States: Either 0 Search Results or 0 Database Customers */
                             <tr>
-                              <td colSpan={10} className="py-12 text-center text-slate-400 text-xs">
-                                <div className="max-w-xs mx-auto space-y-2">
-                                  <Users className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto" />
-                                  <p className="font-semibold text-slate-600 dark:text-slate-300">
-                                    No customer records found
-                                  </p>
-                                  <p className="text-[11px] text-slate-400">
-                                    {customerFilterText
-                                      ? `No customers matching "${customerFilterText}". Try clearing your search query.`
-                                      : "No registered customers found in the system."}
-                                  </p>
+                              <td colSpan={10} className="py-14 text-center text-xs">
+                                <div className="max-w-md mx-auto p-6 rounded-2xl bg-slate-50/80 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-3">
+                                  <div className="p-3 w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-400 mx-auto flex items-center justify-center">
+                                    <Users className="w-6 h-6" />
+                                  </div>
+                                  {debouncedCustomerFilter ? (
+                                    <>
+                                      <p className="font-bold text-sm text-slate-800 dark:text-slate-100">
+                                        No customer accounts matching &ldquo;{debouncedCustomerFilter}&rdquo;
+                                      </p>
+                                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                                        Check for typos or try searching with another username, email, phone number, or customer ID.
+                                      </p>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setCustomerFilterText("");
+                                          setDebouncedCustomerFilter("");
+                                          fetchCustomersFromApi(1, customerPageSize, "");
+                                        }}
+                                        className="px-4 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
+                                      >
+                                        Clear Search Filter
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <p className="font-bold text-sm text-slate-800 dark:text-slate-100">
+                                        No registered customers in production database
+                                      </p>
+                                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                                        Actual customer accounts registered through the customer portal will automatically appear here with their live biometrics, session tokens, and activity logs.
+                                      </p>
+                                      <button
+                                        type="button"
+                                        onClick={() => fetchCustomersFromApi(1, customerPageSize, "", true)}
+                                        className="px-4 py-1.5 rounded-xl bg-[#000080] hover:bg-indigo-900 text-white text-xs font-bold transition-colors cursor-pointer inline-flex items-center gap-1.5 shadow-xs"
+                                      >
+                                        <RefreshCw className="w-3.5 h-3.5" />
+                                        <span>Refresh Database</span>
+                                      </button>
+                                    </>
+                                  )}
                                 </div>
                               </td>
                             </tr>
                           ) : (
-                            paginatedCustomers.map((cust) => {
-                              const worksCount = applications.filter(
-                                (app) =>
-                                  app.customerId === cust.id ||
-                                  (app.customerEmail && app.customerEmail.toLowerCase() === cust.email.toLowerCase())
-                              ).length;
-                              const docCount = getUserDocCount(cust.email);
-                              const totalWorksUploaded = (cust.totalUploads || 0) + worksCount + docCount;
+                            /* Live Database Customer Records */
+                            customerAccountsList.map((cust) => {
+                              const totalWorksUploaded = cust.totalUploads || 0;
                               const faceSnapshot = cust.lastFaceLoginSnapshot || cust.avatar;
                               const hasFaceBiometrics = Boolean(cust.lastFaceLoginSnapshot || cust.faceVerified);
                               const isLiveActive = Boolean(cust.activeSessionId);
@@ -2980,7 +3057,7 @@ export const AdminDashboard: React.FC = () => {
                                       type="button"
                                       onClick={() => setInspectingFaceCustomer(cust)}
                                       className="relative group inline-block focus:outline-none cursor-pointer"
-                                      title="Click to inspect Customer Face captured during sign-in"
+                                      title="Click to inspect Customer Face captured during biometric sign-in"
                                     >
                                       <div className="w-11 h-11 rounded-2xl overflow-hidden border-2 border-indigo-300 dark:border-indigo-700 group-hover:border-amber-500 group-hover:scale-105 transition-all shadow-sm bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
                                         {faceSnapshot ? (
@@ -3002,7 +3079,7 @@ export const AdminDashboard: React.FC = () => {
                                             ? "bg-emerald-500 text-white"
                                             : "bg-amber-400 text-slate-900"
                                         }`}
-                                        title={hasFaceBiometrics ? "Face Biometric Verified" : "Avatar Profile"}
+                                        title={hasFaceBiometrics ? "Face Biometric Verified" : "Profile Picture"}
                                       >
                                         <Camera className="w-2.5 h-2.5" />
                                       </span>
@@ -3028,7 +3105,7 @@ export const AdminDashboard: React.FC = () => {
                                         {cust.name}
                                       </span>
                                       {isLiveActive && (
-                                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" title="Active Session Now" />
+                                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" title="Active Live Session" />
                                       )}
                                     </div>
                                   </td>
@@ -3058,7 +3135,7 @@ export const AdminDashboard: React.FC = () => {
                                     </span>
                                   </td>
 
-                                  {/* 6. Last Login Timestamp (Eppudu login ayyindu) */}
+                                  {/* 6. Last Login Timestamp */}
                                   <td className="py-3 px-3">
                                     <div className="space-y-0.5">
                                       <span className="text-slate-700 dark:text-slate-300 font-medium block">
@@ -3074,21 +3151,21 @@ export const AdminDashboard: React.FC = () => {
                                     </div>
                                   </td>
 
-                                  {/* 7. Total Login Count (Enni sarlu login ayithundu) */}
+                                  {/* 7. Total Login Count */}
                                   <td className="py-3 px-3 text-center">
                                     <span className="px-2.5 py-1 rounded-full text-[11px] font-black bg-[#E8EEF5] dark:bg-blue-950 text-[#000080] dark:text-blue-300 border border-[#BBDEFB] dark:border-blue-800">
                                       {cust.totalLogins || 0}
                                     </span>
                                   </td>
 
-                                  {/* 8. Total Logout Count (Enni sarlu logout ayyindu) */}
+                                  {/* 8. Total Logout Count */}
                                   <td className="py-3 px-3 text-center">
                                     <span className="px-2.5 py-1 rounded-full text-[11px] font-black bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                                       {cust.totalLogouts || 0}
                                     </span>
                                   </td>
 
-                                  {/* 9. Total Uploads / Works Count (Enni works upload chestundu) */}
+                                  {/* 9. Total Uploads / Works Count (Dynamically bound to Vault) */}
                                   <td className="py-3 px-3 text-center">
                                     <span
                                       className={`px-2.5 py-1 rounded-full text-[11px] font-bold inline-flex items-center gap-1.5 ${
@@ -3150,7 +3227,7 @@ export const AdminDashboard: React.FC = () => {
                                         type="button"
                                         onClick={() => setDeletingCustomer(cust)}
                                         className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/60 dark:hover:bg-rose-900/80 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 transition-colors cursor-pointer"
-                                        title="Safely delete or deactivate customer account"
+                                        title="Safely delete customer account from database"
                                       >
                                         <Trash2 className="w-3.5 h-3.5" />
                                       </button>
@@ -3164,32 +3241,47 @@ export const AdminDashboard: React.FC = () => {
                       </table>
                     </div>
 
-                    {/* Pagination Bar */}
+                    {/* Dynamic Pagination Bar (Directly reflecting Backend Database Query) */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 text-xs text-slate-500 dark:text-slate-400">
-                      <div>
-                        Showing{" "}
-                        <strong className="text-slate-800 dark:text-slate-200">
-                          {customerAccountsList.length === 0
-                            ? 0
-                            : (customerPage - 1) * customerPageSize + 1}
-                        </strong>{" "}
-                        to{" "}
-                        <strong className="text-slate-800 dark:text-slate-200">
-                          {Math.min(customerPage * customerPageSize, customerAccountsList.length)}
-                        </strong>{" "}
-                        of{" "}
-                        <strong className="text-slate-800 dark:text-slate-200">
-                          {customerAccountsList.length}
-                        </strong>{" "}
-                        registered customers
+                      <div className="flex items-center gap-2">
+                        <span>
+                          Showing{" "}
+                          <strong className="text-slate-800 dark:text-slate-200">
+                            {customerPagination.showingFrom}
+                          </strong>{" "}
+                          to{" "}
+                          <strong className="text-slate-800 dark:text-slate-200">
+                            {customerPagination.showingTo}
+                          </strong>{" "}
+                          of{" "}
+                          <strong className="text-slate-800 dark:text-slate-200">
+                            {customerPagination.totalCustomers}
+                          </strong>{" "}
+                          registered customers
+                        </span>
+
+                        {/* Page Size Selector */}
+                        <div className="flex items-center gap-1.5 ml-2 pl-3 border-l border-slate-200 dark:border-slate-800">
+                          <span className="text-[11px] text-slate-400">Rows:</span>
+                          <select
+                            value={customerPageSize}
+                            onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                            className="py-1 px-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs font-semibold text-slate-700 dark:text-slate-300 focus:outline-none focus:border-indigo-500 cursor-pointer"
+                          >
+                            <option value={5}>5 per page</option>
+                            <option value={10}>10 per page</option>
+                            <option value={20}>20 per page</option>
+                            <option value={50}>50 per page</option>
+                          </select>
+                        </div>
                       </div>
 
                       {/* Pagination Controls */}
                       <div className="flex items-center gap-1.5 self-center sm:self-auto">
                         <button
                           type="button"
-                          disabled={customerPage <= 1}
-                          onClick={() => setCustomerPage((p) => Math.max(1, p - 1))}
+                          disabled={customerPagination.page <= 1 || isLoadingCustomers}
+                          onClick={() => handlePageChange(customerPagination.page - 1)}
                           className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer flex items-center gap-1"
                         >
                           <ChevronLeft className="w-3.5 h-3.5" />
@@ -3197,13 +3289,14 @@ export const AdminDashboard: React.FC = () => {
                         </button>
 
                         {/* Page Numbers */}
-                        {Array.from({ length: totalCustomerPages }, (_, i) => i + 1).map((num) => (
+                        {Array.from({ length: customerPagination.totalPages }, (_, i) => i + 1).map((num) => (
                           <button
                             key={num}
                             type="button"
-                            onClick={() => setCustomerPage(num)}
+                            disabled={isLoadingCustomers}
+                            onClick={() => handlePageChange(num)}
                             className={`w-7 h-7 rounded-xl font-bold text-xs transition-colors cursor-pointer ${
-                              customerPage === num
+                              customerPagination.page === num
                                 ? "bg-[#000080] text-white shadow-xs"
                                 : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
                             }`}
@@ -3214,8 +3307,8 @@ export const AdminDashboard: React.FC = () => {
 
                         <button
                           type="button"
-                          disabled={customerPage >= totalCustomerPages}
-                          onClick={() => setCustomerPage((p) => Math.min(totalCustomerPages, p + 1))}
+                          disabled={customerPagination.page >= customerPagination.totalPages || isLoadingCustomers}
+                          onClick={() => handlePageChange(customerPagination.page + 1)}
                           className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer flex items-center gap-1"
                         >
                           <span>Next</span>

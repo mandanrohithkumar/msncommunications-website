@@ -95,6 +95,18 @@ export async function POST(req: NextRequest) {
 
     const token = signToken(payload);
 
+    // If customer, update persistent customer database record with live session
+    if (payload.role === "customer") {
+      try {
+        const { recordServerCustomerLogin } = await import("@/lib/server-customer-store");
+        const userAgent = req.headers.get("user-agent") || "Browser / Web Session";
+        const clientIp = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "127.0.0.1";
+        recordServerCustomerLogin(payload.userId, payload.email, payload.name, userAgent, clientIp);
+      } catch (e) {
+        console.warn("[Session Auth] Could not sync customer login with database:", e);
+      }
+    }
+
     const response = NextResponse.json({
       success: true,
       message: "Secure session initialized",
@@ -184,7 +196,20 @@ export async function GET(req: NextRequest) {
  * DELETE /api/auth/session
  * Completely destroys the HTTP-only session cookie on logout.
  */
-export async function DELETE() {
+export async function DELETE(req: NextRequest) {
+  try {
+    const token = req.cookies.get("msn_session_token")?.value;
+    if (token) {
+      const session = verifyToken(token);
+      if (session && session.email) {
+        const { recordServerCustomerLogout } = await import("@/lib/server-customer-store");
+        recordServerCustomerLogout(session.email);
+      }
+    }
+  } catch (e) {
+    console.warn("[Session Auth] Error terminating database session:", e);
+  }
+
   const response = NextResponse.json({
     success: true,
     message: "Session terminated and cookies cleared",
