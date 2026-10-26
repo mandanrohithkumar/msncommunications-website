@@ -9,7 +9,8 @@ import { registerServerCustomer } from "@/lib/server-customer-store";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { email, phone, name, password, gender, avatar, faceEmbedding, faceVerified } = body;
+    const { email, phone, name, password, gender, avatar, photo, faceSnapshot, image, faceEmbedding, faceVerified } = body || {};
+    const masterPhoto = avatar || photo || faceSnapshot || image;
 
     if (!email) {
       return NextResponse.json(
@@ -27,10 +28,10 @@ export async function POST(req: NextRequest) {
       name: name || cleanEmail.split("@")[0],
       password: password || "Password@23",
       gender: gender || "Male",
-      avatar: avatar || undefined,
+      avatar: masterPhoto || undefined,
       faceEmbedding: faceEmbedding || undefined,
-      faceVerified: Boolean(faceVerified || faceEmbedding),
-      lastFaceLoginSnapshot: avatar || undefined,
+      faceVerified: Boolean(faceVerified || faceEmbedding || masterPhoto),
+      lastFaceLoginSnapshot: masterPhoto || undefined,
       role: "customer",
       status: "active",
     });

@@ -8,9 +8,10 @@ import { recordServerFaceLogin } from "@/lib/server-customer-store";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { email, photo, confidence } = body;
+    const { email, photo, faceSnapshot, snapshot, image, confidence } = body || {};
+    const effectivePhoto = photo || faceSnapshot || snapshot || image;
 
-    if (!email || !photo) {
+    if (!email || !effectivePhoto) {
       return NextResponse.json(
         { success: false, error: "Missing email or photo snapshot" },
         { status: 400 }
@@ -25,12 +26,12 @@ export async function POST(req: NextRequest) {
       minute: "2-digit",
     });
 
-    const updatedCustomer = recordServerFaceLogin(email, photo, confidence || 98.8);
+    const updatedCustomer = recordServerFaceLogin(email, effectivePhoto, confidence || 98.8);
 
     const faceRecord = {
       id: `face-log-${Date.now()}`,
       email: email.toLowerCase().trim(),
-      photo,
+      photo: updatedCustomer?.lastFaceLoginSnapshot || effectivePhoto,
       confidence: confidence || 98.8,
       timestamp,
       status: "verified",

@@ -135,46 +135,39 @@ export const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
     }
   }, []);
 
-  // Capture snapshot from current video frame (Hardware camera snapshot)
+  // Capture high-resolution snapshot from current video frame (Hardware camera snapshot)
   const captureSnapshot = useCallback(() => {
-    const size = 480;
+    const video = videoRef.current;
+    if (!video || video.videoWidth === 0 || video.readyState < 1) {
+      console.warn("[FaceCapture] Cannot capture snapshot: webcam stream has not delivered active frames.");
+      return null;
+    }
+
+    const size = 720;
     const canvas = canvasRef.current || document.createElement("canvas");
     canvas.width = size;
     canvas.height = size;
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
 
-    const video = videoRef.current;
-    if (video && (video.videoWidth > 0 || video.readyState >= 1)) {
-      const vWidth = video.videoWidth || size;
-      const vHeight = video.videoHeight || size;
-      const minDim = Math.min(vWidth, vHeight);
-      const sx = (vWidth - minDim) / 2;
-      const sy = (vHeight - minDim) / 2;
+    const vWidth = video.videoWidth || size;
+    const vHeight = video.videoHeight || size;
+    const minDim = Math.min(vWidth, vHeight);
+    const sx = (vWidth - minDim) / 2;
+    const sy = (vHeight - minDim) / 2;
 
-      ctx.save();
-      // Mirror horizontally for natural selfie view matching the preview
-      ctx.translate(size, 0);
-      ctx.scale(-1, 1);
-      ctx.drawImage(video, sx, sy, minDim, minDim, 0, 0, size, size);
-      ctx.restore();
-    } else {
-      ctx.fillStyle = "#0f172a";
-      ctx.fillRect(0, 0, size, size);
-      ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 16px sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText("Front Camera Snapshot", size / 2, size / 2 - 10);
-      ctx.font = "12px sans-serif";
-      ctx.fillStyle = "#94a3b8";
-      ctx.fillText("Live Webcam Capture", size / 2, size / 2 + 15);
-    }
+    ctx.save();
+    // Mirror horizontally for natural selfie view matching the preview
+    ctx.translate(size, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, sx, sy, minDim, minDim, 0, 0, size, size);
+    ctx.restore();
 
     // Trigger visual camera shutter flash
     setFlashEffect(true);
     setTimeout(() => setFlashEffect(false), 240);
 
-    const dataUrl = canvas.toDataURL("image/png", 0.92);
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
     const embedding = extractFacialEmbedding(canvas);
     return { dataUrl, embedding };
   }, []);
@@ -182,6 +175,13 @@ export const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
   // Process capture based on mode
   const handlePerformCapture = useCallback(
     (isManualClick: boolean = false) => {
+      const video = videoRef.current;
+      if (!video || video.videoWidth === 0) {
+        setStatusMessage("Webcam stream is inactive. Please allow camera permissions or upload a real photo.");
+        setInstructionState("no_face");
+        return;
+      }
+
       // STRICT REQUIREMENT: If not a manual override and face is not detected with confidence, block capture
       if (!isManualClick && (!faceDetected || faceConfidence < 0.65)) {
         setStatusMessage("No face detected. Please position your face inside the frame.");
@@ -262,7 +262,7 @@ export const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
       reader.onload = (event) => {
         const img = new Image();
         img.onload = () => {
-          const size = 480;
+          const size = 720;
           const canvas = canvasRef.current || document.createElement("canvas");
           canvas.width = size;
           canvas.height = size;
@@ -272,7 +272,7 @@ export const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
           const sx = (img.width - minDim) / 2;
           const sy = (img.height - minDim) / 2;
           ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, size, size);
-          const dataUrl = canvas.toDataURL("image/png");
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
           const embedding = extractFacialEmbedding(canvas);
           setCapturedPhoto(dataUrl);
 
@@ -342,8 +342,8 @@ export const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: "user",
-          width: { ideal: 640 },
-          height: { ideal: 480 }
+          width: { ideal: 1280, min: 640 },
+          height: { ideal: 720, min: 480 }
         },
         audio: false
       });
@@ -824,10 +824,11 @@ export const FaceRecognitionModal: React.FC<FaceRecognitionModalProps> = ({
             <div className="pt-1.5">
               <label className="text-[11px] text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 font-semibold cursor-pointer inline-flex items-center gap-1.5 transition-colors hover:underline">
                 <Upload className="w-3 h-3" />
-                <span>Upload Profile Photo File Instead</span>
+                <span>Upload Real Face Photo (or Camera Roll)</span>
                 <input
                   type="file"
                   accept="image/*"
+                  capture="user"
                   className="hidden"
                   onChange={handleUploadPhotoFile}
                 />

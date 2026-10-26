@@ -12,3 +12,4 @@ clean-push.js
 tsconfig.tsbuildinfo
 storage/vault_uploads/*
 !storage/vault_uploads/.gitkeep
+scratch/

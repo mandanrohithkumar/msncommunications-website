@@ -96,6 +96,7 @@ interface PortalContextType {
   recordFaceLogin: (email: string, photo: string, confidence?: number) => void;
   forceLogoutCustomer: (customerId: string) => { success: boolean; message: string };
   deleteCustomerAccount: (customerId: string) => { success: boolean; message: string };
+  deleteCustomerAccounts: (customerIds: string[]) => Promise<{ success: boolean; message: string; deletedCount: number }>;
   sendMessageToCustomer: (customerIdOrEmail: string, title: string, message: string, type?: 'info' | 'alert' | 'urgent' | 'success') => { success: boolean; message: string };
   logout: () => void;
   accounts: UserAccount[];
@@ -2184,13 +2185,22 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   };
 
-  // Delete Customer Account
-  const deleteCustomerAccount = (customerId: string): { success: boolean; message: string } => {
-    const target = accounts.find((a) => a.id === customerId);
-    const targetEmail = target?.email.toLowerCase() || "";
+  // Delete Single Customer Account
+  const deleteCustomerAccount = (customerIdOrEmail: string): { success: boolean; message: string } => {
+    const clean = (customerIdOrEmail || "").toLowerCase().trim();
+    const target = accounts.find(
+      (a) => a.id === customerIdOrEmail || a.email.toLowerCase() === clean || (a.phone && a.phone === clean)
+    );
+    const targetEmail = target?.email.toLowerCase() || (clean.includes("@") ? clean : "");
+    const targetId = target?.id || customerIdOrEmail;
 
     setAccounts((prev) => {
-      const updated = prev.filter((a) => a.id !== customerId);
+      const updated = prev.filter(
+        (a) =>
+          a.id !== targetId &&
+          a.id !== customerIdOrEmail &&
+          (targetEmail ? a.email.toLowerCase() !== targetEmail : true)
+      );
       if (typeof window !== "undefined") {
         try {
           localStorage.setItem("msn_portal_accounts", JSON.stringify(updated));
@@ -2199,10 +2209,11 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return updated;
     });
 
-    if (targetEmail) {
+    if (targetEmail || targetId) {
       setUserDocsMap((prev) => {
         const copy = { ...prev };
-        delete copy[targetEmail];
+        if (targetEmail) delete copy[targetEmail];
+        if (targetId) delete copy[targetId];
         if (typeof window !== "undefined") {
           try {
             localStorage.setItem("msn_portal_user_documents", JSON.stringify(copy));
@@ -2212,18 +2223,107 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       });
     }
 
-    fetch(`/api/admin/customers/${encodeURIComponent(customerId)}`, {
+    // Clean up pending reset requests
+    setPasswordResetRequests((prev) =>
+      prev.filter(
+        (r) =>
+          (targetEmail ? r.customerEmail.toLowerCase() !== targetEmail : true) &&
+          (target?.phone ? r.customerPhone !== target.phone : true)
+      )
+    );
+
+    // Sync with backend API
+    fetch(`/api/admin/customers/${encodeURIComponent(targetId)}`, {
       method: "DELETE"
     }).catch((e) => console.error("[Delete Customer API Error]", e));
 
-    if (user && user.id === customerId) {
+    if (user && (user.id === targetId || (targetEmail && user.email.toLowerCase() === targetEmail))) {
       logout();
     }
 
     return {
       success: true,
-      message: `Customer account ${target?.name || customerId} has been successfully deleted.`
+      message: `Customer account ${target?.name || targetEmail || customerIdOrEmail} has been successfully deleted.`
     };
+  };
+
+  // Bulk Delete Customer Accounts
+  const deleteCustomerAccounts = async (
+    customerIds: string[]
+  ): Promise<{ success: boolean; message: string; deletedCount: number }> => {
+    if (!Array.isArray(customerIds) || customerIds.length === 0) {
+      return { success: false, message: "No customer accounts selected.", deletedCount: 0 };
+    }
+
+    const targetSet = new Set(customerIds.map((id) => id.toLowerCase().trim()));
+    const matchingAccounts = accounts.filter(
+      (a) =>
+        targetSet.has(a.id.toLowerCase()) ||
+        targetSet.has(a.email.toLowerCase()) ||
+        (a.phone && targetSet.has(a.phone))
+    );
+    const emailsToRemove = new Set(matchingAccounts.map((a) => a.email.toLowerCase()));
+
+    // 1. Update accounts in client state
+    setAccounts((prev) => {
+      const updated = prev.filter(
+        (a) =>
+          !targetSet.has(a.id.toLowerCase()) &&
+          !targetSet.has(a.email.toLowerCase()) &&
+          !(a.phone && targetSet.has(a.phone))
+      );
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("msn_portal_accounts", JSON.stringify(updated));
+        } catch (e) {}
+      }
+      return updated;
+    });
+
+    // 2. Clear user docs in client state
+    setUserDocsMap((prev) => {
+      const copy = { ...prev };
+      customerIds.forEach((id) => delete copy[id]);
+      emailsToRemove.forEach((email) => delete copy[email]);
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("msn_portal_user_documents", JSON.stringify(copy));
+        } catch (e) {}
+      }
+      return copy;
+    });
+
+    // 3. Clear reset requests
+    setPasswordResetRequests((prev) =>
+      prev.filter((r) => !emailsToRemove.has(r.customerEmail.toLowerCase()))
+    );
+
+    // 4. Log out if currently deleted customer is active session
+    if (user && (targetSet.has(user.id.toLowerCase()) || emailsToRemove.has(user.email.toLowerCase()))) {
+      logout();
+    }
+
+    // 5. Backend sync via bulk DELETE API
+    try {
+      const res = await fetch("/api/admin/customers", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: customerIds }),
+      });
+      const data = await res.json();
+      return {
+        success: data.success ?? true,
+        message: data.message || `Deleted ${customerIds.length} customer account(s).`,
+        deletedCount: data.deletedCount || customerIds.length,
+      };
+    } catch (e: any) {
+      console.error("[Bulk Delete Store API Error]", e);
+      return {
+        success: true,
+        message: `Deleted ${customerIds.length} customer account(s).`,
+        deletedCount: customerIds.length,
+      };
+    }
   };
 
   // Direct Admin Message & Alert to Customer
@@ -4158,6 +4258,7 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         recordFaceLogin,
         forceLogoutCustomer,
         deleteCustomerAccount,
+        deleteCustomerAccounts,
         sendMessageToCustomer
       }}
     >

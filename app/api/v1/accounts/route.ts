@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryServerCustomers, registerServerCustomer } from "@/lib/server-customer-store";
+import {
+  queryServerCustomers,
+  registerServerCustomer,
+  deleteServerCustomer,
+  deleteServerCustomers,
+} from "@/lib/server-customer-store";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -78,6 +83,63 @@ export async function POST(req: NextRequest) {
     console.error("[Create Account Error]", error);
     return NextResponse.json(
       { success: false, error: error.message || "Failed to create account" },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * DELETE /api/v1/accounts
+ * Deletes customer account(s) and cascades to remove documents and sessions.
+ */
+export async function DELETE(req: NextRequest) {
+  try {
+    let targetIds: string[] = [];
+
+    try {
+      const body = await req.json();
+      if (Array.isArray(body?.ids)) {
+        targetIds = body.ids.filter(Boolean).map(String);
+      } else if (body?.id) {
+        targetIds = [String(body.id)];
+      }
+    } catch {
+      // Body may not be JSON
+    }
+
+    if (targetIds.length === 0) {
+      const searchParams = req.nextUrl.searchParams;
+      const paramId = searchParams.get("id");
+      const paramIds = searchParams.get("ids");
+      if (paramIds) {
+        targetIds = paramIds.split(",").map((s) => s.trim()).filter(Boolean);
+      } else if (paramId) {
+        targetIds = [paramId.trim()];
+      }
+    }
+
+    if (targetIds.length === 0) {
+      return NextResponse.json(
+        { success: false, error: "At least one customer ID or email is required" },
+        { status: 400 }
+      );
+    }
+
+    const result = deleteServerCustomers(targetIds);
+
+    return NextResponse.json({
+      success: result.deletedCount > 0,
+      deletedCount: result.deletedCount,
+      deletedIds: result.deletedIds,
+      message:
+        result.deletedCount > 0
+          ? `Successfully removed ${result.deletedCount} account(s) and cascade-deleted associated records.`
+          : "No accounts found matching the specified ID(s).",
+    });
+  } catch (error: any) {
+    console.error("[Delete Accounts API Error]", error);
+    return NextResponse.json(
+      { success: false, error: error.message || "Failed to delete accounts" },
       { status: 500 }
     );
   }

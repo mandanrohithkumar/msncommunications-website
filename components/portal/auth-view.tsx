@@ -580,7 +580,7 @@ export const AuthView: React.FC = () => {
     fetch("/api/auth/face-login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: target.email, faceSnapshot: capturedPhoto })
+      body: JSON.stringify({ email: target.email, photo: capturedPhoto, faceSnapshot: capturedPhoto })
     }).catch((err) => console.warn("Could not sync face login with backend:", err));
 
     // Authenticate session

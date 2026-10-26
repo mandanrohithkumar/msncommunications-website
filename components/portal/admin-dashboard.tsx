@@ -120,6 +120,7 @@ export const AdminDashboard: React.FC = () => {
     passwordChangeAudits,
     forceLogoutCustomer,
     deleteCustomerAccount,
+    deleteCustomerAccounts,
     sendMessageToCustomer,
     logout
   } = usePortal();
@@ -228,6 +229,15 @@ export const AdminDashboard: React.FC = () => {
   });
   const [forceLogoutConfirmCustomer, setForceLogoutConfirmCustomer] = useState<UserAccount | null>(null);
   const [deletingCustomer, setDeletingCustomer] = useState<UserAccount | null>(null);
+  const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
+  const [customerDeleteModal, setCustomerDeleteModal] = useState<{
+    isOpen: boolean;
+    targets: UserAccount[];
+  }>({
+    isOpen: false,
+    targets: [],
+  });
+  const [isDeletingCustomers, setIsDeletingCustomers] = useState(false);
 
   // Super Admin split tabs: Customer View vs Staff & Management
   const [accountSubTab, setAccountSubTab] = useState<"customers" | "staff">("customers");
@@ -347,11 +357,13 @@ export const AdminDashboard: React.FC = () => {
   // Handlers for dynamic pagination controls
   const handlePageChange = (newPage: number) => {
     if (newPage < 1 || newPage > customerPagination.totalPages) return;
+    setSelectedCustomerIds([]);
     setCustomerPage(newPage);
     fetchCustomersFromApi(newPage, customerPageSize, debouncedCustomerFilter);
   };
 
   const handlePageSizeChange = (newSize: number) => {
+    setSelectedCustomerIds([]);
     setCustomerPageSize(newSize);
     setCustomerPage(1);
     fetchCustomersFromApi(1, newSize, debouncedCustomerFilter);
@@ -362,6 +374,22 @@ export const AdminDashboard: React.FC = () => {
     await fetchCustomersFromApi(customerPage, customerPageSize, debouncedCustomerFilter, true);
     showToastMsg("Customer database & live active sessions refreshed successfully!");
   };
+
+  // Open face recognition inspection modal with live sync from API
+  const handleOpenFaceInspector = useCallback(async (cust: UserAccount) => {
+    setInspectingFaceCustomer(cust);
+    try {
+      const res = await fetch(`/api/admin/customers/${encodeURIComponent(cust.id)}?_t=${Date.now()}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.customer) {
+          setInspectingFaceCustomer((prev) => (prev && prev.id === cust.id ? { ...prev, ...data.customer } : prev));
+        }
+      }
+    } catch (e) {
+      // Keep existing customer record
+    }
+  }, []);
 
   // Admin Actions Handlers
   const handleSendMessageSubmit = (e: React.FormEvent) => {
@@ -394,21 +422,84 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
-  const handleConfirmDeleteCustomer = async () => {
-    if (!deletingCustomer) return;
-    const targetId = deletingCustomer.id;
-    const res = deleteCustomerAccount(targetId);
-    showToastMsg(res.message);
-    setDeletingCustomer(null);
+  // Handler to open delete modal for single customer or multiple bulk selections
+  const handleOpenDeleteModal = (targetOrTargets: UserAccount | UserAccount[]) => {
+    const list = Array.isArray(targetOrTargets) ? targetOrTargets : [targetOrTargets];
+    if (list.length === 0) return;
+    setCustomerDeleteModal({
+      isOpen: true,
+      targets: list,
+    });
+  };
 
-    // Sync with backend API
+  // Execution of customer deletion with loading state, optimistic UI update, and backend cascade sync
+  const handleExecuteDeleteCustomers = async () => {
+    const targets =
+      customerDeleteModal.isOpen && customerDeleteModal.targets.length > 0
+        ? customerDeleteModal.targets
+        : deletingCustomer
+        ? [deletingCustomer]
+        : [];
+
+    if (targets.length === 0) return;
+    setIsDeletingCustomers(true);
+
+    const targetIds = targets.map((c) => c.id);
+    const targetEmails = targets.map((c) => c.email.toLowerCase());
+
     try {
-      await fetch(`/api/admin/customers/${targetId}`, { method: "DELETE" });
-      await fetchCustomersFromApi(customerPage, customerPageSize, debouncedCustomerFilter, true);
-    } catch (e) {
-      console.warn("Backend delete sync failed:", e);
+      // 1. Send bulk cascade delete request to backend API
+      const res = await fetch("/api/admin/customers", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: targetIds }),
+      });
+
+      const data = await res.json();
+      if (!res.ok && !data.success) {
+        throw new Error(data.error || "Failed to remove customer account from database");
+      }
+
+      // 2. Synchronize with local client-side accounts in portal store
+      if (deleteCustomerAccounts) {
+        await deleteCustomerAccounts(targetIds);
+      } else {
+        targetIds.forEach((id) => deleteCustomerAccount(id));
+      }
+
+      // 3. Optimistically remove deleted accounts from the active table list immediately
+      setCustomerAccountsList((prev) =>
+        prev.filter((c) => !targetIds.includes(c.id) && !targetEmails.includes(c.email.toLowerCase()))
+      );
+
+      // 4. Remove deleted accounts from selection checklist
+      setSelectedCustomerIds((prev) => prev.filter((id) => !targetIds.includes(id)));
+
+      // 5. Display success toast notification
+      showToastMsg(
+        targets.length === 1
+          ? `Customer account for ${targets[0].name} permanently deleted.`
+          : `Successfully deleted ${targets.length} customer accounts and cascade-removed all associated records.`
+      );
+
+      // 6. Close confirmation modal
+      setCustomerDeleteModal({ isOpen: false, targets: [] });
+      setDeletingCustomer(null);
+
+      // 7. Refresh paginated list from backend to keep database counts & page numbers in sync
+      const newTotal = Math.max(0, customerPagination.totalCustomers - targets.length);
+      const newTotalPages = Math.max(1, Math.ceil(newTotal / customerPageSize));
+      const targetPage = customerPage > newTotalPages ? newTotalPages : customerPage;
+      await fetchCustomersFromApi(targetPage, customerPageSize, debouncedCustomerFilter, true);
+    } catch (err: any) {
+      console.error("[Customer Deletion Sync Error]:", err);
+      showToastMsg(err.message || "Failed to delete customer account(s). Please try again.");
+    } finally {
+      setIsDeletingCustomers(false);
     }
   };
+
+  const handleConfirmDeleteCustomer = handleExecuteDeleteCustomers;
 
   const staffAccountsList = useMemo(() => {
     return accounts.filter((a) => a.role === "superadmin" || a.role === "owner");
@@ -2820,6 +2911,24 @@ export const AdminDashboard: React.FC = () => {
                           )}
                         </div>
 
+                        {/* Bulk Delete Action Button (appears when one or more rows are selected) */}
+                        {selectedCustomerIds.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const selectedCustomers = customerAccountsList.filter((c) =>
+                                selectedCustomerIds.includes(c.id)
+                              );
+                              handleOpenDeleteModal(selectedCustomers);
+                            }}
+                            className="py-2.5 px-3.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-rose-600/30 transition-all cursor-pointer animate-in fade-in zoom-in-95 duration-150"
+                            title={`Bulk delete ${selectedCustomerIds.length} selected customer account(s)`}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Bulk Delete ({selectedCustomerIds.length})</span>
+                          </button>
+                        )}
+
                         {/* Direct Refresh from Server API */}
                         <button
                           type="button"
@@ -2912,11 +3021,69 @@ export const AdminDashboard: React.FC = () => {
                       </div>
                     </div>
 
+                    {/* Selection Active Banner */}
+                    {selectedCustomerIds.length > 0 && (
+                      <div className="mb-3 p-3 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 flex flex-wrap items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2 duration-150">
+                        <div className="flex items-center gap-2.5">
+                          <span className="w-5 h-5 rounded-md bg-indigo-600 text-white flex items-center justify-center text-xs font-bold">
+                            ✓
+                          </span>
+                          <span className="text-xs font-bold text-indigo-900 dark:text-indigo-200">
+                            {selectedCustomerIds.length} {selectedCustomerIds.length === 1 ? "customer" : "customers"} selected on this page
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedCustomerIds([])}
+                            className="px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-200/70 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                          >
+                            Deselect All
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const selectedCustomers = customerAccountsList.filter((c) =>
+                                selectedCustomerIds.includes(c.id)
+                              );
+                              handleOpenDeleteModal(selectedCustomers);
+                            }}
+                            className="px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm shadow-rose-600/30 transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Bulk Delete ({selectedCustomerIds.length})</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     {/* 2. Customer View Paginated Data Table */}
                     <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
                       <table className="w-full text-left text-xs border-collapse">
                         <thead>
                           <tr className="bg-slate-50/90 dark:bg-slate-950/80 border-b border-slate-200 dark:border-slate-800 text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                            {/* Selection Column: Select All Checkbox */}
+                            <th className="py-3 px-3 text-center w-10">
+                              <input
+                                type="checkbox"
+                                id="select-all-customers"
+                                checked={
+                                  customerAccountsList.length > 0 &&
+                                  customerAccountsList.every((c) => selectedCustomerIds.includes(c.id))
+                                }
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    const pageIds = customerAccountsList.map((c) => c.id);
+                                    setSelectedCustomerIds((prev) => Array.from(new Set([...prev, ...pageIds])));
+                                  } else {
+                                    const pageIds = new Set(customerAccountsList.map((c) => c.id));
+                                    setSelectedCustomerIds((prev) => prev.filter((id) => !pageIds.has(id)));
+                                  }
+                                }}
+                                className="w-4 h-4 rounded border-slate-300 dark:border-slate-700 text-indigo-600 focus:ring-indigo-500 cursor-pointer accent-indigo-600"
+                                title="Select all customers on current page"
+                              />
+                            </th>
                             <th className="py-3 px-3 text-center">Customer Face</th>
                             <th className="py-3 px-3">Login Account / Username</th>
                             <th className="py-3 px-3">Full Name</th>
@@ -2934,6 +3101,9 @@ export const AdminDashboard: React.FC = () => {
                             /* Loading Skeleton: Pulsing table rows with realistic placeholder elements */
                             Array.from({ length: customerPageSize }).map((_, idx) => (
                               <tr key={`skeleton-row-${idx}`} className="animate-pulse">
+                                <td className="py-3 px-3 text-center">
+                                  <div className="w-4 h-4 rounded bg-slate-200 dark:bg-slate-800 mx-auto" />
+                                </td>
                                 <td className="py-3 px-3 text-center">
                                   <div className="w-11 h-11 rounded-2xl bg-slate-200 dark:bg-slate-800 mx-auto" />
                                 </td>
@@ -2980,7 +3150,7 @@ export const AdminDashboard: React.FC = () => {
                           ) : customerFetchError ? (
                             /* Error State with Retry Button */
                             <tr>
-                              <td colSpan={10} className="py-12 text-center text-xs">
+                              <td colSpan={11} className="py-12 text-center text-xs">
                                 <div className="max-w-md mx-auto p-5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 space-y-3 shadow-xs">
                                   <AlertTriangle className="w-7 h-7 text-rose-500 mx-auto" />
                                   <p className="font-bold text-sm text-rose-700 dark:text-rose-400">
@@ -3003,7 +3173,7 @@ export const AdminDashboard: React.FC = () => {
                           ) : customerAccountsList.length === 0 ? (
                             /* Empty States: Either 0 Search Results or 0 Database Customers */
                             <tr>
-                              <td colSpan={10} className="py-14 text-center text-xs">
+                              <td colSpan={11} className="py-14 text-center text-xs">
                                 <div className="max-w-md mx-auto p-6 rounded-2xl bg-slate-50/80 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-3">
                                   <div className="p-3 w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-400 mx-auto flex items-center justify-center">
                                     <Users className="w-6 h-6" />
@@ -3053,35 +3223,66 @@ export const AdminDashboard: React.FC = () => {
                             /* Live Database Customer Records */
                             customerAccountsList.map((cust) => {
                               const totalWorksUploaded = cust.totalUploads || 0;
-                              const faceSnapshot = cust.lastFaceLoginSnapshot || cust.avatar;
-                              const hasFaceBiometrics = Boolean(cust.lastFaceLoginSnapshot || cust.faceVerified);
+                              const faceSnapshot = cust.avatar || cust.lastFaceLoginSnapshot;
+                              const hasFaceBiometrics = Boolean(cust.lastFaceLoginSnapshot || cust.faceVerified || cust.avatar);
                               const isLiveActive = Boolean(cust.activeSessionId);
+                              const isSelected = selectedCustomerIds.includes(cust.id);
 
                               return (
                                 <tr
                                   key={cust.id}
-                                  className="hover:bg-indigo-50/30 dark:hover:bg-slate-800/40 transition-colors"
+                                  className={`transition-colors ${
+                                    isSelected
+                                      ? "bg-indigo-50/70 dark:bg-indigo-950/40 border-l-4 border-l-indigo-600"
+                                      : "hover:bg-indigo-50/30 dark:hover:bg-slate-800/40"
+                                  }`}
                                 >
+                                  {/* Selection Checkbox */}
+                                  <td className="py-3 px-3 text-center w-10">
+                                    <input
+                                      type="checkbox"
+                                      checked={isSelected}
+                                      onChange={(e) => {
+                                        if (e.target.checked) {
+                                          setSelectedCustomerIds((prev) => [...prev, cust.id]);
+                                        } else {
+                                          setSelectedCustomerIds((prev) => prev.filter((id) => id !== cust.id));
+                                        }
+                                      }}
+                                      className="w-4 h-4 rounded border-slate-300 dark:border-slate-700 text-indigo-600 focus:ring-indigo-500 cursor-pointer accent-indigo-600"
+                                      title={`Select ${cust.name}`}
+                                    />
+                                  </td>
+
                                   {/* 1. Customer Face: Clickable thumbnail opening biometric inspection modal */}
                                   <td className="py-3 px-3 text-center">
                                     <button
                                       type="button"
-                                      onClick={() => setInspectingFaceCustomer(cust)}
+                                      onClick={() => handleOpenFaceInspector(cust)}
                                       className="relative group inline-block focus:outline-none cursor-pointer"
                                       title="Click to inspect Customer Face captured during biometric sign-in"
                                     >
-                                      <div className="w-11 h-11 rounded-2xl overflow-hidden border-2 border-indigo-300 dark:border-indigo-700 group-hover:border-amber-500 group-hover:scale-105 transition-all shadow-sm bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                                      <div className="w-11 h-11 rounded-2xl overflow-hidden border-2 border-indigo-300 dark:border-indigo-700 group-hover:border-amber-500 group-hover:scale-105 transition-all shadow-sm bg-slate-100 dark:bg-slate-800 flex items-center justify-center relative">
                                         {faceSnapshot ? (
                                           <img
                                             src={faceSnapshot}
                                             alt={cust.name}
                                             className="w-full h-full object-cover"
+                                            onError={(e) => {
+                                              const target = e.currentTarget;
+                                              target.style.display = "none";
+                                              const fallback = target.nextElementSibling;
+                                              if (fallback) fallback.classList.remove("hidden");
+                                            }}
                                           />
-                                        ) : (
-                                          <div className="w-full h-full bg-[#000080] text-white flex items-center justify-center font-bold text-sm">
-                                            {cust.name.slice(0, 1).toUpperCase()}
-                                          </div>
-                                        )}
+                                        ) : null}
+                                        <div
+                                          className={`w-full h-full bg-[#000080] text-white flex items-center justify-center font-bold text-sm ${
+                                            faceSnapshot ? "hidden" : ""
+                                          }`}
+                                        >
+                                          {cust.name.slice(0, 1).toUpperCase()}
+                                        </div>
                                       </div>
                                       {/* Biometric Status Badge */}
                                       <span
@@ -3244,7 +3445,7 @@ export const AdminDashboard: React.FC = () => {
                                       {/* Action D: Delete / Remove Customer Option */}
                                       <button
                                         type="button"
-                                        onClick={() => setDeletingCustomer(cust)}
+                                        onClick={() => handleOpenDeleteModal(cust)}
                                         className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/60 dark:hover:bg-rose-900/80 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 transition-colors cursor-pointer"
                                         title="Safely delete customer account from database"
                                       >
@@ -4258,126 +4459,165 @@ export const AdminDashboard: React.FC = () => {
                     </div>
 
                     {/* Modal Body */}
-                    <div className="p-6 overflow-y-auto space-y-6 text-xs">
-                      {/* Side-by-Side Face Comparison */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Box A: Registered Master Profile Photo */}
-                        <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/60 flex flex-col items-center text-center space-y-3">
-                          <div className="flex items-center justify-between w-full">
-                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
-                              Registered Master Photo
-                            </span>
-                            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                              Enrollment Baseline
-                            </span>
-                          </div>
-                          <div className="w-36 h-36 rounded-2xl overflow-hidden border-2 border-slate-300 dark:border-slate-700 shadow-inner bg-slate-200 dark:bg-slate-800 flex items-center justify-center">
-                            {inspectingFaceCustomer.avatar ? (
-                              <img
-                                src={inspectingFaceCustomer.avatar}
-                                alt="Master Registration Avatar"
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-full h-full bg-[#000080] text-white flex items-center justify-center font-bold text-3xl">
-                                {inspectingFaceCustomer.name.slice(0, 1).toUpperCase()}
+                    {(() => {
+                      const masterPhoto = inspectingFaceCustomer.avatar || inspectingFaceCustomer.lastFaceLoginSnapshot;
+                      const snapshotPhoto = inspectingFaceCustomer.lastFaceLoginSnapshot || inspectingFaceCustomer.avatar;
+
+                      return (
+                        <div className="p-6 overflow-y-auto space-y-6 text-xs">
+                          {/* Side-by-Side Face Comparison */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Box A: Registered Master Profile Photo */}
+                            <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/60 flex flex-col items-center text-center space-y-3">
+                              <div className="flex items-center justify-between w-full">
+                                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                                  Registered Master Photo
+                                </span>
+                                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                                  Enrollment Baseline
+                                </span>
                               </div>
-                            )}
-                          </div>
-                          <p className="text-[11px] text-slate-500">
-                            Registered: <strong>{inspectingFaceCustomer.registeredAt || inspectingFaceCustomer.createdAt}</strong>
-                          </p>
-                        </div>
-
-                        {/* Box B: Captured Live Sign-In Face Snapshot */}
-                        <div className="p-4 rounded-2xl border-2 border-emerald-300 dark:border-emerald-700/60 bg-gradient-to-br from-emerald-50/40 via-white to-indigo-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-emerald-950/20 flex flex-col items-center text-center space-y-3 relative shadow-md">
-                          <div className="flex items-center justify-between w-full">
-                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
-                              <Camera className="w-3 h-3 text-emerald-600" />
-                              Sign-In Biometric Snapshot
-                            </span>
-                            <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300">
-                              98.8% Match
-                            </span>
-                          </div>
-                          <div className="w-36 h-36 rounded-2xl overflow-hidden border-2 border-emerald-500 shadow-md bg-slate-200 dark:bg-slate-800 flex items-center justify-center relative">
-                            {inspectingFaceCustomer.lastFaceLoginSnapshot || inspectingFaceCustomer.avatar ? (
-                              <img
-                                src={inspectingFaceCustomer.lastFaceLoginSnapshot || inspectingFaceCustomer.avatar}
-                                alt="Live Biometric Login Snapshot"
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-full h-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center">
-                                <Camera className="w-10 h-10" />
-                              </div>
-                            )}
-                            <div className="absolute inset-0 border border-emerald-400/40 rounded-2xl pointer-events-none" />
-                          </div>
-                          <p className="text-[11px] text-slate-700 dark:text-slate-300 font-semibold">
-                            Captured at: <strong>{inspectingFaceCustomer.faceLoginTimestamp || inspectingFaceCustomer.lastLogin || "Recent Session"}</strong>
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Biometric Verification Metadata Grid */}
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                            Liveness Verification
-                          </span>
-                          <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 mt-1">
-                            <ShieldCheck className="w-3.5 h-3.5" /> Blink Liveness Passed
-                          </span>
-                        </div>
-
-                        <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                            Device & IP Address
-                          </span>
-                          <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block truncate mt-1">
-                            Chrome / Win 11 (49.205.14.88)
-                          </span>
-                        </div>
-
-                        <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                            Security Standard
-                          </span>
-                          <span className="text-xs font-mono font-bold text-indigo-600 dark:text-indigo-400 block mt-1">
-                            AES-256 Vector Embedded
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Recent Biometric Login Snapshots History */}
-                      {inspectingFaceCustomer.faceLoginHistory && inspectingFaceCustomer.faceLoginHistory.length > 0 && (
-                        <div className="space-y-2">
-                          <h4 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                            <History className="w-3.5 h-3.5 text-[#FF9933]" />
-                            <span>Recent Biometric Login History ({inspectingFaceCustomer.faceLoginHistory.length})</span>
-                          </h4>
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                            {inspectingFaceCustomer.faceLoginHistory.slice(0, 4).map((log) => (
-                              <div
-                                key={log.id}
-                                className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 flex flex-col items-center space-y-1 text-center"
-                              >
-                                <div className="w-14 h-14 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-800">
-                                  <img src={log.photo} alt="Snapshot" className="w-full h-full object-cover" />
+                              <div className="w-36 h-36 rounded-2xl overflow-hidden border-2 border-slate-300 dark:border-slate-700 shadow-inner bg-slate-200 dark:bg-slate-800 flex items-center justify-center relative">
+                                {masterPhoto ? (
+                                  <img
+                                    src={masterPhoto}
+                                    alt="Registered Master Photo"
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      const target = e.currentTarget;
+                                      target.style.display = "none";
+                                      const fallback = target.nextElementSibling;
+                                      if (fallback) fallback.classList.remove("hidden");
+                                    }}
+                                  />
+                                ) : null}
+                                <div
+                                  className={`w-full h-full bg-[#000080] text-white flex items-center justify-center font-bold text-3xl ${
+                                    masterPhoto ? "hidden" : ""
+                                  }`}
+                                >
+                                  {inspectingFaceCustomer.name ? inspectingFaceCustomer.name.slice(0, 1).toUpperCase() : "U"}
                                 </div>
-                                <span className="text-[9px] text-slate-400 font-mono truncate w-full">
-                                  {log.timestamp}
+                              </div>
+                              <p className="text-[11px] text-slate-500">
+                                Registered: <strong>{inspectingFaceCustomer.registeredAt || inspectingFaceCustomer.createdAt}</strong>
+                              </p>
+                            </div>
+
+                            {/* Box B: Captured Live Sign-In Face Snapshot */}
+                            <div className="p-4 rounded-2xl border-2 border-emerald-300 dark:border-emerald-700/60 bg-gradient-to-br from-emerald-50/40 via-white to-indigo-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-emerald-950/20 flex flex-col items-center text-center space-y-3 relative shadow-md">
+                              <div className="flex items-center justify-between w-full">
+                                <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
+                                  <Camera className="w-3 h-3 text-emerald-600" />
+                                  Sign-In Biometric Snapshot
                                 </span>
-                                <span className="text-[9px] font-bold text-emerald-600">
-                                  {log.confidence || 98}% Match
+                                <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300">
+                                  98.8% Match
                                 </span>
                               </div>
-                            ))}
+                              <div className="w-36 h-36 rounded-2xl overflow-hidden border-2 border-emerald-500 shadow-md bg-slate-200 dark:bg-slate-800 flex items-center justify-center relative">
+                                {snapshotPhoto ? (
+                                  <img
+                                    src={snapshotPhoto}
+                                    alt="Sign-In Biometric Snapshot"
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      const target = e.currentTarget;
+                                      target.style.display = "none";
+                                      const fallback = target.nextElementSibling;
+                                      if (fallback) fallback.classList.remove("hidden");
+                                    }}
+                                  />
+                                ) : null}
+                                <div
+                                  className={`w-full h-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex flex-col items-center justify-center gap-1 ${
+                                    snapshotPhoto ? "hidden" : ""
+                                  }`}
+                                >
+                                  <Camera className="w-10 h-10" />
+                                  <span className="text-[10px] font-medium text-slate-400">No Biometric Photo</span>
+                                </div>
+                                <div className="absolute inset-0 border border-emerald-400/40 rounded-2xl pointer-events-none" />
+                              </div>
+                              <p className="text-[11px] text-slate-700 dark:text-slate-300 font-semibold">
+                                Captured at: <strong>{inspectingFaceCustomer.faceLoginTimestamp || inspectingFaceCustomer.lastLogin || "Recent Session"}</strong>
+                              </p>
+                            </div>
                           </div>
+
+                          {/* Biometric Verification Metadata Grid */}
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                                Liveness Verification
+                              </span>
+                              <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 mt-1">
+                                <ShieldCheck className="w-3.5 h-3.5" /> Blink Liveness Passed
+                              </span>
+                            </div>
+
+                            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                                Device & IP Address
+                              </span>
+                              <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block truncate mt-1">
+                                Chrome / Win 11 (49.205.14.88)
+                              </span>
+                            </div>
+
+                            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                                Security Standard
+                              </span>
+                              <span className="text-xs font-mono font-bold text-indigo-600 dark:text-indigo-400 block mt-1">
+                                AES-256 Vector Embedded
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Recent Biometric Login Snapshots History */}
+                          {inspectingFaceCustomer.faceLoginHistory && inspectingFaceCustomer.faceLoginHistory.length > 0 && (
+                            <div className="space-y-2">
+                              <h4 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                                <History className="w-3.5 h-3.5 text-[#FF9933]" />
+                                <span>Recent Biometric Login History ({inspectingFaceCustomer.faceLoginHistory.length})</span>
+                              </h4>
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                {inspectingFaceCustomer.faceLoginHistory.slice(0, 4).map((log) => (
+                                  <div
+                                    key={log.id}
+                                    className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 flex flex-col items-center space-y-1 text-center"
+                                  >
+                                    <div className="w-14 h-14 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                                      {log.photo ? (
+                                        <img
+                                          src={log.photo}
+                                          alt="Snapshot"
+                                          className="w-full h-full object-cover"
+                                          onError={(e) => {
+                                            const target = e.currentTarget;
+                                            target.style.display = "none";
+                                            const fallback = target.nextElementSibling;
+                                            if (fallback) fallback.classList.remove("hidden");
+                                          }}
+                                        />
+                                      ) : null}
+                                      <Camera className={`w-5 h-5 text-slate-400 ${log.photo ? "hidden" : ""}`} />
+                                    </div>
+                                    <span className="text-[9px] text-slate-400 font-mono truncate w-full">
+                                      {log.timestamp}
+                                    </span>
+                                    <span className="text-[9px] font-bold text-emerald-600">
+                                      {log.confidence || 98}% Match
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
+                      );
+                    })()}
 
                     {/* Modal Footer */}
                     <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs bg-slate-50/50 dark:bg-slate-950/50">
@@ -4567,57 +4807,125 @@ export const AdminDashboard: React.FC = () => {
               {/* ========================================================= */}
               {/* MODAL 4: DELETE / REMOVE CUSTOMER ACCOUNT CONFIRMATION     */}
               {/* ========================================================= */}
-              {deletingCustomer && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl w-full max-w-md p-6 space-y-4 animate-in zoom-in-95 duration-150">
-                    <div className="flex items-center gap-3 text-rose-600">
-                      <div className="p-2.5 rounded-2xl bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300">
-                        <Trash2 className="w-6 h-6" />
+              {(customerDeleteModal.isOpen || deletingCustomer) && (() => {
+                const targetsToDelete: UserAccount[] =
+                  customerDeleteModal.isOpen && customerDeleteModal.targets.length > 0
+                    ? customerDeleteModal.targets
+                    : deletingCustomer
+                    ? [deletingCustomer]
+                    : [];
+                const isBulk = targetsToDelete.length > 1;
+                const singleTarget = targetsToDelete[0];
+
+                return (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl w-full max-w-lg p-6 space-y-4 animate-in zoom-in-95 duration-150">
+                      <div className="flex items-center gap-3 text-rose-600">
+                        <div className="p-2.5 rounded-2xl bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300">
+                          <Trash2 className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+                            {isBulk
+                              ? `Delete ${targetsToDelete.length} Customer Accounts`
+                              : "Delete Customer Account"}
+                          </h3>
+                          <p className="text-xs text-slate-500">
+                            Dangerous action • Permanent database & vault removal
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
-                          Delete Customer Account
-                        </h3>
-                        <p className="text-xs text-slate-500">
-                          Dangerous action • Permanent account removal
+
+                      <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 text-xs text-rose-900 dark:text-rose-300 space-y-3">
+                        <p className="font-semibold text-rose-800 dark:text-rose-200">
+                          {isBulk
+                            ? `Are you sure you want to permanently delete these ${targetsToDelete.length} customer accounts? This action cannot be undone.`
+                            : "Are you sure you want to permanently delete this customer account? This action cannot be undone."}
                         </p>
-                      </div>
-                    </div>
 
-                    <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 text-xs text-rose-900 dark:text-rose-300 space-y-2">
-                      <p>
-                        Are you sure you want to permanently delete this customer record?
-                      </p>
-                      <div className="p-2.5 rounded-xl bg-white dark:bg-slate-950 border border-rose-200 dark:border-rose-900/50 font-mono text-[11px] space-y-0.5">
-                        <p><strong>Name:</strong> {deletingCustomer.name}</p>
-                        <p><strong>Email:</strong> {deletingCustomer.email}</p>
-                        <p><strong>Account ID:</strong> {deletingCustomer.id}</p>
-                      </div>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                        Associated customer documents and session records will be deleted with strict tenant data isolation. This action cannot be undone.
-                      </p>
-                    </div>
+                        {/* Target Display: Single Customer vs Bulk Customers List */}
+                        {!isBulk && singleTarget ? (
+                          <div className="p-3 rounded-xl bg-white dark:bg-slate-950 border border-rose-200 dark:border-rose-900/50 font-mono text-[11px] space-y-1">
+                            <p><strong>Name:</strong> {singleTarget.name}</p>
+                            <p><strong>Email:</strong> {singleTarget.email}</p>
+                            <p><strong>Phone:</strong> {singleTarget.phone || "N/A"}</p>
+                            <p><strong>Account ID:</strong> {singleTarget.id}</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-1.5">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-rose-700 dark:text-rose-400">
+                              Selected Accounts to be Removed ({targetsToDelete.length}):
+                            </span>
+                            <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1 divide-y divide-rose-100 dark:divide-rose-900/40">
+                              {targetsToDelete.map((target) => (
+                                <div
+                                  key={target.id}
+                                  className="pt-1.5 first:pt-0 flex items-center justify-between text-[11px] font-mono"
+                                >
+                                  <div className="truncate">
+                                    <span className="font-bold text-slate-900 dark:text-white">{target.name}</span>
+                                    <span className="text-slate-500 dark:text-slate-400 ml-2">({target.email})</span>
+                                  </div>
+                                  <span className="text-[10px] text-slate-400 shrink-0 ml-2">{target.phone || target.id}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
 
-                    <div className="flex justify-end gap-2.5 pt-2">
-                      <button
-                        type="button"
-                        onClick={() => setDeletingCustomer(null)}
-                        className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 cursor-pointer"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleConfirmDeleteCustomer}
-                        className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-rose-600/30 transition-colors cursor-pointer"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span>Delete Customer</span>
-                      </button>
+                        <div className="p-2.5 rounded-xl bg-white/70 dark:bg-slate-950/70 border border-rose-200 dark:border-rose-900/40 text-[11px] text-slate-600 dark:text-slate-400 space-y-1">
+                          <p className="flex items-center gap-1.5 font-bold text-rose-700 dark:text-rose-300">
+                            <AlertTriangle className="w-3.5 h-3.5" />
+                            <span>Cascade Deletion & Re-registration Support:</span>
+                          </p>
+                          <ul className="list-disc list-inside space-y-0.5 text-[10px] text-slate-500 dark:text-slate-400">
+                            <li>All related session tokens and active logins will be terminated.</li>
+                            <li>Biometric face logs and uploaded document records in vault will be deleted.</li>
+                            <li>The customer account(s) will completely disappear from Customer View.</li>
+                            <li>These users can freely re-register with their email and phone without duplicate key errors.</li>
+                          </ul>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end gap-2.5 pt-2">
+                        <button
+                          type="button"
+                          disabled={isDeletingCustomers}
+                          onClick={() => {
+                            setCustomerDeleteModal({ isOpen: false, targets: [] });
+                            setDeletingCustomer(null);
+                          }}
+                          className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 disabled:opacity-50 cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isDeletingCustomers}
+                          onClick={handleExecuteDeleteCustomers}
+                          className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:bg-rose-400 text-white text-xs font-bold flex items-center gap-2 shadow-md shadow-rose-600/30 transition-colors cursor-pointer disabled:cursor-not-allowed"
+                        >
+                          {isDeletingCustomers ? (
+                            <>
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                              <span>{isBulk ? "Deleting Accounts..." : "Deleting Account..."}</span>
+                            </>
+                          ) : (
+                            <>
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>
+                                {isBulk
+                                  ? `Confirm Bulk Delete (${targetsToDelete.length})`
+                                  : "Confirm Delete"}
+                              </span>
+                            </>
+                          )}
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
               {/* ========================================================= */}
               {/* FOOTER AREA: CUSTOMER PASSWORD CHANGE REQUESTS APPROVAL BOX*/}
               {/* ========================================================= */}

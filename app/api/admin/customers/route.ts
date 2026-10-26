@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryServerCustomers, registerServerCustomer } from "@/lib/server-customer-store";
+import {
+  queryServerCustomers,
+  registerServerCustomer,
+  deleteServerCustomer,
+  deleteServerCustomers,
+} from "@/lib/server-customer-store";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -81,6 +86,81 @@ export async function POST(req: NextRequest) {
     console.error("[Create Customer API Error]", error);
     return NextResponse.json(
       { success: false, error: error.message || "Failed to create customer account" },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * DELETE /api/admin/customers
+ * Allows Super Admin to securely delete single or multiple customer accounts in bulk.
+ * Cascades to remove related documents, biometric logs, and sessions.
+ * Supports:
+ * - JSON body: { ids: string[] } or { id: string }
+ * - URL search params: ?id=xxx or ?ids=xxx,yyy
+ */
+export async function DELETE(req: NextRequest) {
+  try {
+    let targetIds: string[] = [];
+
+    // 1. Try reading from request body (JSON)
+    try {
+      const body = await req.json();
+      if (Array.isArray(body?.ids)) {
+        targetIds = body.ids.filter(Boolean).map(String);
+      } else if (body?.id) {
+        targetIds = [String(body.id)];
+      }
+    } catch {
+      // Body may be empty if passing via query params
+    }
+
+    // 2. If not found in body, fallback to URL search params
+    if (targetIds.length === 0) {
+      const searchParams = req.nextUrl.searchParams;
+      const paramId = searchParams.get("id");
+      const paramIds = searchParams.get("ids");
+      if (paramIds) {
+        targetIds = paramIds.split(",").map((s) => s.trim()).filter(Boolean);
+      } else if (paramId) {
+        targetIds = [paramId.trim()];
+      }
+    }
+
+    if (targetIds.length === 0) {
+      return NextResponse.json(
+        { success: false, error: "At least one customer ID or email is required for deletion" },
+        { status: 400 }
+      );
+    }
+
+    const result = deleteServerCustomers(targetIds);
+
+    if (result.success && result.deletedCount > 0) {
+      return NextResponse.json({
+        success: true,
+        deletedCount: result.deletedCount,
+        deletedIds: result.deletedIds,
+        deletedAt: new Date().toISOString(),
+        message:
+          result.deletedCount === 1
+            ? "Customer account and all associated documents, biometric logs, and sessions permanently removed."
+            : `Successfully deleted ${result.deletedCount} customer accounts and cascade-removed all associated records.`,
+      });
+    }
+
+    return NextResponse.json(
+      {
+        success: false,
+        deletedCount: 0,
+        error: "No matching customer account found to delete",
+      },
+      { status: 404 }
+    );
+  } catch (error: any) {
+    console.error("[Bulk Delete Customers API Error]", error);
+    return NextResponse.json(
+      { success: false, error: error.message || "Failed to delete customer accounts" },
       { status: 500 }
     );
   }

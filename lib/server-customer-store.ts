@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import { UserAccount, UserSessionRecord, UserActivityLog, FaceLoginLog } from "@/types/portal";
+import { saveFaceImageToStorage } from "./image-storage";
 
 // Persistent file-backed storage paths
 const STORAGE_DIR = path.join(process.cwd(), "storage");
@@ -112,11 +113,17 @@ function enrichCustomerRecord(customer: UserAccount): UserAccount {
       `sess-live-${customer.id}`
     : undefined;
 
+  // Ensure valid photo representation: if customer has avatar or snapshot, cross-link as fallback
+  const avatar = customer.avatar || customer.lastFaceLoginSnapshot;
+  const lastFaceLoginSnapshot = customer.lastFaceLoginSnapshot || customer.avatar;
+
   return {
     ...customer,
+    avatar,
+    lastFaceLoginSnapshot,
     totalUploads,
     activeSessionId,
-    faceVerified: Boolean(customer.lastFaceLoginSnapshot || customer.faceVerified),
+    faceVerified: Boolean(lastFaceLoginSnapshot || avatar || customer.faceVerified),
   };
 }
 
@@ -300,6 +307,12 @@ export function registerServerCustomer(data: Partial<UserAccount>): UserAccount 
       .replace(/[._-]/g, " ")
       .replace(/\b\w/g, (c) => c.toUpperCase());
 
+  const savedAvatar = saveFaceImageToStorage(data.avatar, cleanEmail, "master") || data.avatar;
+  const savedSnapshot =
+    saveFaceImageToStorage(data.lastFaceLoginSnapshot, cleanEmail, "snapshot") ||
+    data.lastFaceLoginSnapshot ||
+    savedAvatar;
+
   const newCustomer: UserAccount = {
     id: data.id || `usr-cust-${Date.now()}`,
     name: displayName,
@@ -310,11 +323,11 @@ export function registerServerCustomer(data: Partial<UserAccount>): UserAccount 
     gender: data.gender || "Male",
     role: "customer",
     status: data.status || "active",
-    avatar: data.avatar,
+    avatar: savedAvatar,
     faceEmbedding: data.faceEmbedding,
-    faceVerified: Boolean(data.faceVerified || data.faceEmbedding || data.lastFaceLoginSnapshot),
-    lastFaceLoginSnapshot: data.lastFaceLoginSnapshot,
-    faceLoginTimestamp: data.faceLoginTimestamp,
+    faceVerified: Boolean(savedAvatar || savedSnapshot || data.faceVerified || data.faceEmbedding),
+    lastFaceLoginSnapshot: savedSnapshot,
+    faceLoginTimestamp: data.faceLoginTimestamp || (savedSnapshot ? nowStr : undefined),
     lastLogin: data.lastLogin || "Never",
     dailyServiceCount: 0,
     monthlyServiceCount: 0,
@@ -374,21 +387,165 @@ export function updateServerCustomer(
 }
 
 /**
- * Deletes customer account and associated sessions from database.
+ * Cascade-deletes all uploaded documents, service links, and storage files for specified customer accounts.
+ */
+function cascadeDeleteCustomerVaultAndFiles(
+  deletedCustomers: { id: string; email: string; username?: string }[]
+): void {
+  if (!deletedCustomers || deletedCustomers.length === 0) return;
+
+  const matchIdentifiers = new Set<string>();
+  deletedCustomers.forEach((c) => {
+    if (c.id) matchIdentifiers.add(c.id.toLowerCase().trim());
+    if (c.email) {
+      const em = c.email.toLowerCase().trim();
+      matchIdentifiers.add(em);
+      const prefix = em.split("@")[0];
+      if (prefix) matchIdentifiers.add(prefix);
+    }
+    if (c.username) matchIdentifiers.add(c.username.toLowerCase().trim());
+  });
+
+  // 1. Cascade-delete from storage/user_documents.json and physical files on disk
+  try {
+    if (fs.existsSync(USER_DOCUMENTS_FILE)) {
+      const raw = fs.readFileSync(USER_DOCUMENTS_FILE, "utf-8");
+      if (raw.trim()) {
+        const docs = JSON.parse(raw);
+        if (Array.isArray(docs)) {
+          const keptDocs: any[] = [];
+          for (const doc of docs) {
+            const uid = String(doc.user_id || "").toLowerCase().trim();
+            const isMatch =
+              matchIdentifiers.has(uid) ||
+              Array.from(matchIdentifiers).some((m) => uid.length > 2 && uid.includes(m));
+
+            if (isMatch) {
+              // Safely unlink physical file from disk if present
+              if (doc.storage_path && typeof doc.storage_path === "string") {
+                try {
+                  const resolvedPath = path.isAbsolute(doc.storage_path)
+                    ? doc.storage_path
+                    : path.join(process.cwd(), doc.storage_path);
+                  if (fs.existsSync(resolvedPath)) {
+                    fs.unlinkSync(resolvedPath);
+                  }
+                } catch (unlinkErr) {
+                  console.warn("[CustomerStore] Failed to unlink file:", doc.storage_path, unlinkErr);
+                }
+              }
+            } else {
+              keptDocs.push(doc);
+            }
+          }
+          fs.writeFileSync(USER_DOCUMENTS_FILE, JSON.stringify(keptDocs, null, 2), "utf-8");
+        }
+      }
+    }
+  } catch (err) {
+    console.error("[CustomerStore] Error cascade-deleting from user_documents.json:", err);
+  }
+
+  // 2. Cascade-delete from storage/service_linked_documents.json
+  try {
+    if (fs.existsSync(SERVICE_LINKS_FILE)) {
+      const raw = fs.readFileSync(SERVICE_LINKS_FILE, "utf-8");
+      if (raw.trim()) {
+        const links = JSON.parse(raw);
+        if (Array.isArray(links)) {
+          const keptLinks = links.filter((link) => {
+            const uid = String(link.user_id || "").toLowerCase().trim();
+            return (
+              !matchIdentifiers.has(uid) &&
+              !Array.from(matchIdentifiers).some((m) => uid.length > 2 && uid.includes(m))
+            );
+          });
+          fs.writeFileSync(SERVICE_LINKS_FILE, JSON.stringify(keptLinks, null, 2), "utf-8");
+        }
+      }
+    }
+  } catch (err) {
+    console.error("[CustomerStore] Error cascade-deleting from service_linked_documents.json:", err);
+  }
+}
+
+/**
+ * Deletes customer account and cascade-removes associated sessions, documents, and vault records.
  */
 export function deleteServerCustomer(id: string): boolean {
-  const current = readCustomersFromDisk();
-  const initialLen = current.length;
-  const filtered = current.filter(
-    (c) => c.id !== id && c.email.toLowerCase() !== id.toLowerCase()
+  const result = deleteServerCustomers([id]);
+  return result.deletedCount > 0;
+}
+
+/**
+ * Bulk deletes customer accounts and cascade-removes associated sessions, documents, and vault records.
+ */
+export function deleteServerCustomers(idsOrEmails: string[]): {
+  success: boolean;
+  deletedCount: number;
+  deletedIds: string[];
+} {
+  if (!Array.isArray(idsOrEmails) || idsOrEmails.length === 0) {
+    return { success: false, deletedCount: 0, deletedIds: [] };
+  }
+
+  const cleanTargets = new Set(
+    idsOrEmails
+      .filter(Boolean)
+      .map((x) => {
+        try {
+          return decodeURIComponent(String(x)).toLowerCase().trim();
+        } catch {
+          return String(x).toLowerCase().trim();
+        }
+      })
   );
 
-  if (filtered.length < initialLen) {
-    writeCustomersToDisk(filtered);
-    cachedCustomers = filtered.map(enrichCustomerRecord);
-    return true;
+  const current = readCustomersFromDisk();
+  const deletedCustomers: UserAccount[] = [];
+  const keptCustomers: UserAccount[] = [];
+
+  for (const c of current) {
+    const cId = String(c.id || "").toLowerCase().trim();
+    const cEmail = String(c.email || "").toLowerCase().trim();
+    const cUsername = String(c.username || "").toLowerCase().trim();
+    const cPhone = String(c.phone || "").replace(/\s+/g, "");
+
+    const isMatch =
+      cleanTargets.has(cId) ||
+      cleanTargets.has(cEmail) ||
+      cleanTargets.has(cUsername) ||
+      (cPhone && cleanTargets.has(cPhone));
+
+    if (isMatch) {
+      deletedCustomers.push(c);
+    } else {
+      keptCustomers.push(c);
+    }
   }
-  return false;
+
+  if (deletedCustomers.length > 0) {
+    // 1. Write updated customer accounts to disk
+    writeCustomersToDisk(keptCustomers);
+    cachedCustomers = keptCustomers.map(enrichCustomerRecord);
+
+    // 2. Cascade delete documents, vault records, session files
+    cascadeDeleteCustomerVaultAndFiles(
+      deletedCustomers.map((c) => ({
+        id: c.id,
+        email: c.email,
+        username: c.username,
+      }))
+    );
+
+    return {
+      success: true,
+      deletedCount: deletedCustomers.length,
+      deletedIds: deletedCustomers.map((c) => c.id),
+    };
+  }
+
+  return { success: false, deletedCount: 0, deletedIds: [] };
 }
 
 /**
@@ -409,14 +566,15 @@ export function recordServerFaceLogin(
   });
 
   const sessionToken = `sess-face-${Date.now()}-${crypto.randomBytes(4).toString("hex")}`;
+  const savedPhoto = saveFaceImageToStorage(photo, clean, "snapshot") || photo;
   let customer = findServerCustomer(clean);
 
   if (!customer) {
     // If not in database yet, auto-register customer with this face biometric
     customer = registerServerCustomer({
       email: clean,
-      avatar: photo,
-      lastFaceLoginSnapshot: photo,
+      avatar: savedPhoto,
+      lastFaceLoginSnapshot: savedPhoto,
       faceLoginTimestamp: nowStr,
       faceVerified: true,
       lastLogin: nowStr,
@@ -447,7 +605,7 @@ export function recordServerFaceLogin(
 
   const newFaceLog: FaceLoginLog = {
     id: `face-log-${Date.now()}`,
-    photo,
+    photo: savedPhoto,
     timestamp: nowStr,
     confidence,
     status: "verified",
@@ -459,7 +617,8 @@ export function recordServerFaceLogin(
   const updatedFaceHistory = [newFaceLog, ...(customer.faceLoginHistory || [])];
 
   return updateServerCustomer(customer.id, {
-    lastFaceLoginSnapshot: photo,
+    avatar: customer.avatar || savedPhoto,
+    lastFaceLoginSnapshot: savedPhoto,
     faceLoginTimestamp: nowStr,
     faceVerified: true,
     lastLogin: nowStr,
